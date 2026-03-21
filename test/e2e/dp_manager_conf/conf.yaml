@@ -1,0 +1,10 @@
+server:
+  listen:
+    host: "0.0.0.0"
+    port: 7900
+    tls_port: 7943
+database:
+  dsn: "postgres://api7:api7@postgresql:5432/api7?sslmode=disable"
+log:
+  level: warn
+  output: stderr

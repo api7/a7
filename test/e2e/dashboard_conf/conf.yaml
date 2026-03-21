@@ -1,0 +1,12 @@
+server:
+  listen:
+    host: "0.0.0.0"
+    port: 7080
+    tls_port: 7443
+database:
+  dsn: "postgres://api7:api7@postgresql:5432/api7?sslmode=disable"
+authentication:
+  token_expire_time: 86400
+log:
+  level: warn
+  output: stderr

@@ -1,0 +1,23 @@
+apisix:
+  node_listen:
+    - 9080
+  ssl:
+    listen:
+      - port: 9443
+  admin_listen:
+    ip: 0.0.0.0
+    port: 9180
+  enable_admin: true
+  config_center: yaml
+deployment:
+  role: data_plane
+  role_data_plane:
+    config_provider: control_plane
+    control_plane:
+      host:
+        - "https://dp-manager:7943"
+      prefix: "/apisix"
+      timeout: 30
+  certs:
+    cert: /usr/local/apisix/conf/ssl/cert.pem
+    cert_key: /usr/local/apisix/conf/ssl/key.pem

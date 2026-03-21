@@ -8,7 +8,7 @@ LDFLAGS := -s -w \
 	-X $(MODULE)/internal/version.Commit=$(COMMIT) \
 	-X $(MODULE)/internal/version.Date=$(DATE)
 
-.PHONY: build test test-verbose lint fmt vet check install clean test-e2e
+.PHONY: build test test-verbose lint fmt vet check install clean docker-up docker-down test-e2e
 
 build:
 	go build -ldflags "$(LDFLAGS)" -o bin/$(BINARY) ./cmd/a7
@@ -36,6 +36,12 @@ install: build
 
 clean:
 	rm -rf bin/
+
+docker-up:
+	docker compose -f test/e2e/docker-compose.yml up -d --wait --wait-timeout 120
+
+docker-down:
+	docker compose -f test/e2e/docker-compose.yml down -v
 
 test-e2e:
 	go test ./test/e2e/... -count=1 -v -tags=e2e

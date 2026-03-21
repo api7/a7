@@ -1,0 +1,69 @@
+services:
+  postgresql:
+    image: api7/postgresql:15.4.0-debian-11-r45
+    environment:
+      POSTGRESQL_USERNAME: api7
+      POSTGRESQL_PASSWORD: api7
+      POSTGRESQL_DATABASE: api7
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "api7"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [a7-test]
+
+  prometheus:
+    image: api7/prometheus:2.48.1-debian-11-r0
+    ports: ["9090:9090"]
+    networks: [a7-test]
+
+  dashboard:
+    image: api7/api7-ee-3-integrated:${API7_VERSION:-v3.2.16.4}
+    restart: always
+    volumes:
+      - ./dashboard_conf/conf.yaml:/usr/local/api7/conf/conf.yaml:ro
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    ports:
+      - "7080:7080"
+      - "7443:7443"
+    networks: [a7-test]
+
+  dp-manager:
+    image: api7/api7-ee-dp-manager:${API7_VERSION:-v3.2.16.4}
+    restart: always
+    volumes:
+      - ./dp_manager_conf/conf.yaml:/usr/local/api7/conf/conf.yaml:ro
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    ports:
+      - "7900:7900"
+      - "7943:7943"
+    networks: [a7-test]
+
+  gateway:
+    image: api7/api7-ee-3-gateway:${GATEWAY_VERSION:-3.9.6}
+    restart: always
+    volumes:
+      - ./gateway_conf/config.yaml:/usr/local/apisix/conf/config.yaml:ro
+      - ./gateway_conf/apisix.uid:/usr/local/apisix/conf/apisix.uid:ro
+    depends_on:
+      - dp-manager
+    ports:
+      - "9080:9080"
+      - "9443:9443"
+      - "9180:9180"
+    networks: [a7-test]
+
+  httpbin:
+    image: ghcr.io/mccutchen/go-httpbin
+    restart: always
+    ports: ["8080:8080"]
+    networks: [a7-test]
+
+networks:
+  a7-test:
+    driver: bridge
