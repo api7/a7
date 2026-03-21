@@ -1,0 +1,48 @@
+project_name: a7
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: ./cmd/a7
+    binary: a7
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+      - -X github.com/api7/a7/internal/version.Version={{.Version}}
+      - -X github.com/api7/a7/internal/version.Commit={{.ShortCommit}}
+      - -X github.com/api7/a7/internal/version.Date={{.Date}}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+
+release:
+  github:
+    owner: api7
+    name: a7
+  draft: false
+  prerelease: auto
