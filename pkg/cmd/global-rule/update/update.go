@@ -19,6 +19,7 @@ type Options struct {
 	Client       func() (*http.Client, error)
 	Config       func() (config.Config, error)
 	Output       string
+	File         string
 	GatewayGroup string
 	ID           string
 
@@ -40,6 +41,7 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 	}
 
 	c.Flags().StringVar(&opts.PluginsJSON, "plugins-json", "", "Plugins as JSON map")
+	c.Flags().StringVarP(&opts.File, "file", "f", "", "Path to JSON/YAML file with resource definition")
 
 	return c
 }
@@ -64,6 +66,23 @@ func actionRun(opts *Options) error {
 	httpClient, err := opts.Client()
 	if err != nil {
 		return err
+	}
+
+	if opts.File != "" {
+		payload, err := cmdutil.ReadResourceFile(opts.File, opts.IO.In)
+		if err != nil {
+			return err
+		}
+		client := api.NewClient(httpClient, cfg.BaseURL())
+		body, err := client.Put("/apisix/admin/global_rules/"+opts.ID+"?gateway_group_id="+ggID, payload)
+		if err != nil {
+			return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
+		}
+		format := opts.Output
+		if format == "" {
+			format = "json"
+		}
+		return cmdutil.NewExporter(format, opts.IO.Out).Write(json.RawMessage(body))
 	}
 
 	plugins := make(map[string]interface{})

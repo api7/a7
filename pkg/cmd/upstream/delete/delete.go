@@ -1,8 +1,10 @@
 package delete
 
 import (
+	"bufio"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -19,6 +21,7 @@ type Options struct {
 	Config       func() (config.Config, error)
 	GatewayGroup string
 	ID           string
+	Force        bool
 }
 
 func NewCmd(f *cmd.Factory) *cobra.Command {
@@ -33,6 +36,7 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 			return actionRun(opts)
 		},
 	}
+	c.Flags().BoolVar(&opts.Force, "force", false, "Skip confirmation prompt")
 
 	return c
 }
@@ -58,6 +62,19 @@ func actionRun(opts *Options) error {
 
 	client := api.NewClient(httpClient, cfg.BaseURL())
 	query := map[string]string{"gateway_group_id": ggID}
+	if !opts.Force && opts.IO.IsStdinTTY() {
+		fmt.Fprintf(opts.IO.ErrOut, "Delete upstream %q? (y/N): ", opts.ID)
+		reader := bufio.NewReader(opts.IO.In)
+		answer, err := reader.ReadString('\n')
+		if err != nil {
+			return fmt.Errorf("failed to read confirmation: %w", err)
+		}
+		answer = strings.TrimSpace(strings.ToLower(answer))
+		if answer != "y" && answer != "yes" {
+			fmt.Fprintln(opts.IO.ErrOut, "Aborted.")
+			return nil
+		}
+	}
 	if _, err := client.Delete("/apisix/admin/upstreams/"+opts.ID, query); err != nil {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
 	}

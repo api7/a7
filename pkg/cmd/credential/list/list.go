@@ -22,6 +22,7 @@ type Options struct {
 	Output       string
 	GatewayGroup string
 	Consumer     string
+	Label        string
 }
 
 func NewCmd(f *cmd.Factory) *cobra.Command {
@@ -35,11 +36,13 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 			opts.Output, _ = c.Flags().GetString("output")
 			opts.GatewayGroup, _ = c.Flags().GetString("gateway-group")
 			opts.Consumer, _ = c.Flags().GetString("consumer")
+			opts.Label, _ = c.Flags().GetString("label")
 			return actionRun(opts)
 		},
 	}
 
 	c.Flags().StringVar(&opts.Consumer, "consumer", "", "Consumer username")
+	c.Flags().StringVar(&opts.Label, "label", "", "Filter by label (key=value)")
 	_ = c.MarkFlagRequired("consumer")
 
 	return c
@@ -70,7 +73,12 @@ func actionRun(opts *Options) error {
 
 	path := "/apisix/admin/consumers/" + opts.Consumer + "/credentials"
 	client := api.NewClient(httpClient, cfg.BaseURL())
-	body, err := client.Get(path, map[string]string{"gateway_group_id": ggID})
+	query := map[string]string{"gateway_group_id": ggID}
+	labelKey, labelValue := cmdutil.ParseLabel(opts.Label)
+	if labelKey != "" {
+		query["label"] = labelKey
+	}
+	body, err := client.Get(path, query)
 	if err != nil {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
 	}
@@ -78,6 +86,16 @@ func actionRun(opts *Options) error {
 	var resp api.ListResponse[api.Credential]
 	if err := json.Unmarshal(body, &resp); err != nil {
 		return fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if labelValue != "" {
+		filtered := make([]api.Credential, 0)
+		for _, item := range resp.List {
+			if item.Labels != nil && item.Labels[labelKey] == labelValue {
+				filtered = append(filtered, item)
+			}
+		}
+		resp.List = filtered
 	}
 
 	if opts.Output != "" {

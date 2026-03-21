@@ -2,6 +2,8 @@ package update
 
 import (
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -54,4 +56,34 @@ func TestUpdateRoute_InvalidLabel(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "invalid label") {
 		t.Fatalf("expected invalid label error, got: %v", err)
 	}
+}
+
+func TestUpdateRoute_FromFile(t *testing.T) {
+	ios, _, out, _ := iostreams.Test()
+	registry := &httpmock.Registry{}
+	registry.Register(http.MethodPut, "/apisix/admin/routes/r2", httpmock.JSONResponse(`{"id":"r2","name":"from-file"}`))
+
+	filePath := filepath.Join(t.TempDir(), "route.json")
+	if err := os.WriteFile(filePath, []byte(`{"name":"from-file","uri":"/from-file"}`), 0o644); err != nil {
+		t.Fatalf("failed to write temp route file: %v", err)
+	}
+
+	opts := &Options{
+		IO:     ios,
+		Client: func() (*http.Client, error) { return registry.GetClient(), nil },
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
+		},
+		ID:           "r2",
+		File:         filePath,
+		GatewayGroup: "gg1",
+	}
+
+	if err := actionRun(opts); err != nil {
+		t.Fatalf("actionRun failed: %v", err)
+	}
+	if !strings.Contains(out.String(), "from-file") {
+		t.Fatalf("expected file-based updated route output: %s", out.String())
+	}
+	registry.Verify(t)
 }

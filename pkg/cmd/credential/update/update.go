@@ -20,6 +20,7 @@ type Options struct {
 	Client       func() (*http.Client, error)
 	Config       func() (config.Config, error)
 	Output       string
+	File         string
 	GatewayGroup string
 	Consumer     string
 	ID           string
@@ -48,6 +49,7 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 	c.Flags().StringVar(&opts.Desc, "desc", "", "Credential description")
 	c.Flags().StringVar(&opts.PluginsJSON, "plugins-json", "", "Plugins JSON string")
 	c.Flags().StringSliceVar(&opts.Labels, "labels", nil, "Labels in key=value format")
+	c.Flags().StringVarP(&opts.File, "file", "f", "", "Path to JSON/YAML file with resource definition")
 	_ = c.MarkFlagRequired("consumer")
 
 	return c
@@ -76,6 +78,24 @@ func actionRun(opts *Options) error {
 		return err
 	}
 
+	path := "/apisix/admin/consumers/" + opts.Consumer + "/credentials/" + opts.ID + "?gateway_group_id=" + ggID
+	if opts.File != "" {
+		payload, err := cmdutil.ReadResourceFile(opts.File, opts.IO.In)
+		if err != nil {
+			return err
+		}
+		client := api.NewClient(httpClient, cfg.BaseURL())
+		body, err := client.Put(path, payload)
+		if err != nil {
+			return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
+		}
+		format := opts.Output
+		if format == "" {
+			format = "json"
+		}
+		return cmdutil.NewExporter(format, opts.IO.Out).Write(json.RawMessage(body))
+	}
+
 	pl := make(map[string]interface{})
 	if opts.PluginsJSON != "" {
 		if err := json.Unmarshal([]byte(opts.PluginsJSON), &pl); err != nil {
@@ -100,7 +120,6 @@ func actionRun(opts *Options) error {
 		bodyReq.Labels = labels
 	}
 
-	path := "/apisix/admin/consumers/" + opts.Consumer + "/credentials/" + opts.ID + "?gateway_group_id=" + ggID
 	client := api.NewClient(httpClient, cfg.BaseURL())
 	body, err := client.Put(path, bodyReq)
 	if err != nil {

@@ -21,6 +21,7 @@ type Options struct {
 	Config       func() (config.Config, error)
 	Output       string
 	GatewayGroup string
+	Label        string
 }
 
 func NewCmd(f *cmd.Factory) *cobra.Command {
@@ -33,9 +34,11 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.Output, _ = c.Flags().GetString("output")
 			opts.GatewayGroup, _ = c.Flags().GetString("gateway-group")
+			opts.Label, _ = c.Flags().GetString("label")
 			return actionRun(opts)
 		},
 	}
+	c.Flags().StringVar(&opts.Label, "label", "", "Filter by label (key=value)")
 
 	return c
 }
@@ -61,6 +64,10 @@ func actionRun(opts *Options) error {
 
 	client := api.NewClient(httpClient, cfg.BaseURL())
 	query := map[string]string{"gateway_group_id": ggID}
+	labelKey, labelValue := cmdutil.ParseLabel(opts.Label)
+	if labelKey != "" {
+		query["label"] = labelKey
+	}
 	body, err := client.Get("/apisix/admin/protos", query)
 	if err != nil {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
@@ -69,6 +76,16 @@ func actionRun(opts *Options) error {
 	var resp api.ListResponse[api.Proto]
 	if err := json.Unmarshal(body, &resp); err != nil {
 		return fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if labelValue != "" {
+		filtered := make([]api.Proto, 0)
+		for _, item := range resp.List {
+			if item.Labels != nil && item.Labels[labelKey] == labelValue {
+				filtered = append(filtered, item)
+			}
+		}
+		resp.List = filtered
 	}
 
 	if opts.Output != "" {

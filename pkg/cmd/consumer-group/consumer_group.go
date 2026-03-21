@@ -6,6 +6,7 @@ import (
 	cmd "github.com/api7/a7/pkg/cmd"
 	"github.com/api7/a7/pkg/cmd/consumer-group/create"
 	del "github.com/api7/a7/pkg/cmd/consumer-group/delete"
+	"github.com/api7/a7/pkg/cmd/consumer-group/export"
 	"github.com/api7/a7/pkg/cmd/consumer-group/get"
 	"github.com/api7/a7/pkg/cmd/consumer-group/list"
 	"github.com/api7/a7/pkg/cmd/consumer-group/update"
@@ -23,6 +24,7 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 	c.AddCommand(create.NewCmd(f))
 	c.AddCommand(update.NewCmd(f))
 	c.AddCommand(del.NewCmd(f))
+	c.AddCommand(export.NewCmd(f))
 
 	return c
 }

@@ -22,6 +22,7 @@ type Options struct {
 	Output       string
 	GatewayGroup string
 	Consumer     string
+	File         string
 
 	Desc        string
 	PluginsJSON string
@@ -43,10 +44,10 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 	}
 
 	c.Flags().StringVar(&opts.Consumer, "consumer", "", "Consumer username")
+	c.Flags().StringVarP(&opts.File, "file", "f", "", "Path to JSON/YAML file with resource definition")
 	c.Flags().StringVar(&opts.Desc, "desc", "", "Credential description")
 	c.Flags().StringVar(&opts.PluginsJSON, "plugins-json", "", "Plugins JSON string")
 	c.Flags().StringSliceVar(&opts.Labels, "labels", nil, "Labels in key=value format")
-	_ = c.MarkFlagRequired("consumer")
 
 	return c
 }
@@ -67,6 +68,35 @@ func actionRun(opts *Options) error {
 	}
 	if ggID == "" {
 		return fmt.Errorf("gateway group is required; use --gateway-group flag or set a default in context config")
+	}
+	if opts.File != "" {
+		payload, err := cmdutil.ReadResourceFile(opts.File, opts.IO.In)
+		if err != nil {
+			return err
+		}
+
+		httpClient, err := opts.Client()
+		if err != nil {
+			return err
+		}
+
+		path := "/apisix/admin/consumers/" + opts.Consumer + "/credentials?gateway_group_id=" + ggID
+		client := api.NewClient(httpClient, cfg.BaseURL())
+		var body []byte
+		if id, ok := payload["id"]; ok {
+			body, err = client.Put(fmt.Sprintf("/apisix/admin/consumers/%s/credentials/%v?gateway_group_id=%s", opts.Consumer, id, ggID), payload)
+		} else {
+			body, err = client.Post(path, payload)
+		}
+		if err != nil {
+			return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
+		}
+
+		format := opts.Output
+		if format == "" {
+			format = "json"
+		}
+		return cmdutil.NewExporter(format, opts.IO.Out).Write(json.RawMessage(body))
 	}
 
 	httpClient, err := opts.Client()

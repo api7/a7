@@ -20,6 +20,7 @@ type Options struct {
 	Config       func() (config.Config, error)
 	Output       string
 	GatewayGroup string
+	File         string
 
 	ID          string
 	PluginsJSON string
@@ -39,10 +40,8 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 	}
 
 	c.Flags().StringVar(&opts.ID, "id", "", "Global rule ID")
+	c.Flags().StringVarP(&opts.File, "file", "f", "", "Path to JSON/YAML file with resource definition")
 	c.Flags().StringVar(&opts.PluginsJSON, "plugins-json", "", "Plugins as JSON map")
-	if err := c.MarkFlagRequired("id"); err != nil {
-		return nil
-	}
 
 	return c
 }
@@ -59,6 +58,34 @@ func actionRun(opts *Options) error {
 	}
 	if ggID == "" {
 		return fmt.Errorf("gateway group is required; use --gateway-group flag or set a default in context config")
+	}
+	if opts.File != "" {
+		payload, err := cmdutil.ReadResourceFile(opts.File, opts.IO.In)
+		if err != nil {
+			return err
+		}
+
+		httpClient, err := opts.Client()
+		if err != nil {
+			return err
+		}
+
+		client := api.NewClient(httpClient, cfg.BaseURL())
+		var body []byte
+		if id, ok := payload["id"]; ok {
+			body, err = client.Put(fmt.Sprintf("/apisix/admin/global_rules/%v?gateway_group_id=%s", id, ggID), payload)
+		} else {
+			body, err = client.Post("/apisix/admin/global_rules?gateway_group_id="+ggID, payload)
+		}
+		if err != nil {
+			return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
+		}
+
+		format := opts.Output
+		if format == "" {
+			format = "json"
+		}
+		return cmdutil.NewExporter(format, opts.IO.Out).Write(json.RawMessage(body))
 	}
 	if opts.ID == "" {
 		return fmt.Errorf("--id is required")

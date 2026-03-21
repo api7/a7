@@ -21,6 +21,7 @@ type Options struct {
 	Config       func() (config.Config, error)
 	Output       string
 	GatewayGroup string
+	File         string
 
 	Name       string
 	Desc       string
@@ -43,14 +44,11 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 	}
 
 	c.Flags().StringVar(&opts.Name, "name", "", "Service name")
+	c.Flags().StringVarP(&opts.File, "file", "f", "", "Path to JSON/YAML file with resource definition")
 	c.Flags().StringVar(&opts.Desc, "desc", "", "Service description")
 	c.Flags().StringVar(&opts.UpstreamID, "upstream-id", "", "Bound upstream ID")
 	c.Flags().StringSliceVar(&opts.Labels, "labels", nil, "Labels in key=value format")
 	c.Flags().StringVar(&opts.Host, "host", "", "Service host")
-	if err := c.MarkFlagRequired("name"); err != nil {
-		return nil
-	}
-
 	return c
 }
 
@@ -66,6 +64,34 @@ func actionRun(opts *Options) error {
 	}
 	if ggID == "" {
 		return fmt.Errorf("gateway group is required; use --gateway-group flag or set a default in context config")
+	}
+	if opts.File != "" {
+		payload, err := cmdutil.ReadResourceFile(opts.File, opts.IO.In)
+		if err != nil {
+			return err
+		}
+
+		httpClient, err := opts.Client()
+		if err != nil {
+			return err
+		}
+
+		client := api.NewClient(httpClient, cfg.BaseURL())
+		var body []byte
+		if id, ok := payload["id"]; ok {
+			body, err = client.Put(fmt.Sprintf("/apisix/admin/services/%v?gateway_group_id=%s", id, ggID), payload)
+		} else {
+			body, err = client.Post("/apisix/admin/services?gateway_group_id="+ggID, payload)
+		}
+		if err != nil {
+			return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
+		}
+
+		format := opts.Output
+		if format == "" {
+			format = "json"
+		}
+		return cmdutil.NewExporter(format, opts.IO.Out).Write(json.RawMessage(body))
 	}
 	if opts.Name == "" {
 		return fmt.Errorf("--name is required")

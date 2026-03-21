@@ -1,8 +1,10 @@
 package delete
 
 import (
+	"bufio"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -20,6 +22,7 @@ type Options struct {
 	GatewayGroup string
 	Consumer     string
 	ID           string
+	Force        bool
 }
 
 func NewCmd(f *cmd.Factory) *cobra.Command {
@@ -37,6 +40,7 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 	}
 
 	c.Flags().StringVar(&opts.Consumer, "consumer", "", "Consumer username")
+	c.Flags().BoolVar(&opts.Force, "force", false, "Skip confirmation prompt")
 	_ = c.MarkFlagRequired("consumer")
 
 	return c
@@ -67,6 +71,19 @@ func actionRun(opts *Options) error {
 
 	path := "/apisix/admin/consumers/" + opts.Consumer + "/credentials/" + opts.ID
 	client := api.NewClient(httpClient, cfg.BaseURL())
+	if !opts.Force && opts.IO.IsStdinTTY() {
+		fmt.Fprintf(opts.IO.ErrOut, "Delete credential %q? (y/N): ", opts.ID)
+		reader := bufio.NewReader(opts.IO.In)
+		answer, err := reader.ReadString('\n')
+		if err != nil {
+			return fmt.Errorf("failed to read confirmation: %w", err)
+		}
+		answer = strings.TrimSpace(strings.ToLower(answer))
+		if answer != "y" && answer != "yes" {
+			fmt.Fprintln(opts.IO.ErrOut, "Aborted.")
+			return nil
+		}
+	}
 	if _, err := client.Delete(path, map[string]string{"gateway_group_id": ggID}); err != nil {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
 	}

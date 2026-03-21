@@ -19,6 +19,7 @@ type Options struct {
 	Client      func() (*http.Client, error)
 	Config      func() (config.Config, error)
 	Output      string
+	File        string
 	Name        string
 	Description string
 	Labels      []string
@@ -49,6 +50,7 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 	}
 
 	c.Flags().StringVar(&opts.Name, "name", "", "Service template name")
+	c.Flags().StringVarP(&opts.File, "file", "f", "", "Path to JSON/YAML file with resource definition")
 	c.Flags().StringVar(&opts.Description, "description", "", "Service template description")
 	c.Flags().StringSliceVar(&opts.Labels, "labels", nil, "Labels in key=value format")
 	c.Flags().StringSliceVar(&opts.Hosts, "host", nil, "Host to match (repeatable)")
@@ -58,13 +60,42 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 }
 
 func actionRun(opts *Options) error {
-	if opts.Name == "" {
-		return fmt.Errorf("required flag(s) \"name\" not set")
-	}
-
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
+	}
+
+	if opts.File != "" {
+		payload, err := cmdutil.ReadResourceFile(opts.File, opts.IO.In)
+		if err != nil {
+			return err
+		}
+
+		httpClient, err := opts.Client()
+		if err != nil {
+			return err
+		}
+
+		client := api.NewClient(httpClient, cfg.BaseURL())
+		var body []byte
+		if id, ok := payload["id"]; ok {
+			body, err = client.Put(fmt.Sprintf("/api/services/template/%v", id), payload)
+		} else {
+			body, err = client.Post("/api/services/template", payload)
+		}
+		if err != nil {
+			return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
+		}
+
+		format := opts.Output
+		if format == "" {
+			format = "json"
+		}
+		return cmdutil.NewExporter(format, opts.IO.Out).Write(json.RawMessage(body))
+	}
+
+	if opts.Name == "" {
+		return fmt.Errorf("required flag(s) \"name\" not set")
 	}
 
 	httpClient, err := opts.Client()

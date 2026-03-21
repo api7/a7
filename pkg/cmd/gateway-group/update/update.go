@@ -21,6 +21,7 @@ type Options struct {
 	Client      func() (*http.Client, error)
 	Config      func() (config.Config, error)
 	Output      string
+	File        string
 	ID          string
 	Name        string
 	Description string
@@ -49,6 +50,7 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 	c.Flags().StringVar(&opts.Description, "description", "", "Gateway group description")
 	c.Flags().StringArrayVar(&opts.Labels, "labels", nil, "Gateway group label in key=value format (repeatable)")
 	c.Flags().StringVar(&opts.Prefix, "prefix", "", "Gateway group route prefix")
+	c.Flags().StringVarP(&opts.File, "file", "f", "", "Path to JSON/YAML file with resource definition")
 
 	return c
 }
@@ -62,6 +64,23 @@ func updateRun(opts *Options) error {
 	httpClient, err := opts.Client()
 	if err != nil {
 		return err
+	}
+
+	if opts.File != "" {
+		payload, err := cmdutil.ReadResourceFile(opts.File, opts.IO.In)
+		if err != nil {
+			return err
+		}
+		client := api.NewClient(httpClient, cfg.BaseURL())
+		body, err := client.Put("/api/gateway_groups/"+opts.ID, payload)
+		if err != nil {
+			return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
+		}
+		format := opts.Output
+		if format == "" {
+			format = "json"
+		}
+		return cmdutil.NewExporter(format, opts.IO.Out).Write(json.RawMessage(body))
 	}
 
 	labels := map[string]string{}

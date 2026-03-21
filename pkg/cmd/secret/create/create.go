@@ -21,6 +21,7 @@ type Options struct {
 	Config       func() (config.Config, error)
 	Output       string
 	GatewayGroup string
+	File         string
 
 	ID     string
 	URI    string
@@ -43,6 +44,7 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 	}
 
 	c.Flags().StringVar(&opts.ID, "id", "", "Secret provider ID")
+	c.Flags().StringVarP(&opts.File, "file", "f", "", "Path to JSON/YAML file with resource definition")
 	c.Flags().StringVar(&opts.URI, "uri", "", "Secret provider URI")
 	c.Flags().StringVar(&opts.Prefix, "prefix", "", "Secret provider prefix")
 	c.Flags().StringVar(&opts.Token, "token", "", "Secret provider token")
@@ -63,6 +65,34 @@ func actionRun(opts *Options) error {
 	}
 	if ggID == "" {
 		return fmt.Errorf("gateway group is required; use --gateway-group flag or set a default in context config")
+	}
+	if opts.File != "" {
+		payload, err := cmdutil.ReadResourceFile(opts.File, opts.IO.In)
+		if err != nil {
+			return err
+		}
+
+		httpClient, err := opts.Client()
+		if err != nil {
+			return err
+		}
+
+		client := api.NewClient(httpClient, cfg.BaseURL())
+		var body []byte
+		if id, ok := payload["id"]; ok {
+			body, err = client.Put(fmt.Sprintf("/apisix/admin/secrets/%v?gateway_group_id=%s", id, ggID), payload)
+		} else {
+			body, err = client.Post("/apisix/admin/secrets?gateway_group_id="+ggID, payload)
+		}
+		if err != nil {
+			return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
+		}
+
+		format := opts.Output
+		if format == "" {
+			format = "json"
+		}
+		return cmdutil.NewExporter(format, opts.IO.Out).Write(json.RawMessage(body))
 	}
 	if opts.ID == "" {
 		return fmt.Errorf("--id is required")

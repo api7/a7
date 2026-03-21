@@ -20,6 +20,7 @@ type Options struct {
 	Client func() (*http.Client, error)
 	Config func() (config.Config, error)
 	Output string
+	Label  string
 }
 
 func NewCmd(f *cmd.Factory) *cobra.Command {
@@ -35,9 +36,11 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 		Args:    cobra.NoArgs,
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.Output, _ = c.Flags().GetString("output")
+			opts.Label, _ = c.Flags().GetString("label")
 			return listRun(opts)
 		},
 	}
+	c.Flags().StringVar(&opts.Label, "label", "", "Filter by label (key=value)")
 	return c
 }
 
@@ -53,7 +56,12 @@ func listRun(opts *Options) error {
 	}
 
 	client := api.NewClient(httpClient, cfg.BaseURL())
-	body, err := client.Get("/api/gateway_groups", nil)
+	var query map[string]string
+	labelKey, labelValue := cmdutil.ParseLabel(opts.Label)
+	if labelKey != "" {
+		query = map[string]string{"label": labelKey}
+	}
+	body, err := client.Get("/api/gateway_groups", query)
 	if err != nil {
 		return fmt.Errorf("failed to list gateway groups: %s", cmdutil.FormatAPIError(err))
 	}
@@ -70,6 +78,16 @@ func listRun(opts *Options) error {
 	var result api.ListResponse[api.GatewayGroup]
 	if err := json.Unmarshal(body, &result); err != nil {
 		return err
+	}
+
+	if labelValue != "" {
+		filtered := make([]api.GatewayGroup, 0)
+		for _, item := range result.List {
+			if item.Labels != nil && item.Labels[labelKey] == labelValue {
+				filtered = append(filtered, item)
+			}
+		}
+		result.List = filtered
 	}
 
 	tp := tableprinter.New(opts.IO.Out)

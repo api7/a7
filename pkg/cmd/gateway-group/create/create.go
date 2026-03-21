@@ -21,6 +21,7 @@ type Options struct {
 	Client      func() (*http.Client, error)
 	Config      func() (config.Config, error)
 	Output      string
+	File        string
 	Name        string
 	Description string
 	Labels      []string
@@ -44,6 +45,7 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 	}
 
 	c.Flags().StringVar(&opts.Name, "name", "", "Gateway group name")
+	c.Flags().StringVarP(&opts.File, "file", "f", "", "Path to JSON/YAML file with resource definition")
 	c.Flags().StringVar(&opts.Description, "description", "", "Gateway group description")
 	c.Flags().StringArrayVar(&opts.Labels, "labels", nil, "Gateway group label in key=value format (repeatable)")
 	c.Flags().StringVar(&opts.Prefix, "prefix", "", "Gateway group route prefix")
@@ -52,13 +54,42 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 }
 
 func createRun(opts *Options) error {
-	if opts.Name == "" {
-		return &cmdutil.FlagError{Err: fmt.Errorf("required flag(s) \"name\" not set")}
-	}
-
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
+	}
+
+	if opts.File != "" {
+		payload, err := cmdutil.ReadResourceFile(opts.File, opts.IO.In)
+		if err != nil {
+			return err
+		}
+
+		httpClient, err := opts.Client()
+		if err != nil {
+			return err
+		}
+
+		client := api.NewClient(httpClient, cfg.BaseURL())
+		var body []byte
+		if id, ok := payload["id"]; ok {
+			body, err = client.Put(fmt.Sprintf("/api/gateway_groups/%v", id), payload)
+		} else {
+			body, err = client.Post("/api/gateway_groups", payload)
+		}
+		if err != nil {
+			return fmt.Errorf("failed to create gateway group: %s", cmdutil.FormatAPIError(err))
+		}
+
+		format := opts.Output
+		if format == "" {
+			format = "json"
+		}
+		return cmdutil.NewExporter(format, opts.IO.Out).Write(json.RawMessage(body))
+	}
+
+	if opts.Name == "" {
+		return &cmdutil.FlagError{Err: fmt.Errorf("required flag(s) \"name\" not set")}
 	}
 
 	httpClient, err := opts.Client()

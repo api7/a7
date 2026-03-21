@@ -22,6 +22,7 @@ type Options struct {
 	Config       func() (config.Config, error)
 	Output       string
 	GatewayGroup string
+	File         string
 
 	Name         string
 	Type         string
@@ -47,6 +48,7 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 	}
 
 	c.Flags().StringVar(&opts.Name, "name", "", "Upstream name")
+	c.Flags().StringVarP(&opts.File, "file", "f", "", "Path to JSON/YAML file with resource definition")
 	c.Flags().StringVar(&opts.Type, "type", "roundrobin", "Load balancing type")
 	c.Flags().StringSliceVar(&opts.Nodes, "nodes", nil, "Upstream node, repeatable, format host:port=weight")
 	c.Flags().StringVar(&opts.Scheme, "scheme", "http", "Upstream scheme")
@@ -54,10 +56,6 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 	c.Flags().StringVar(&opts.PassHost, "pass-host", "", "Pass host mode")
 	c.Flags().StringVar(&opts.UpstreamHost, "upstream-host", "", "Upstream host override")
 	c.Flags().StringSliceVar(&opts.Labels, "labels", nil, "Labels in key=value format")
-	if err := c.MarkFlagRequired("name"); err != nil {
-		return nil
-	}
-
 	return c
 }
 
@@ -73,6 +71,34 @@ func actionRun(opts *Options) error {
 	}
 	if ggID == "" {
 		return fmt.Errorf("gateway group is required; use --gateway-group flag or set a default in context config")
+	}
+	if opts.File != "" {
+		payload, err := cmdutil.ReadResourceFile(opts.File, opts.IO.In)
+		if err != nil {
+			return err
+		}
+
+		httpClient, err := opts.Client()
+		if err != nil {
+			return err
+		}
+
+		client := api.NewClient(httpClient, cfg.BaseURL())
+		var body []byte
+		if id, ok := payload["id"]; ok {
+			body, err = client.Put(fmt.Sprintf("/apisix/admin/upstreams/%v?gateway_group_id=%s", id, ggID), payload)
+		} else {
+			body, err = client.Post("/apisix/admin/upstreams?gateway_group_id="+ggID, payload)
+		}
+		if err != nil {
+			return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
+		}
+
+		format := opts.Output
+		if format == "" {
+			format = "json"
+		}
+		return cmdutil.NewExporter(format, opts.IO.Out).Write(json.RawMessage(body))
 	}
 
 	httpClient, err := opts.Client()

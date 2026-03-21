@@ -1,6 +1,7 @@
 package update
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -21,6 +22,7 @@ type Options struct {
 	Client       func() (*http.Client, error)
 	Config       func() (config.Config, error)
 	Output       string
+	File         string
 	GatewayGroup string
 
 	ID     string
@@ -59,6 +61,7 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 	c.Flags().StringVar(&opts.Type, "type", "server", "SSL type")
 	c.Flags().StringArrayVar(&opts.Labels, "labels", nil, "SSL labels in key=value format (repeatable)")
 	c.Flags().IntVar(&opts.Status, "status", 1, "SSL status")
+	c.Flags().StringVarP(&opts.File, "file", "f", "", "Path to JSON/YAML file with resource definition")
 
 	return c
 }
@@ -80,6 +83,23 @@ func actionRun(opts *Options) error {
 	httpClient, err := opts.Client()
 	if err != nil {
 		return err
+	}
+
+	if opts.File != "" {
+		payload, err := cmdutil.ReadResourceFile(opts.File, opts.IO.In)
+		if err != nil {
+			return err
+		}
+		client := api.NewClient(httpClient, cfg.BaseURL())
+		body, err := client.Put("/apisix/admin/ssls/"+opts.ID+"?gateway_group_id="+ggID, payload)
+		if err != nil {
+			return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
+		}
+		format := opts.Output
+		if format == "" {
+			format = "json"
+		}
+		return cmdutil.NewExporter(format, opts.IO.Out).Write(json.RawMessage(body))
 	}
 
 	cert, err := maybeReadFile(opts.Cert)
