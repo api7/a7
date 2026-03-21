@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 
 	cmd "github.com/api7/a7/pkg/cmd"
+	pluginGet "github.com/api7/a7/pkg/cmd/plugin/get"
 	pluginlist "github.com/api7/a7/pkg/cmd/plugin/list"
 )
 
@@ -15,6 +16,7 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 	}
 
 	c.AddCommand(pluginlist.NewCmd(f))
+	c.AddCommand(pluginGet.NewCmd(f))
 
 	return c
 }

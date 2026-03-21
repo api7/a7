@@ -9,12 +9,21 @@ import (
 	cmd "github.com/api7/a7/pkg/cmd"
 	"github.com/api7/a7/pkg/cmd/completion"
 	"github.com/api7/a7/pkg/cmd/consumer"
+	consumergroup "github.com/api7/a7/pkg/cmd/consumer-group"
 	"github.com/api7/a7/pkg/cmd/context"
+	"github.com/api7/a7/pkg/cmd/credential"
 	gatewaygroup "github.com/api7/a7/pkg/cmd/gateway-group"
+	globalrule "github.com/api7/a7/pkg/cmd/global-rule"
 	"github.com/api7/a7/pkg/cmd/plugin"
+	pluginconfig "github.com/api7/a7/pkg/cmd/plugin-config"
+	pluginmetadata "github.com/api7/a7/pkg/cmd/plugin-metadata"
+	"github.com/api7/a7/pkg/cmd/proto"
 	"github.com/api7/a7/pkg/cmd/route"
+	"github.com/api7/a7/pkg/cmd/secret"
+	"github.com/api7/a7/pkg/cmd/service"
 	servicetemplate "github.com/api7/a7/pkg/cmd/service-template"
 	"github.com/api7/a7/pkg/cmd/ssl"
+	streamroute "github.com/api7/a7/pkg/cmd/stream-route"
 	"github.com/api7/a7/pkg/cmd/upstream"
 	"github.com/api7/a7/pkg/cmd/version"
 )
@@ -75,6 +84,15 @@ func NewCmd(f *cmd.Factory, cfg *config.FileConfig) *cobra.Command {
 	c.AddCommand(consumer.NewCmd(f))
 	c.AddCommand(ssl.NewCmd(f))
 	c.AddCommand(plugin.NewCmd(f))
+	c.AddCommand(service.NewCmd(f))
+	c.AddCommand(globalrule.NewCmd(f))
+	c.AddCommand(streamroute.NewCmd(f))
+	c.AddCommand(pluginconfig.NewCmd(f))
+	c.AddCommand(pluginmetadata.NewCmd(f))
+	c.AddCommand(consumergroup.NewCmd(f))
+	c.AddCommand(credential.NewCmd(f))
+	c.AddCommand(secret.NewCmd(f))
+	c.AddCommand(proto.NewCmd(f))
 
 	return c
 }
