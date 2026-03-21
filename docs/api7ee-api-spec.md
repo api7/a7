@@ -17,8 +17,6 @@ Authentication is required for all requests via the `X-API-KEY` header. API7 EE 
 | Prefix | Type | Description |
 |--------|------|-------------|
 | `a7ee` | Access Token | General API access (RBAC-controlled) |
-| `a7adm` | Admin Key | Gateway-level administrative access |
-| `a7prt` | Portal Token | Developer portal specific access |
 
 ## Gateway Group Scoping
 

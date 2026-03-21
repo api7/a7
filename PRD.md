@@ -17,7 +17,7 @@
 
 ### Goals
 - Provide full CRUD operations for all API7 EE resources (both control-plane `/api/*` and APISIX admin `/apisix/admin/*` endpoints).
-- Support **multiple authentication modes**: access tokens (X-API-KEY with `a7ee` prefix), gateway-group admin keys (`a7adm` prefix), and session-based login.
+- Support **multiple authentication modes**: access tokens (X-API-KEY with `a7ee` prefix) and session-based login.
 - Implement **gateway group** scoping for all runtime operations (enterprise-specific concept).
 - Implement context/profile management for switching between multiple API7 EE instances.
 - Support rich terminal output (tables for TTY, JSON/YAML for pipes).
@@ -57,7 +57,6 @@
 
 ### Token Types Supported
 - **Access Token** (prefix `a7ee`): Full control-plane + APISIX admin API access, user-scoped.
-- **Gateway Admin Key** (prefix `a7adm`): Restricted to `/apisix/admin/*` endpoints, gateway-group-scoped.
 - **Session Login**: `a7 auth login --username <user> --password <pass>` for cookie-based session auth.
 
 ### Security
@@ -248,10 +247,10 @@ Port and adapt 40 SKILL.md files from a6, organized by category:
 | **Advanced Recipes** | 3 | multi-tenant, api-versioning, graphql-proxy |
 | **Personas** | 2 | operator, developer |
 
-### Phase 7 — Debug & Operations 🔲 PLANNED
-1. 🔲 `a7 debug logs` — Stream real-time error logs from API7 EE.
-2. 🔲 `a7 debug trace` — Trace a request through the gateway with timing breakdown.
-3. 🔲 `a7 update` — Self-update CLI binary from GitHub releases.
+### Phase 7 — Debug & Operations ✅ COMPLETE
+1. ✅ `a7 debug logs` — Stream real-time error logs from API7 EE.
+2. ✅ `a7 debug trace` — Trace a request through the gateway with timing breakdown.
+3. ✅ `a7 update` — Self-update CLI binary from GitHub releases.
 
 ### Phase 8 — End-to-End Tests 🔲 PLANNED
 1. 🔲 `test/e2e/docker-compose.yml` — Docker Compose for API7 EE + etcd + httpbin.
@@ -327,8 +326,8 @@ The following table tracks feature parity between a7 and [a6](https://github.com
 | Declarative config (dump/diff/sync/validate) | ✅ | ✅ | Phase 4 |
 | docs/ (29 files) | ✅ | ✅ | Phase 5 |
 | skills/ (40 SKILL.md) | ✅ | ✅ | Phase 6 |
-| Debug (logs + trace) | ✅ | 🔲 | Phase 7 |
-| Self-update | ✅ | 🔲 | Phase 7 |
+| Debug (logs + trace) | ✅ | ✅ | Phase 7 |
+| Self-update | ✅ | ✅ | Phase 7 |
 | E2E tests | ✅ | 🔲 | Phase 8 |
 | Bulk operations | ✅ | 🔲 | Phase 9 |
 | Interactive mode | ✅ | 🔲 | Phase 9 |

@@ -102,7 +102,7 @@ a7/
 ### API7 EE vs APISIX Differences (Key)
 - API7 EE uses `/api/services/template` for design-time services, `/apisix/admin/services` for published (runtime) services.
 - Gateway groups scope all operations. Many endpoints require `gateway_group_id` as a query parameter.
-- Auth tokens have prefixes: `a7ee` (access token), `a7adm` (gateway admin key), `a7prt` (portal token).
+- Auth tokens use `a7ee` prefix (access token).
 - PATCH endpoints use JSON Patch (RFC 6902) arrays, not merge-patch.
 - Enterprise-specific resources: gateway groups, service templates, RBAC (users/roles/policies), developer portal, audit logs, custom plugins, service registries, tokens.
 

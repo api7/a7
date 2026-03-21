@@ -177,7 +177,6 @@ a7 supports API7 EE access tokens via the `X-API-KEY` header.
 | Prefix | Type | Scope |
 |--------|------|-------|
 | `a7ee` | Access Token | Full control-plane + admin API |
-| `a7adm` | Gateway Admin Key | Runtime API only (gateway-group scoped) |
 
 ## Configuration
 

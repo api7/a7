@@ -88,7 +88,7 @@ type Factory struct {
 ```
 
 The `Config()` interface provides:
-- `Token()`: Returns the auth token (prefixed with `a7ee`, `a7adm`, or `a7prt`)
+- `Token()`: Returns the auth token (prefixed with `a7ee`)
 - `GatewayGroup()`: Returns the default gateway group
 - `TLSSkipVerify()`: TLS verification setting
 - `CACert()`: Custom CA certificate path
@@ -112,10 +112,7 @@ func xxxRun(opts *Options) error { ... }
 
 ### Authentication
 
-API7 EE uses the `X-API-KEY` header. Tokens are typically prefixed:
-- `a7ee`: Enterprise Edition token
-- `a7adm`: Admin token
-- `a7prt`: Personal access token
+API7 EE uses the `X-API-KEY` header. Tokens are prefixed with `a7ee`.
 
 ### PATCH Method
 

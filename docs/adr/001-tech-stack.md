@@ -116,7 +116,7 @@ Each command is structured into four distinct parts:
 - **Dual-API Prefix Selection**: Automatically selects between `/api/*` (control-plane) and `/apisix/admin/*` (runtime) based on resource type.
 - **Gateway Group Scoping**: Transparently injects `gateway_group_id` query parameters for runtime resources.
 - **JSON Patch (RFC 6902)**: Used for `PATCH` operations to ensure precise updates.
-- **Auth Tokens**: Injects `X-API-KEY` header using tokens with enterprise-specific prefixes (`a7ee`, `a7adm`, `a7prt`).
+- **Auth Tokens**: Injects `X-API-KEY` header using tokens with `a7ee` prefix.
 - **TLS Support**: Configurable `TLSSkipVerify` and `CACert` for enterprise HTTPS endpoints.
 - Methods return parsed structs instead of raw responses.
 - API errors are parsed into `APIError` types.

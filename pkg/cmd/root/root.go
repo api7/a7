@@ -13,6 +13,7 @@ import (
 	consumergroup "github.com/api7/a7/pkg/cmd/consumer-group"
 	"github.com/api7/a7/pkg/cmd/context"
 	"github.com/api7/a7/pkg/cmd/credential"
+	"github.com/api7/a7/pkg/cmd/debug"
 	gatewaygroup "github.com/api7/a7/pkg/cmd/gateway-group"
 	globalrule "github.com/api7/a7/pkg/cmd/global-rule"
 	"github.com/api7/a7/pkg/cmd/plugin"
@@ -25,6 +26,7 @@ import (
 	servicetemplate "github.com/api7/a7/pkg/cmd/service-template"
 	"github.com/api7/a7/pkg/cmd/ssl"
 	streamroute "github.com/api7/a7/pkg/cmd/stream-route"
+	"github.com/api7/a7/pkg/cmd/update"
 	"github.com/api7/a7/pkg/cmd/upstream"
 	"github.com/api7/a7/pkg/cmd/version"
 )
@@ -77,6 +79,8 @@ func NewCmd(f *cmd.Factory, cfg *config.FileConfig) *cobra.Command {
 	c.AddCommand(completion.NewCmd())
 	c.AddCommand(context.NewCmd(f))
 	c.AddCommand(configcmd.NewCmd(f))
+	c.AddCommand(debug.NewCmd(f))
+	c.AddCommand(update.NewCmdUpdate(f))
 
 	// Register resource commands.
 	c.AddCommand(gatewaygroup.NewCmd(f))
