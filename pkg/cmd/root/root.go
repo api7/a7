@@ -8,6 +8,7 @@ import (
 	"github.com/api7/a7/internal/config"
 	cmd "github.com/api7/a7/pkg/cmd"
 	"github.com/api7/a7/pkg/cmd/completion"
+	configcmd "github.com/api7/a7/pkg/cmd/config"
 	"github.com/api7/a7/pkg/cmd/consumer"
 	consumergroup "github.com/api7/a7/pkg/cmd/consumer-group"
 	"github.com/api7/a7/pkg/cmd/context"
@@ -75,6 +76,7 @@ func NewCmd(f *cmd.Factory, cfg *config.FileConfig) *cobra.Command {
 	c.AddCommand(version.NewCmd(f))
 	c.AddCommand(completion.NewCmd())
 	c.AddCommand(context.NewCmd(f))
+	c.AddCommand(configcmd.NewCmd(f))
 
 	// Register resource commands.
 	c.AddCommand(gatewaygroup.NewCmd(f))
