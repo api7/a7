@@ -252,14 +252,17 @@ Port and adapt 40 SKILL.md files from a6, organized by category:
 2. ✅ `a7 debug trace` — Trace a request through the gateway with timing breakdown.
 3. ✅ `a7 update` — Self-update CLI binary from GitHub releases.
 
-### Phase 8 — End-to-End Tests 🔲 PLANNED
-1. 🔲 `test/e2e/docker-compose.yml` — Docker Compose for API7 EE + etcd + httpbin.
-2. 🔲 `test/e2e/setup_test.go` — TestMain, binary build, admin/control API helpers.
-3. 🔲 Per-resource E2E tests: route, service, upstream, consumer, ssl, plugin, global-rule, stream-route, plugin-config, plugin-metadata, consumer-group, credential, secret, proto, context.
-4. 🔲 Declarative config E2E tests: dump, diff, sync, validate.
-5. 🔲 Export and label E2E tests.
-6. 🔲 Debug E2E tests.
-7. 🔲 `.github/workflows/e2e.yml` — CI workflow for E2E tests.
+### Phase 8 — End-to-End Tests ✅ COMPLETE
+1. ✅ `test/e2e/docker-compose.yml` — Docker Compose for API7 EE (Dashboard + DP Manager + Gateway + PostgreSQL).
+2. ✅ `test/e2e/setup_test.go` — TestMain, binary build, admin/control API helpers, shared test utilities.
+3. ✅ Per-resource E2E tests (22 test files): route, service, upstream, consumer, ssl, plugin, global-rule, stream-route, plugin-config, plugin-metadata, consumer-group, credential, secret, proto, context, gateway-group, service-template.
+4. ✅ Declarative config E2E tests: dump, diff, sync, validate (config_test.go + config_sync_test.go).
+5. ✅ Export and label E2E tests (integrated into resource test files).
+6. ✅ Debug E2E tests: trace (JSON/method/headers/host/path) + logs (file mode).
+7. ✅ Completion + version + help E2E tests.
+8. ✅ `.github/workflows/e2e.yml` — CI workflow for automated E2E testing.
+9. ✅ Makefile targets: `docker-up`, `docker-down`, `test-e2e`.
+10. ✅ All 40 skill examples covered in resource-specific tests.
 
 ### Phase 9 — Enterprise-Specific Features 🔲 FUTURE
 1. 🔲 Token management (create/list/delete/regenerate).
@@ -328,7 +331,7 @@ The following table tracks feature parity between a7 and [a6](https://github.com
 | skills/ (40 SKILL.md) | ✅ | ✅ | Phase 6 |
 | Debug (logs + trace) | ✅ | ✅ | Phase 7 |
 | Self-update | ✅ | ✅ | Phase 7 |
-| E2E tests | ✅ | 🔲 | Phase 8 |
+| E2E tests | ✅ | ✅ | Phase 8 |
 | Bulk operations | ✅ | 🔲 | Phase 9 |
 | Interactive mode | ✅ | 🔲 | Phase 9 |
 | Extension system | ✅ | 🔲 | Phase 9 |
