@@ -232,7 +232,7 @@ All runtime commands require `--gateway-group <id>` (or default from context).
 8. ✅ `docs/api7ee-api-spec.md` — API7 EE Admin API reference (16 resources, dual-API).
 9. ✅ `docs/user-guide/` — 21 per-resource user guides (getting-started, configuration, route, service, upstream, consumer, ssl, plugin, global-rule, stream-route, plugin-config, plugin-metadata, consumer-group, credential, secret, proto, declarative-config, gateway-group, service-template, debug, bulk-operations).
 
-### Phase 6 — AI Agent Skills 🔲 PLANNED
+### Phase 6 — AI Agent Skills ✅ COMPLETE
 Port and adapt 40 SKILL.md files from a6, organized by category:
 
 | Category | Count | Skills |
@@ -326,7 +326,7 @@ The following table tracks feature parity between a7 and [a6](https://github.com
 | `--verbose` HTTP logging | ✅ | 🔲 | Phase 3 |
 | Declarative config (dump/diff/sync/validate) | ✅ | ✅ | Phase 4 |
 | docs/ (29 files) | ✅ | ✅ | Phase 5 |
-| skills/ (40 SKILL.md) | ✅ | 🔲 | Phase 6 |
+| skills/ (40 SKILL.md) | ✅ | ✅ | Phase 6 |
 | Debug (logs + trace) | ✅ | 🔲 | Phase 7 |
 | Self-update | ✅ | 🔲 | Phase 7 |
 | E2E tests | ✅ | 🔲 | Phase 8 |
