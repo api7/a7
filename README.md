@@ -242,6 +242,13 @@ See [AGENTS.md](AGENTS.md) for the full development guide, coding conventions, a
 
 - [Product Requirements](PRD.md)
 - [AI Agent Guide](AGENTS.md)
+- [Architecture Decision Record](docs/adr/001-tech-stack.md)
+- [API7 EE API Specification](docs/api7ee-api-spec.md)
+- [Golden Example](docs/golden-example.md)
+- [Coding Standards](docs/coding-standards.md)
+- [Testing Strategy](docs/testing-strategy.md)
+- [Development Roadmap](docs/roadmap.md)
+- [User Guides](docs/user-guide/) — Per-resource guides for all 16 resource types
 
 ## Contributing
 

@@ -206,29 +206,31 @@ All runtime commands require `--gateway-group <id>` (or default from context).
 16. ✅ Proto CRUD.
 17. ✅ Unit tests for all new commands (56 test files).
 
-### Phase 3 — CLI Usability 🔲 IN PROGRESS
-1. 🔲 `-f/--file` flag: file-based create/update for all resource commands.
-2. 🔲 `export` subcommand for all applicable resources (route, service, upstream, consumer, consumer-group, ssl, global-rule, stream-route, plugin-config, proto).
-3. 🔲 `--force` flag for delete commands (skip confirmation).
-4. 🔲 `--label` flag for list/export commands (label-based filtering).
+### Phase 3 — CLI Usability ✅ COMPLETE
+1. ✅ `-f/--file` flag: file-based create/update for all resource commands.
+2. ✅ `export` subcommand for all applicable resources (route, service, upstream, consumer, consumer-group, ssl, global-rule, stream-route, plugin-config, proto).
+3. ✅ `--force` flag for delete commands (skip confirmation).
+4. ✅ `--label` flag for list/export commands (label-based filtering).
 5. 🔲 `--dry-run` flag for create/update commands.
 6. 🔲 `--verbose` flag for HTTP request/response logging.
 
-### Phase 4 — Declarative Configuration 🔲 PLANNED
-1. 🔲 `a7 config dump` — Export full gateway configuration to YAML file.
-2. 🔲 `a7 config validate` — Validate a configuration file against API7 EE schema.
-3. 🔲 `a7 config diff` — Compare local config file against live gateway state.
-4. 🔲 `a7 config sync` — Apply a configuration file to the gateway (with `--dry-run` support).
-5. 🔲 `configutil` package — Shared helpers for config file parsing, resource ordering, and diff logic.
+### Phase 4 — Declarative Configuration ✅ COMPLETE
+1. ✅ `a7 config dump` — Export full gateway configuration to YAML file.
+2. ✅ `a7 config validate` — Validate a configuration file against API7 EE schema.
+3. ✅ `a7 config diff` — Compare local config file against live gateway state.
+4. ✅ `a7 config sync` — Apply a configuration file to the gateway (with `--dry-run` support).
+5. ✅ `configutil` package — Shared helpers for config file parsing, resource ordering, and diff logic.
 
-### Phase 5 — Documentation 🔲 PLANNED
-1. 🔲 `docs/adr/001-tech-stack.md` — Architecture Decision Record.
-2. 🔲 `docs/coding-standards.md` — Go coding standards and conventions.
-3. 🔲 `docs/golden-example.md` — Canonical implementation example (Factory, IOStreams, tests).
-4. 🔲 `docs/testing-strategy.md` — Unit test and E2E test patterns.
-5. 🔲 `docs/skills.md` — AI agent skill format specification.
-6. 🔲 `docs/documentation-maintenance.md` — Doc update rules and templates.
-7. 🔲 `docs/user-guide/` — Per-resource user guides (getting-started, configuration, route, service, upstream, consumer, ssl, plugin, global-rule, stream-route, plugin-config, plugin-metadata, consumer-group, credential, secret, proto, declarative-config, debug, bulk-operations, extensions, auto-update).
+### Phase 5 — Documentation ✅ COMPLETE
+1. ✅ `docs/adr/001-tech-stack.md` — Architecture Decision Record.
+2. ✅ `docs/coding-standards.md` — Go coding standards and conventions.
+3. ✅ `docs/golden-example.md` — Canonical implementation example (Factory, IOStreams, tests).
+4. ✅ `docs/testing-strategy.md` — Unit test and E2E test patterns.
+5. ✅ `docs/skills.md` — AI agent skill format specification.
+6. ✅ `docs/documentation-maintenance.md` — Doc update rules and templates.
+7. ✅ `docs/roadmap.md` — Per-PR development plan for Phases 5-9.
+8. ✅ `docs/api7ee-api-spec.md` — API7 EE Admin API reference (16 resources, dual-API).
+9. ✅ `docs/user-guide/` — 21 per-resource user guides (getting-started, configuration, route, service, upstream, consumer, ssl, plugin, global-rule, stream-route, plugin-config, plugin-metadata, consumer-group, credential, secret, proto, declarative-config, gateway-group, service-template, debug, bulk-operations).
 
 ### Phase 6 — AI Agent Skills 🔲 PLANNED
 Port and adapt 40 SKILL.md files from a6, organized by category:
@@ -317,13 +319,13 @@ The following table tracks feature parity between a7 and [a6](https://github.com
 | Context management | ✅ | ✅ | |
 | Shell completions | ✅ | ✅ | |
 | JSON/YAML/table output | ✅ | ✅ | |
-| `-f/--file` create/update | ✅ | 🔲 | Phase 3 |
-| `export` subcommand | ✅ | 🔲 | Phase 3 |
-| `--force` delete flag | ✅ | 🔲 | Phase 3 |
-| `--label` filtering | ✅ | 🔲 | Phase 3 |
+| `-f/--file` create/update | ✅ | ✅ | Phase 3 |
+| `export` subcommand | ✅ | ✅ | Phase 3 |
+| `--force` delete flag | ✅ | ✅ | Phase 3 |
+| `--label` filtering | ✅ | ✅ | Phase 3 |
 | `--verbose` HTTP logging | ✅ | 🔲 | Phase 3 |
-| Declarative config (dump/diff/sync/validate) | ✅ | 🔲 | Phase 4 |
-| docs/ (29 files) | ✅ | 🔲 | Phase 5 |
+| Declarative config (dump/diff/sync/validate) | ✅ | ✅ | Phase 4 |
+| docs/ (29 files) | ✅ | ✅ | Phase 5 |
 | skills/ (40 SKILL.md) | ✅ | 🔲 | Phase 6 |
 | Debug (logs + trace) | ✅ | 🔲 | Phase 7 |
 | Self-update | ✅ | 🔲 | Phase 7 |
