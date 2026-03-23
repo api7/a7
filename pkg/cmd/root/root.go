@@ -44,7 +44,7 @@ func NewCmd(f *cmd.Factory, cfg *config.FileConfig) *cobra.Command {
 	// Global persistent flags — these apply to ALL subcommands.
 	c.PersistentFlags().String("server", "", "API7 EE server URL (overrides context config)")
 	c.PersistentFlags().String("token", "", "API access token (overrides context config)")
-	c.PersistentFlags().String("gateway-group", "", "Default gateway group (overrides context config)")
+	c.PersistentFlags().StringP("gateway-group", "g", "", "Default gateway group (overrides context config)")
 	c.PersistentFlags().StringP("output", "o", "", "Output format: json, yaml (default: table)")
 
 	// Environment variable overrides — applied at init time.
