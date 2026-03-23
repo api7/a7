@@ -21,9 +21,8 @@ type Options struct {
 	Client func() (*http.Client, error)
 	Config func() (config.Config, error)
 
-	Output       string
-	File         string
-	GatewayGroup string
+	Output string
+	File   string
 }
 
 func NewCmdDump(f *cmd.Factory) *cobra.Command {
@@ -45,7 +44,6 @@ func NewCmdDump(f *cmd.Factory) *cobra.Command {
 
 	c.Flags().StringVarP(&opts.Output, "output", "o", "yaml", "Output format: yaml, json")
 	c.Flags().StringVarP(&opts.File, "file", "f", "", "Write output to file")
-	c.Flags().StringVar(&opts.GatewayGroup, "gateway-group", "", "Gateway group ID (overrides context default)")
 
 	return c
 }
@@ -63,10 +61,7 @@ func dumpRun(opts *Options) error {
 
 	client := api.NewClient(httpClient, cfg.BaseURL())
 
-	gatewayGroup := opts.GatewayGroup
-	if gatewayGroup == "" {
-		gatewayGroup = cfg.GatewayGroup()
-	}
+	gatewayGroup := cfg.GatewayGroup()
 
 	remote, err := configutil.FetchRemoteConfig(client, gatewayGroup)
 	if err != nil {

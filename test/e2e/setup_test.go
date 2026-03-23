@@ -16,7 +16,9 @@ package e2e
 import (
 	"bytes"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -96,6 +98,18 @@ func TestMain(m *testing.M) {
 	if err := waitForHealthy(healthURL, 120*time.Second); err != nil {
 		fmt.Fprintf(os.Stderr, "API7 EE not ready: %v\n", err)
 		os.Exit(1)
+	}
+
+	// Resolve the actual gateway group UUID. API7 EE uses UUID-style IDs,
+	// not human-readable names like "default".
+	if gatewayGroup == "default" || gatewayGroup == "" {
+		ggID, err := resolveFirstGatewayGroupID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to resolve gateway group ID: %v\n", err)
+			os.Exit(1)
+		}
+		gatewayGroup = ggID
+		fmt.Fprintf(os.Stderr, "Resolved gateway group ID: %s\n", gatewayGroup)
 	}
 
 	os.Exit(m.Run())
@@ -263,4 +277,38 @@ func upstreamNode() string {
 		return node
 	}
 	return "127.0.0.1:80"
+}
+
+func resolveFirstGatewayGroupID() (string, error) {
+	req, err := http.NewRequest(http.MethodGet, adminURL+"/api/gateway_groups", nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("X-API-KEY", adminToken)
+	resp, err := insecureClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	if resp.StatusCode >= 400 {
+		return "", fmt.Errorf("GET /api/gateway_groups returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		List []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"list"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", fmt.Errorf("failed to parse gateway groups: %w (body: %s)", err, string(body))
+	}
+	if len(result.List) == 0 {
+		return "", fmt.Errorf("no gateway groups found")
+	}
+	return result.List[0].ID, nil
 }

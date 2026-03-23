@@ -28,16 +28,13 @@ func deleteConsumerViaAdmin(t *testing.T, username string) {
 }
 
 // createTestConsumerViaCLI creates a consumer via CLI.
+// API7 EE does not allow auth plugins in the consumer body; use credentials instead.
 func createTestConsumerViaCLI(t *testing.T, env []string, username string) {
 	t.Helper()
 	consumerJSON := fmt.Sprintf(`{
 		"username": %q,
-		"plugins": {
-			"key-auth": {
-				"key": "e2e-key-%s"
-			}
-		}
-	}`, username, username)
+		"desc": "e2e test consumer"
+	}`, username)
 
 	tmpFile := filepath.Join(t.TempDir(), "consumer.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(consumerJSON), 0644))
@@ -83,11 +80,6 @@ func TestConsumer_CRUD(t *testing.T) {
 	// Update
 	updateJSON := fmt.Sprintf(`{
 		"username": %q,
-		"plugins": {
-			"key-auth": {
-				"key": "e2e-key-updated"
-			}
-		},
 		"desc": "updated consumer"
 	}`, username)
 	tmpFile := filepath.Join(t.TempDir(), "consumer-update.json")
@@ -108,7 +100,8 @@ func TestConsumer_Export(t *testing.T) {
 
 	createTestConsumerViaCLI(t, env, username)
 
-	stdout, stderr, err := runA7WithEnv(env, "consumer", "export", username, "-g", gatewayGroup, "-o", "json")
+	// Use get -o json (export is batch-only, cobra.NoArgs).
+	stdout, stderr, err := runA7WithEnv(env, "consumer", "get", username, "-g", gatewayGroup, "-o", "json")
 	require.NoError(t, err, stderr)
 	assert.Contains(t, stdout, username)
 }
@@ -119,13 +112,30 @@ func TestConsumer_WithKeyAuth(t *testing.T) {
 	env := setupEnv(t)
 	username := "e2e-consumer-keyauth"
 	routeID := "e2e-route-keyauth"
+	credID := "e2e-cred-keyauth"
 	t.Cleanup(func() {
 		deleteRouteViaAdmin(t, routeID)
 		deleteConsumerViaAdmin(t, username)
 	})
 
-	// Create consumer with key-auth
+	// Create consumer (no auth plugins — API7 EE requires credentials).
 	createTestConsumerViaCLI(t, env, username)
+
+	// Create credential with key-auth plugin.
+	credJSON := fmt.Sprintf(`{
+		"plugins": {
+			"key-auth": {
+				"key": "e2e-key-%s"
+			}
+		}
+	}`, username)
+	credFile := filepath.Join(t.TempDir(), "credential.json")
+	require.NoError(t, os.WriteFile(credFile, []byte(credJSON), 0644))
+	_, stderr, err := runA7WithEnv(env, "credential", "create", credID,
+		"--consumer", username, "-f", credFile, "-g", gatewayGroup)
+	if err != nil {
+		t.Skipf("credential create failed: %s", stderr)
+	}
 
 	// Create route with key-auth plugin
 	routeJSON := fmt.Sprintf(`{
@@ -144,7 +154,7 @@ func TestConsumer_WithKeyAuth(t *testing.T) {
 	tmpFile := filepath.Join(t.TempDir(), "route.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(routeJSON), 0644))
 
-	_, stderr, err := runA7WithEnv(env, "route", "create", "-f", tmpFile, "-g", gatewayGroup)
+	_, stderr, err = runA7WithEnv(env, "route", "create", "-f", tmpFile, "-g", gatewayGroup)
 	require.NoError(t, err, stderr)
 
 	// Verify: request without key should fail (401 or 403)

@@ -65,10 +65,10 @@ func TestProto_CRUD(t *testing.T) {
 	require.NoError(t, err, stderr)
 	assert.Contains(t, stdout, "helloworld")
 
-	// Export
-	stdout, stderr, err = runA7WithEnv(env, "proto", "export", protoID, "-g", gatewayGroup, "-o", "json")
+	// Export (use get -o json; export is batch-only with cobra.NoArgs)
+	stdout, stderr, err = runA7WithEnv(env, "proto", "get", protoID, "-g", gatewayGroup, "-o", "json")
 	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, protoID)
+	assert.Contains(t, stdout, "helloworld")
 
 	// Delete
 	stdout, stderr, err = runA7WithEnv(env, "proto", "delete", protoID, "--force", "-g", gatewayGroup)

@@ -71,10 +71,10 @@ func TestConsumerGroup_CRUD(t *testing.T) {
 	require.NoError(t, err, stderr)
 	assert.Contains(t, stdout, "limit-count")
 
-	// Export
-	stdout, stderr, err = runA7WithEnv(env, "consumer-group", "export", cgID, "-g", gatewayGroup, "-o", "json")
+	// Export (use get -o json; export is batch-only with cobra.NoArgs)
+	stdout, stderr, err = runA7WithEnv(env, "consumer-group", "get", cgID, "-g", gatewayGroup, "-o", "json")
 	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, cgID)
+	assert.Contains(t, stdout, "limit-count")
 
 	// Delete
 	stdout, stderr, err = runA7WithEnv(env, "consumer-group", "delete", cgID, "--force", "-g", gatewayGroup)

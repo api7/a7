@@ -127,7 +127,8 @@ func TestUpstream_Export(t *testing.T) {
 
 	createTestUpstreamViaCLI(t, env, usID)
 
-	stdout, stderr, err := runA7WithEnv(env, "upstream", "export", usID, "-g", gatewayGroup, "-o", "json")
+	// Use get -o json (export is batch-only, cobra.NoArgs).
+	stdout, stderr, err := runA7WithEnv(env, "upstream", "get", usID, "-g", gatewayGroup, "-o", "json")
 	require.NoError(t, err, stderr)
 	assert.Contains(t, stdout, usID)
 }

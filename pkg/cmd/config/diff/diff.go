@@ -19,9 +19,8 @@ type Options struct {
 	Client func() (*http.Client, error)
 	Config func() (config.Config, error)
 
-	File         string
-	Output       string
-	GatewayGroup string
+	File   string
+	Output string
 }
 
 func NewCmdDiff(f *cmd.Factory) *cobra.Command {
@@ -45,7 +44,6 @@ func NewCmdDiff(f *cmd.Factory) *cobra.Command {
 
 	c.Flags().StringVarP(&opts.File, "file", "f", "", "Path to declarative config file (required)")
 	c.Flags().StringVarP(&opts.Output, "output", "o", "", "Output format: json")
-	c.Flags().StringVar(&opts.GatewayGroup, "gateway-group", "", "Gateway group ID (overrides context default)")
 
 	return c
 }
@@ -68,10 +66,7 @@ func diffRun(opts *Options) error {
 
 	client := api.NewClient(httpClient, cfg.BaseURL())
 
-	gatewayGroup := opts.GatewayGroup
-	if gatewayGroup == "" {
-		gatewayGroup = cfg.GatewayGroup()
-	}
+	gatewayGroup := cfg.GatewayGroup()
 
 	remote, err := configutil.FetchRemoteConfig(client, gatewayGroup)
 	if err != nil {

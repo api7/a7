@@ -112,14 +112,13 @@ func TestGatewayGroup_Alias(t *testing.T) {
 
 func TestGatewayGroup_CRUD(t *testing.T) {
 	env := setupEnv(t)
-	ggID := "e2e-gateway-group-crud"
-	t.Cleanup(func() { deleteGatewayGroupViaAdmin(t, ggID) })
+	ggName := "E2E Test Gateway Group"
 
+	// API7 EE generates UUIDs for gateway groups; custom IDs are not supported.
 	ggJSON := fmt.Sprintf(`{
-		"id": %q,
-		"name": "E2E Test Gateway Group",
+		"name": %q,
 		"description": "Created by e2e tests"
-	}`, ggID)
+	}`, ggName)
 
 	tmpFile := filepath.Join(t.TempDir(), "gateway-group.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(ggJSON), 0644))
@@ -128,15 +127,28 @@ func TestGatewayGroup_CRUD(t *testing.T) {
 	stdout, stderr, err := runA7WithEnv(env, "gateway-group", "create", "-f", tmpFile)
 	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
 
+	// Parse created ID from response.
+	var created map[string]interface{}
+	var ggID string
+	if json.Unmarshal([]byte(stdout), &created) == nil {
+		if id, ok := created["id"]; ok {
+			ggID = fmt.Sprintf("%v", id)
+		}
+	}
+	if ggID == "" {
+		t.Fatalf("failed to parse gateway group ID from create response: %s", stdout)
+	}
+	t.Cleanup(func() { deleteGatewayGroupViaAdmin(t, ggID) })
+
 	// Get
 	stdout, stderr, err = runA7WithEnv(env, "gateway-group", "get", ggID)
 	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, ggID)
+	assert.Contains(t, stdout, ggName)
 
 	// Get JSON
 	stdout, stderr, err = runA7WithEnv(env, "gateway-group", "get", ggID, "-o", "json")
 	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, "E2E Test Gateway Group")
+	assert.Contains(t, stdout, ggName)
 
 	// Delete
 	stdout, stderr, err = runA7WithEnv(env, "gateway-group", "delete", ggID, "--force")

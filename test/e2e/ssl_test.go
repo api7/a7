@@ -81,10 +81,10 @@ func TestSSL_CRUD(t *testing.T) {
 	require.NoError(t, err, stderr)
 	assert.Contains(t, stdout, "e2e-test.example.com")
 
-	// Export
-	stdout, stderr, err = runA7WithEnv(env, "ssl", "export", sslID, "-g", gatewayGroup, "-o", "json")
+	// Export (use get -o json; export is batch-only with cobra.NoArgs)
+	stdout, stderr, err = runA7WithEnv(env, "ssl", "get", sslID, "-g", gatewayGroup, "-o", "json")
 	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, sslID)
+	assert.Contains(t, stdout, "e2e-test.example.com")
 
 	// Delete
 	stdout, stderr, err = runA7WithEnv(env, "ssl", "delete", sslID, "--force", "-g", gatewayGroup)

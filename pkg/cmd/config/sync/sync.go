@@ -23,10 +23,9 @@ type Options struct {
 	Client func() (*http.Client, error)
 	Config func() (config.Config, error)
 
-	File         string
-	DryRun       bool
-	Delete       bool
-	GatewayGroup string
+	File   string
+	DryRun bool
+	Delete bool
 }
 
 func NewCmdSync(f *cmd.Factory) *cobra.Command {
@@ -52,7 +51,6 @@ func NewCmdSync(f *cmd.Factory) *cobra.Command {
 	c.Flags().StringVarP(&opts.File, "file", "f", "", "Path to declarative config file (required)")
 	c.Flags().BoolVar(&opts.DryRun, "dry-run", false, "Show what would change without applying")
 	c.Flags().BoolVar(&opts.Delete, "delete", true, "Delete remote resources not present in local config")
-	c.Flags().StringVar(&opts.GatewayGroup, "gateway-group", "", "Gateway group ID (overrides context default)")
 
 	return c
 }
@@ -80,10 +78,7 @@ func syncRun(opts *Options) error {
 
 	client := api.NewClient(httpClient, cfg.BaseURL())
 
-	gatewayGroup := opts.GatewayGroup
-	if gatewayGroup == "" {
-		gatewayGroup = cfg.GatewayGroup()
-	}
+	gatewayGroup := cfg.GatewayGroup()
 
 	remote, err := configutil.FetchRemoteConfig(client, gatewayGroup)
 	if err != nil {

@@ -83,10 +83,10 @@ func TestPluginConfig_CRUD(t *testing.T) {
 	stdout, stderr, err = runA7WithEnv(env, "plugin-config", "update", pcID, "-f", tmpFile2, "-g", gatewayGroup)
 	require.NoError(t, err, stderr)
 
-	// Export
-	stdout, stderr, err = runA7WithEnv(env, "plugin-config", "export", pcID, "-g", gatewayGroup, "-o", "json")
+	// Export (use get -o json; export is batch-only with cobra.NoArgs)
+	stdout, stderr, err = runA7WithEnv(env, "plugin-config", "get", pcID, "-g", gatewayGroup, "-o", "json")
 	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, pcID)
+	assert.Contains(t, stdout, "proxy-rewrite")
 
 	// Delete
 	stdout, stderr, err = runA7WithEnv(env, "plugin-config", "delete", pcID, "--force", "-g", gatewayGroup)

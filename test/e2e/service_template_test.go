@@ -22,12 +22,12 @@ func deleteServiceTemplateViaAdmin(t *testing.T, id string) {
 	}
 }
 
-// createTestServiceTemplateViaCLI creates a service template via CLI and returns its ID.
-func createTestServiceTemplateViaCLI(t *testing.T, env []string, id string) string {
+// createTestServiceTemplateViaCLI creates a service template via CLI and returns its API-generated ID.
+// API7 EE generates UUIDs for service templates; custom IDs are not supported.
+func createTestServiceTemplateViaCLI(t *testing.T, env []string, name string) string {
 	t.Helper()
 	stJSON := fmt.Sprintf(`{
-		"id": %q,
-		"name": "e2e-template-%s",
+		"name": %q,
 		"description": "Created by e2e tests",
 		"upstream": {
 			"type": "roundrobin",
@@ -35,14 +35,37 @@ func createTestServiceTemplateViaCLI(t *testing.T, env []string, id string) stri
 				"127.0.0.1:8080": 1
 			}
 		}
-	}`, id, id)
+	}`, name)
 
 	tmpFile := filepath.Join(t.TempDir(), "service-template.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(stJSON), 0644))
 
 	stdout, stderr, err := runA7WithEnv(env, "service-template", "create", "-f", tmpFile)
 	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
-	return id
+
+	// Parse the returned ID from JSON response.
+	var resp map[string]interface{}
+	if err := json.Unmarshal([]byte(stdout), &resp); err == nil {
+		if id, ok := resp["id"]; ok {
+			return fmt.Sprintf("%v", id)
+		}
+	}
+	// Fallback: try listing and finding by name.
+	listOut, _, lerr := runA7WithEnv(env, "service-template", "list", "-o", "json")
+	if lerr == nil {
+		var templates []map[string]interface{}
+		if json.Unmarshal([]byte(listOut), &templates) == nil {
+			for _, tmpl := range templates {
+				if n, _ := tmpl["name"].(string); n == name {
+					if id, ok := tmpl["id"]; ok {
+						return fmt.Sprintf("%v", id)
+					}
+				}
+			}
+		}
+	}
+	t.Fatalf("failed to capture service template ID for %q", name)
+	return ""
 }
 
 func TestServiceTemplate_List(t *testing.T) {
@@ -73,25 +96,24 @@ func TestServiceTemplate_Alias(t *testing.T) {
 
 func TestServiceTemplate_CRUD(t *testing.T) {
 	env := setupEnv(t)
-	stID := "e2e-service-template-crud"
-	t.Cleanup(func() { deleteServiceTemplateViaAdmin(t, stID) })
+	stName := "e2e-template-crud"
 
-	// Create
-	createTestServiceTemplateViaCLI(t, env, stID)
+	// Create (API generates UUID ID).
+	stID := createTestServiceTemplateViaCLI(t, env, stName)
+	t.Cleanup(func() { deleteServiceTemplateViaAdmin(t, stID) })
 
 	// Get
 	stdout, stderr, err := runA7WithEnv(env, "service-template", "get", stID)
 	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, stID)
+	assert.Contains(t, stdout, stName)
 
 	// Get JSON
 	stdout, stderr, err = runA7WithEnv(env, "service-template", "get", stID, "-o", "json")
 	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, "e2e-template-"+stID)
+	assert.Contains(t, stdout, stName)
 
 	// Update via file
-	updateJSON := fmt.Sprintf(`{
-		"id": %q,
+	updateJSON := `{
 		"name": "e2e-template-updated",
 		"description": "Updated by e2e tests",
 		"upstream": {
@@ -100,7 +122,7 @@ func TestServiceTemplate_CRUD(t *testing.T) {
 				"127.0.0.1:8080": 1
 			}
 		}
-	}`, stID)
+	}`
 	tmpFile := filepath.Join(t.TempDir(), "service-template-update.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(updateJSON), 0644))
 
@@ -135,10 +157,10 @@ func TestServiceTemplate_CreateWithName(t *testing.T) {
 
 func TestServiceTemplate_Publish(t *testing.T) {
 	env := setupEnv(t)
-	stID := "e2e-service-template-publish"
-	t.Cleanup(func() { deleteServiceTemplateViaAdmin(t, stID) })
+	stName := "e2e-template-publish"
 
-	createTestServiceTemplateViaCLI(t, env, stID)
+	stID := createTestServiceTemplateViaCLI(t, env, stName)
+	t.Cleanup(func() { deleteServiceTemplateViaAdmin(t, stID) })
 
 	// Publish to the default gateway group.
 	stdout, stderr, err := runA7WithEnv(env, "service-template", "publish", stID,

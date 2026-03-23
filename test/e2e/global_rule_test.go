@@ -40,7 +40,8 @@ func TestGlobalRule_ListJSON(t *testing.T) {
 
 func TestGlobalRule_CRUD(t *testing.T) {
 	env := setupEnv(t)
-	grID := "e2e-global-rule-crud"
+	// API7 EE requires global rule ID to match a plugin name in its plugins map.
+	grID := "prometheus"
 	t.Cleanup(func() { deleteGlobalRuleViaAdmin(t, grID) })
 
 	grJSON := fmt.Sprintf(`{
@@ -81,10 +82,10 @@ func TestGlobalRule_CRUD(t *testing.T) {
 	stdout, stderr, err = runA7WithEnv(env, "global-rule", "update", grID, "-f", tmpFile2, "-g", gatewayGroup)
 	require.NoError(t, err, stderr)
 
-	// Export
-	stdout, stderr, err = runA7WithEnv(env, "global-rule", "export", grID, "-g", gatewayGroup, "-o", "json")
+	// Export (use get -o json; export is batch-only with cobra.NoArgs)
+	stdout, stderr, err = runA7WithEnv(env, "global-rule", "get", grID, "-g", gatewayGroup, "-o", "json")
 	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, grID)
+	assert.Contains(t, stdout, "prometheus")
 
 	// Delete
 	stdout, stderr, err = runA7WithEnv(env, "global-rule", "delete", grID, "--force", "-g", gatewayGroup)
@@ -102,7 +103,8 @@ func TestGlobalRule_DeleteNonexistent(t *testing.T) {
 // a7 global-rule create -f - <<'EOF'
 func TestGlobalRule_SkillExample(t *testing.T) {
 	env := setupEnv(t)
-	grID := "e2e-gr-skill"
+	// API7 EE requires global rule ID to match a plugin name.
+	grID := "ip-restriction"
 	t.Cleanup(func() { deleteGlobalRuleViaAdmin(t, grID) })
 
 	grJSON := fmt.Sprintf(`{
