@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -51,7 +50,7 @@ func TestStreamRoute_CRUD(t *testing.T) {
 			"type": "roundrobin",
 			"nodes": {"%s": 1}
 		}
-	}`, srID, strings.TrimPrefix(httpbinURL, "http://"))
+	}`, srID, upstreamNode())
 
 	tmpFile := filepath.Join(t.TempDir(), "stream-route.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(srJSON), 0644))

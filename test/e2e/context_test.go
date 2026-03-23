@@ -66,17 +66,17 @@ func TestContext_List(t *testing.T) {
 func TestContext_Delete(t *testing.T) {
 	env := []string{"A7_CONFIG_DIR=" + t.TempDir()}
 
-	_, stderr, err := runA7WithEnv(env, "context", "create", "local", "--server", "https://localhost:7443")
+	_, stderr, err := runA7WithEnv(env, "context", "create", "ctx-to-delete", "--server", "https://localhost:7443")
 	require.NoError(t, err, stderr)
 	_, stderr, err = runA7WithEnv(env, "context", "create", "staging", "--server", "https://localhost:7443")
 	require.NoError(t, err, stderr)
 
-	_, stderr, err = runA7WithEnv(env, "context", "delete", "local")
+	_, stderr, err = runA7WithEnv(env, "context", "delete", "ctx-to-delete")
 	require.NoError(t, err, stderr)
 
 	stdout, stderr, err := runA7WithEnv(env, "context", "list")
 	require.NoError(t, err, stderr)
-	assert.NotContains(t, stdout, "local")
+	assert.NotContains(t, stdout, "ctx-to-delete")
 	assert.Contains(t, stdout, "staging")
 }
 

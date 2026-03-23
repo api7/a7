@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -29,7 +28,7 @@ func TestDebugTrace_JSONOutput(t *testing.T) {
 			"type": "roundrobin",
 			"nodes": {"%s": 1}
 		}
-	}`, routeID, strings.TrimPrefix(httpbinURL, "http://"))
+	}`, routeID, upstreamNode())
 
 	tmpFile := filepath.Join(t.TempDir(), "route.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(routeJSON), 0644))
@@ -72,7 +71,7 @@ func TestDebugTrace_WithMethod(t *testing.T) {
 				"uri": "/post"
 			}
 		}
-	}`, routeID, strings.TrimPrefix(httpbinURL, "http://"))
+	}`, routeID, upstreamNode())
 
 	tmpFile := filepath.Join(t.TempDir(), "route.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(routeJSON), 0644))
@@ -110,7 +109,7 @@ func TestDebugTrace_WithHeaders(t *testing.T) {
 			"type": "roundrobin",
 			"nodes": {"%s": 1}
 		}
-	}`, routeID, strings.TrimPrefix(httpbinURL, "http://"))
+	}`, routeID, upstreamNode())
 
 	tmpFile := filepath.Join(t.TempDir(), "route.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(routeJSON), 0644))
@@ -144,7 +143,7 @@ func TestDebugTrace_WithHost(t *testing.T) {
 			"type": "roundrobin",
 			"nodes": {"%s": 1}
 		}
-	}`, routeID, strings.TrimPrefix(httpbinURL, "http://"))
+	}`, routeID, upstreamNode())
 
 	tmpFile := filepath.Join(t.TempDir(), "route.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(routeJSON), 0644))
@@ -184,7 +183,7 @@ func TestDebugTrace_WithPath(t *testing.T) {
 				"uri": "/get"
 			}
 		}
-	}`, routeID, strings.TrimPrefix(httpbinURL, "http://"))
+	}`, routeID, upstreamNode())
 
 	tmpFile := filepath.Join(t.TempDir(), "route.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(routeJSON), 0644))
@@ -234,7 +233,7 @@ func TestDebugTrace_YAMLOutput(t *testing.T) {
 			"type": "roundrobin",
 			"nodes": {"%s": 1}
 		}
-	}`, routeID, strings.TrimPrefix(httpbinURL, "http://"))
+	}`, routeID, upstreamNode())
 
 	tmpFile := filepath.Join(t.TempDir(), "route.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(routeJSON), 0644))

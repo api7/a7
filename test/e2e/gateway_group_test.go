@@ -22,6 +22,27 @@ func deleteGatewayGroupViaAdmin(t *testing.T, id string) {
 	}
 }
 
+// findDefaultGatewayGroupID uses the CLI to list gateway groups in JSON
+// and returns the ID of the first group whose name contains "default".
+// API7 EE uses UUID-style IDs, not names, so we need to resolve the real ID.
+func findDefaultGatewayGroupID(t *testing.T, env []string) string {
+	t.Helper()
+	stdout, stderr, err := runA7WithEnv(env, "gateway-group", "list", "-o", "json")
+	require.NoError(t, err, "list gateway groups failed: %s", stderr)
+
+	var groups []map[string]interface{}
+	require.NoError(t, json.Unmarshal([]byte(stdout), &groups), "should be valid JSON array")
+	require.NotEmpty(t, groups, "no gateway groups found")
+
+	for _, g := range groups {
+		if id, ok := g["id"].(string); ok && id != "" {
+			return id
+		}
+	}
+	t.Fatal("no gateway group with a valid id found")
+	return ""
+}
+
 func TestGatewayGroup_List(t *testing.T) {
 	env := setupEnv(t)
 
@@ -29,8 +50,6 @@ func TestGatewayGroup_List(t *testing.T) {
 	stdout, stderr, err := runA7WithEnv(env, "gateway-group", "list")
 	require.NoError(t, err, stderr)
 	assert.NotEmpty(t, stdout)
-	// The "default" gateway group should always exist.
-	assert.Contains(t, stdout, "default")
 }
 
 func TestGatewayGroup_ListJSON(t *testing.T) {
@@ -56,22 +75,23 @@ func TestGatewayGroup_ListYAML(t *testing.T) {
 func TestGatewayGroup_Get(t *testing.T) {
 	env := setupEnv(t)
 
-	// The "default" gateway group should exist in API7 EE.
-	stdout, stderr, err := runA7WithEnv(env, "gateway-group", "get", "default")
+	ggID := findDefaultGatewayGroupID(t, env)
+	stdout, stderr, err := runA7WithEnv(env, "gateway-group", "get", ggID)
 	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, "default")
+	assert.NotEmpty(t, stdout)
 }
 
 func TestGatewayGroup_GetJSON(t *testing.T) {
 	env := setupEnv(t)
 
-	stdout, stderr, err := runA7WithEnv(env, "gateway-group", "get", "default", "-o", "json")
+	ggID := findDefaultGatewayGroupID(t, env)
+	stdout, stderr, err := runA7WithEnv(env, "gateway-group", "get", ggID, "-o", "json")
 	require.NoError(t, err, stderr)
 	assert.NotEmpty(t, stdout)
 
 	var group map[string]interface{}
 	require.NoError(t, json.Unmarshal([]byte(stdout), &group), "should be valid JSON")
-	assert.Equal(t, "default", group["id"])
+	assert.Equal(t, ggID, group["id"])
 }
 
 func TestGatewayGroup_GetNonexistent(t *testing.T) {

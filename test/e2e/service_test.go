@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -38,7 +37,7 @@ func createTestServiceViaCLI(t *testing.T, env []string, id string) {
 			"type": "roundrobin",
 			"nodes": {"%s": 1}
 		}
-	}`, id, id, strings.TrimPrefix(httpbinURL, "http://"))
+	}`, id, id, upstreamNode())
 
 	tmpFile := filepath.Join(t.TempDir(), "service.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(svcJSON), 0644))
@@ -89,7 +88,7 @@ func TestService_CRUD(t *testing.T) {
 			"type": "roundrobin",
 			"nodes": {"%s": 2}
 		}
-	}`, svcID, strings.TrimPrefix(httpbinURL, "http://"))
+	}`, svcID, upstreamNode())
 	tmpFile := filepath.Join(t.TempDir(), "service-update.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(updateJSON), 0644))
 
@@ -135,7 +134,7 @@ func TestService_WithPlugins(t *testing.T) {
 				"uri": "/get"
 			}
 		}
-	}`, svcID, strings.TrimPrefix(httpbinURL, "http://"))
+	}`, svcID, upstreamNode())
 
 	tmpFile := filepath.Join(t.TempDir(), "service.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(svcJSON), 0644))

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -39,7 +38,7 @@ func createTestRouteViaCLI(t *testing.T, env []string, id string) string {
 			"type": "roundrobin",
 			"nodes": {"%s": 1}
 		}
-	}`, id, id, strings.TrimPrefix(httpbinURL, "http://"))
+	}`, id, id, upstreamNode())
 
 	tmpFile := filepath.Join(t.TempDir(), "route.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(routeJSON), 0644))
@@ -91,7 +90,7 @@ func TestRoute_CRUD(t *testing.T) {
 			"type": "roundrobin",
 			"nodes": {"%s": 1}
 		}
-	}`, routeID, strings.TrimPrefix(httpbinURL, "http://"))
+	}`, routeID, upstreamNode())
 	tmpFile := filepath.Join(t.TempDir(), "route-update.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(updateJSON), 0644))
 
@@ -124,7 +123,7 @@ func TestRoute_CreateWithFlags(t *testing.T) {
 			"nodes": {"%s": 1}
 		},
 		"labels": {"env": "test", "team": "e2e"}
-	}`, routeID, strings.TrimPrefix(httpbinURL, "http://"))
+	}`, routeID, upstreamNode())
 
 	tmpFile := filepath.Join(t.TempDir(), "route.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(routeJSON), 0644))
@@ -155,7 +154,7 @@ func TestRoute_CreateWithPlugins(t *testing.T) {
 				"uri": "/get"
 			}
 		}
-	}`, routeID, strings.TrimPrefix(httpbinURL, "http://"))
+	}`, routeID, upstreamNode())
 
 	tmpFile := filepath.Join(t.TempDir(), "route.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(routeJSON), 0644))
@@ -223,7 +222,7 @@ func TestRoute_ListWithLabel(t *testing.T) {
 			"nodes": {"%s": 1}
 		},
 		"labels": {"filter-test": "yes"}
-	}`, routeID, strings.TrimPrefix(httpbinURL, "http://"))
+	}`, routeID, upstreamNode())
 
 	tmpFile := filepath.Join(t.TempDir(), "route.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(routeJSON), 0644))
@@ -255,7 +254,7 @@ func TestRoute_TrafficForwarding(t *testing.T) {
 				"uri": "/get"
 			}
 		}
-	}`, routeID, strings.TrimPrefix(httpbinURL, "http://"))
+	}`, routeID, upstreamNode())
 
 	tmpFile := filepath.Join(t.TempDir(), "route.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(routeJSON), 0644))

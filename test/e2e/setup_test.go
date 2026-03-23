@@ -251,3 +251,16 @@ func requireHTTPBin(t *testing.T) {
 		t.Skip("HTTPBIN_URL not set — skipping httpbin-dependent test")
 	}
 }
+
+// upstreamNode returns a valid upstream node address for test fixtures.
+// When HTTPBIN_URL is set, it returns the host:port from that URL.
+// Otherwise, it returns a safe dummy address so that routes can be created
+// even when no real upstream is available.
+func upstreamNode() string {
+	if httpbinURL != "" {
+		node := strings.TrimPrefix(httpbinURL, "http://")
+		node = strings.TrimPrefix(node, "https://")
+		return node
+	}
+	return "127.0.0.1:80"
+}

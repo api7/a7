@@ -38,6 +38,7 @@ func main() {
 	rootCmd := root.NewCmd(f, cfg)
 
 	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
 		os.Exit(1)
 	}
 }

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -35,7 +34,7 @@ func createTestUpstreamViaCLI(t *testing.T, env []string, id string) {
 		"id": %q,
 		"type": "roundrobin",
 		"nodes": {"%s": 1}
-	}`, id, strings.TrimPrefix(httpbinURL, "http://"))
+	}`, id, upstreamNode())
 
 	tmpFile := filepath.Join(t.TempDir(), "upstream.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(upstreamJSON), 0644))
@@ -83,7 +82,7 @@ func TestUpstream_CRUD(t *testing.T) {
 		"id": %q,
 		"type": "roundrobin",
 		"nodes": {"%s": 2}
-	}`, usID, strings.TrimPrefix(httpbinURL, "http://"))
+	}`, usID, upstreamNode())
 	tmpFile := filepath.Join(t.TempDir(), "upstream-update.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(updateJSON), 0644))
 
@@ -107,7 +106,7 @@ func TestUpstream_MultiNode(t *testing.T) {
 			"%s": 3,
 			"127.0.0.1:9999": 1
 		}
-	}`, usID, strings.TrimPrefix(httpbinURL, "http://"))
+	}`, usID, upstreamNode())
 
 	tmpFile := filepath.Join(t.TempDir(), "upstream.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(upstreamJSON), 0644))
@@ -181,7 +180,7 @@ func TestUpstream_ListWithLabel(t *testing.T) {
 		"type": "roundrobin",
 		"nodes": {"%s": 1},
 		"labels": {"env": "e2e-test"}
-	}`, usID, strings.TrimPrefix(httpbinURL, "http://"))
+	}`, usID, upstreamNode())
 
 	tmpFile := filepath.Join(t.TempDir(), "upstream.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(upstreamJSON), 0644))

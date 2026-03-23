@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -140,7 +139,7 @@ func TestConsumer_WithKeyAuth(t *testing.T) {
 			"key-auth": {},
 			"proxy-rewrite": {"uri": "/get"}
 		}
-	}`, routeID, strings.TrimPrefix(httpbinURL, "http://"))
+	}`, routeID, upstreamNode())
 
 	tmpFile := filepath.Join(t.TempDir(), "route.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(routeJSON), 0644))
