@@ -7,6 +7,7 @@ type Route struct {
 	Desc       string                 `json:"desc,omitempty" yaml:"desc,omitempty"`
 	URI        string                 `json:"uri,omitempty" yaml:"uri,omitempty"`
 	URIs       []string               `json:"uris,omitempty" yaml:"uris,omitempty"`
+	Paths      []string               `json:"paths,omitempty" yaml:"paths,omitempty"`
 	Methods    []string               `json:"methods,omitempty" yaml:"methods,omitempty"`
 	Host       string                 `json:"host,omitempty" yaml:"host,omitempty"`
 	Hosts      []string               `json:"hosts,omitempty" yaml:"hosts,omitempty"`

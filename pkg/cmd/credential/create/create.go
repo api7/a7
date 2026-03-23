@@ -23,6 +23,7 @@ type Options struct {
 	GatewayGroup string
 	Consumer     string
 	File         string
+	ID           string
 
 	Desc        string
 	PluginsJSON string
@@ -32,13 +33,16 @@ type Options struct {
 func NewCmd(f *cmd.Factory) *cobra.Command {
 	opts := &Options{IO: f.IOStreams, Client: f.HttpClient, Config: f.Config}
 	c := &cobra.Command{
-		Use:   "create",
+		Use:   "create [id]",
 		Short: "Create a credential",
-		Args:  cobra.NoArgs,
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.Output, _ = c.Flags().GetString("output")
 			opts.GatewayGroup, _ = c.Flags().GetString("gateway-group")
 			opts.Consumer, _ = c.Flags().GetString("consumer")
+			if len(args) > 0 {
+				opts.ID = args[0]
+			}
 			return actionRun(opts)
 		},
 	}
@@ -73,6 +77,10 @@ func actionRun(opts *Options) error {
 		payload, err := cmdutil.ReadResourceFile(opts.File, opts.IO.In)
 		if err != nil {
 			return err
+		}
+
+		if opts.ID != "" {
+			payload["id"] = opts.ID
 		}
 
 		httpClient, err := opts.Client()

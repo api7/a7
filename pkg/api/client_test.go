@@ -179,7 +179,7 @@ func TestClient_APIError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"message":"bad request"}`))
+		w.Write([]byte(`{"error_msg":"bad request"}`))
 	}))
 	defer server.Close()
 
@@ -213,7 +213,7 @@ func TestClient_APIError_401(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"message":"invalid api key"}`))
+		w.Write([]byte(`{"error_msg":"invalid api key"}`))
 	}))
 	defer server.Close()
 
@@ -884,7 +884,7 @@ func TestClient_StatusCode_204(t *testing.T) {
 func TestClient_StatusCode_400(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`{"message": "bad request"}`))
+		w.Write([]byte(`{"error_msg": "bad request"}`))
 	}))
 	defer server.Close()
 
@@ -904,7 +904,7 @@ func TestClient_StatusCode_400(t *testing.T) {
 func TestClient_StatusCode_403(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
-		w.Write([]byte(`{"message": "forbidden"}`))
+		w.Write([]byte(`{"error_msg": "forbidden"}`))
 	}))
 	defer server.Close()
 
@@ -933,7 +933,7 @@ func TestClient_StatusCode_403(t *testing.T) {
 func TestClient_StatusCode_404(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(`{"message": "not found"}`))
+		w.Write([]byte(`{"error_msg": "not found"}`))
 	}))
 	defer server.Close()
 
@@ -962,7 +962,7 @@ func TestClient_StatusCode_404(t *testing.T) {
 func TestClient_StatusCode_500(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(`{"message": "internal error"}`))
+		w.Write([]byte(`{"error_msg": "internal error"}`))
 	}))
 	defer server.Close()
 
@@ -991,7 +991,7 @@ func TestClient_StatusCode_500(t *testing.T) {
 func TestClient_StatusCode_502(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadGateway)
-		w.Write([]byte(`{"message": "bad gateway"}`))
+		w.Write([]byte(`{"error_msg": "bad gateway"}`))
 	}))
 	defer server.Close()
 

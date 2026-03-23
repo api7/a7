@@ -462,6 +462,15 @@ func fetchPluginMetadata(client *api.Client, query map[string]string) ([]api.Plu
 			if cmdutil.IsNotFound(err) {
 				continue
 			}
+			// Skip plugins that don't support metadata (e.g., "plugin doesn't
+			// have metadata_schema"). This is common in API7 EE where some
+			// plugins expose the metadata endpoint but return an error.
+			errMsg := err.Error()
+			if strings.Contains(errMsg, "metadata_schema") ||
+				strings.Contains(errMsg, "doesn't have") ||
+				cmdutil.IsOptionalResourceError(err) {
+				continue
+			}
 			return nil, err
 		}
 

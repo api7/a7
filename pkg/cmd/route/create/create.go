@@ -25,6 +25,7 @@ type Options struct {
 
 	Name       string
 	URI        string
+	Paths      []string
 	Methods    []string
 	Host       string
 	ServiceID  string
@@ -48,7 +49,8 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 
 	c.Flags().StringVar(&opts.Name, "name", "", "Route name")
 	c.Flags().StringVarP(&opts.File, "file", "f", "", "Path to JSON/YAML file with resource definition")
-	c.Flags().StringVar(&opts.URI, "uri", "", "Route URI")
+	c.Flags().StringVar(&opts.URI, "uri", "", "Route URI (single path, APISIX compat)")
+	c.Flags().StringSliceVar(&opts.Paths, "path", nil, "Route path (repeatable, API7 EE format)")
 	c.Flags().StringSliceVar(&opts.Methods, "methods", nil, "Allowed HTTP methods")
 	c.Flags().StringVar(&opts.Host, "host", "", "Route host")
 	c.Flags().StringVar(&opts.ServiceID, "service-id", "", "Bound service ID")
@@ -100,8 +102,18 @@ func actionRun(opts *Options) error {
 		}
 		return cmdutil.NewExporter(format, opts.IO.Out).Write(json.RawMessage(body))
 	}
-	if opts.URI == "" {
-		return fmt.Errorf("--uri is required")
+	if opts.URI == "" && len(opts.Paths) == 0 {
+		return fmt.Errorf("--path or --uri is required")
+	}
+
+	if opts.Name == "" {
+		return fmt.Errorf("--name is required for flag-based route creation")
+	}
+
+	// Convert --uri to Paths for API7 EE compatibility.
+	paths := opts.Paths
+	if len(paths) == 0 && opts.URI != "" {
+		paths = []string{opts.URI}
 	}
 
 	httpClient, err := opts.Client()
@@ -120,7 +132,7 @@ func actionRun(opts *Options) error {
 
 	bodyReq := api.Route{
 		Name:       opts.Name,
-		URI:        opts.URI,
+		Paths:      paths,
 		Methods:    opts.Methods,
 		Host:       opts.Host,
 		ServiceID:  opts.ServiceID,

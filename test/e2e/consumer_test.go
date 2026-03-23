@@ -140,7 +140,8 @@ func TestConsumer_WithKeyAuth(t *testing.T) {
 	// Create route with key-auth plugin
 	routeJSON := fmt.Sprintf(`{
 		"id": %q,
-		"uri": "/test-keyauth",
+		"name": "route-keyauth",
+		"paths": ["/test-keyauth"],
 		"upstream": {
 			"type": "roundrobin",
 			"nodes": {"%s": 1}

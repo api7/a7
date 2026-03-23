@@ -160,7 +160,8 @@ func TestService_RouteWithServiceID(t *testing.T) {
 
 	routeJSON := fmt.Sprintf(`{
 		"id": %q,
-		"uri": "/test-svc-ref",
+		"name": "route-svc-ref",
+		"paths": ["/test-svc-ref"],
 		"service_id": %q
 	}`, routeID, svcID)
 	tmpFile := filepath.Join(t.TempDir(), "route.json")

@@ -81,8 +81,8 @@ func TestListRoutes_Table(t *testing.T) {
 	if !strings.Contains(output, "NAME") {
 		t.Error("table should contain NAME header")
 	}
-	if !strings.Contains(output, "URI") {
-		t.Error("table should contain URI header")
+	if !strings.Contains(output, "PATHS") {
+		t.Error("table should contain PATHS header")
 	}
 	if !strings.Contains(output, "METHODS") {
 		t.Error("table should contain METHODS header")

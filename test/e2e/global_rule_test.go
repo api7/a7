@@ -68,12 +68,11 @@ func TestGlobalRule_CRUD(t *testing.T) {
 	require.NoError(t, err, stderr)
 	assert.Contains(t, stdout, "prometheus")
 
-	// Update
+	// Update — API7 EE requires exactly one plugin per global rule.
 	updateJSON := fmt.Sprintf(`{
 		"id": %q,
 		"plugins": {
-			"prometheus": {},
-			"server-header": {"server_header_value": "e2e-test"}
+			"prometheus": {"prefer_name": true}
 		}
 	}`, grID)
 	tmpFile2 := filepath.Join(t.TempDir(), "global-rule-update.json")

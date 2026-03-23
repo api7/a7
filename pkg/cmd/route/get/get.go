@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -81,6 +82,7 @@ func actionRun(opts *Options) error {
 	tp.AddRow("id", item.ID)
 	tp.AddRow("name", item.Name)
 	tp.AddRow("uri", item.URI)
+	tp.AddRow("paths", strings.Join(item.Paths, ", "))
 	tp.AddRow("host", item.Host)
 	tp.AddRow("service_id", item.ServiceID)
 	tp.AddRow("upstream_id", item.UpstreamID)

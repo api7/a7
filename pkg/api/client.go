@@ -132,5 +132,30 @@ func (c *Client) do(method, path string, query map[string]string, body interface
 		return nil, &apiErr
 	}
 
-	return respBody, nil
+	// API7 EE wraps single-resource responses in {"value": {...}}.
+	// List responses use {"total": N, "list": [...]}, left as-is.
+	return unwrapValueEnvelope(respBody), nil
+}
+
+// unwrapValueEnvelope strips the API7 EE {"value": ...} envelope from
+// single-resource responses. List responses and non-object bodies pass through.
+func unwrapValueEnvelope(body []byte) []byte {
+	trimmed := bytes.TrimSpace(body)
+	if len(trimmed) == 0 || trimmed[0] != '{' {
+		return body
+	}
+
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return body
+	}
+
+	val, hasValue := envelope["value"]
+	_, hasList := envelope["list"]
+	_, hasTotal := envelope["total"]
+	if hasValue && !hasList && !hasTotal && len(envelope) <= 2 {
+		return val
+	}
+
+	return body
 }

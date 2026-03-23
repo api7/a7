@@ -19,7 +19,9 @@ func TestConfigSync_DryRun(t *testing.T) {
 	syncYAML := `version: "1"
 routes:
   - id: e2e-sync-dryrun-route
-    uri: /sync-dryrun
+    name: e2e-sync-dryrun-route
+    paths:
+      - /sync-dryrun
     upstream:
       type: roundrobin
       nodes:
@@ -47,12 +49,14 @@ func TestConfigSync_CreateAndCleanup(t *testing.T) {
 	minimalYAML := fmt.Sprintf(`version: "1"
 routes:
   - id: %s
-    uri: /sync-create-test
+    name: %s
+    paths:
+      - /sync-create-test
     upstream:
       type: roundrobin
       nodes:
         "127.0.0.1:8080": 1
-`, routeID)
+`, routeID, routeID)
 
 	syncFile := filepath.Join(t.TempDir(), "sync-create.yaml")
 	require.NoError(t, os.WriteFile(syncFile, []byte(minimalYAML), 0644))

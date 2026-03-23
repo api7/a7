@@ -19,7 +19,7 @@ type SingleResponse[T any] struct {
 // APIError represents an error response from the API7 EE Admin API.
 type APIError struct {
 	StatusCode int    `json:"-"`
-	ErrorMsg   string `json:"message"`
+	ErrorMsg   string `json:"error_msg"`
 }
 
 func (e *APIError) Error() string {
