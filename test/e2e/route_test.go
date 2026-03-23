@@ -237,6 +237,8 @@ func TestRoute_ListWithLabel(t *testing.T) {
 }
 
 func TestRoute_TrafficForwarding(t *testing.T) {
+	requireGatewayURL(t)
+	requireHTTPBin(t)
 	env := setupEnv(t)
 	routeID := "e2e-route-traffic"
 	t.Cleanup(func() { deleteRouteViaAdmin(t, routeID) })

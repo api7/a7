@@ -15,6 +15,8 @@ import (
 )
 
 func TestDebugTrace_JSONOutput(t *testing.T) {
+	requireGatewayURL(t)
+	requireHTTPBin(t)
 	env := setupEnv(t)
 	routeID := "e2e-debug-trace-route"
 	t.Cleanup(func() { deleteRouteViaAdmin(t, routeID) })
@@ -51,6 +53,8 @@ func TestDebugTrace_JSONOutput(t *testing.T) {
 }
 
 func TestDebugTrace_WithMethod(t *testing.T) {
+	requireGatewayURL(t)
+	requireHTTPBin(t)
 	env := setupEnv(t)
 	routeID := "e2e-debug-trace-method"
 	t.Cleanup(func() { deleteRouteViaAdmin(t, routeID) })
@@ -93,6 +97,8 @@ func TestDebugTrace_WithMethod(t *testing.T) {
 }
 
 func TestDebugTrace_WithHeaders(t *testing.T) {
+	requireGatewayURL(t)
+	requireHTTPBin(t)
 	env := setupEnv(t)
 	routeID := "e2e-debug-trace-headers"
 	t.Cleanup(func() { deleteRouteViaAdmin(t, routeID) })
@@ -124,6 +130,8 @@ func TestDebugTrace_WithHeaders(t *testing.T) {
 }
 
 func TestDebugTrace_WithHost(t *testing.T) {
+	requireGatewayURL(t)
+	requireHTTPBin(t)
 	env := setupEnv(t)
 	routeID := "e2e-debug-trace-host"
 	t.Cleanup(func() { deleteRouteViaAdmin(t, routeID) })
@@ -158,6 +166,8 @@ func TestDebugTrace_WithHost(t *testing.T) {
 }
 
 func TestDebugTrace_WithPath(t *testing.T) {
+	requireGatewayURL(t)
+	requireHTTPBin(t)
 	env := setupEnv(t)
 	routeID := "e2e-debug-trace-path"
 	t.Cleanup(func() { deleteRouteViaAdmin(t, routeID) })
@@ -199,6 +209,7 @@ func TestDebugTrace_WithPath(t *testing.T) {
 }
 
 func TestDebugTrace_NonexistentRoute(t *testing.T) {
+	requireGatewayURL(t)
 	env := setupEnv(t)
 
 	_, _, err := runA7WithEnv(env, "debug", "trace", "nonexistent-route-12345",
@@ -210,6 +221,8 @@ func TestDebugTrace_NonexistentRoute(t *testing.T) {
 }
 
 func TestDebugTrace_YAMLOutput(t *testing.T) {
+	requireGatewayURL(t)
+	requireHTTPBin(t)
 	env := setupEnv(t)
 	routeID := "e2e-debug-trace-yaml"
 	t.Cleanup(func() { deleteRouteViaAdmin(t, routeID) })

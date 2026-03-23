@@ -115,6 +115,8 @@ func TestConsumer_Export(t *testing.T) {
 }
 
 func TestConsumer_WithKeyAuth(t *testing.T) {
+	requireGatewayURL(t)
+	requireHTTPBin(t)
 	env := setupEnv(t)
 	username := "e2e-consumer-keyauth"
 	routeID := "e2e-route-keyauth"

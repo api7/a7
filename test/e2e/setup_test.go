@@ -2,11 +2,13 @@
 
 // Package e2e provides end-to-end tests for the a7 CLI.
 // These tests run against a real API7 Enterprise Edition instance and require
-// the following environment to be available:
+// the following environment variables:
 //
-//   - API7 EE Dashboard API at A7_ADMIN_URL (default: https://127.0.0.1:7443)
-//   - API7 EE Gateway at A7_GATEWAY_URL (default: http://127.0.0.1:9080)
-//   - httpbin at HTTPBIN_URL (default: http://127.0.0.1:8080)
+//   - A7_ADMIN_URL: API7 EE Dashboard/control-plane URL (required)
+//   - A7_TOKEN: API7 EE access token (required)
+//   - A7_GATEWAY_GROUP: Gateway group name (default: "default")
+//   - A7_GATEWAY_URL: Gateway data-plane URL (optional — gateway traffic tests skipped if empty)
+//   - HTTPBIN_URL: httpbin URL (optional — traffic forwarding tests skipped if empty)
 //
 // Run with: go test -v -tags e2e -count=1 -timeout 10m ./test/e2e/...
 package e2e
@@ -42,13 +44,18 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	adminURL = envOrDefault("A7_ADMIN_URL", "https://127.0.0.1:7443")
-	gatewayURL = envOrDefault("A7_GATEWAY_URL", "http://127.0.0.1:9080")
-	httpbinURL = envOrDefault("HTTPBIN_URL", "http://127.0.0.1:8080")
+	adminURL = envOrDefault("A7_ADMIN_URL", "")
+	gatewayURL = envOrDefault("A7_GATEWAY_URL", "")
+	httpbinURL = envOrDefault("HTTPBIN_URL", "")
 	adminToken = envOrDefault("A7_TOKEN", "")
 
 	if g := os.Getenv("A7_GATEWAY_GROUP"); g != "" {
 		gatewayGroup = g
+	}
+
+	if adminURL == "" {
+		fmt.Fprintln(os.Stderr, "A7_ADMIN_URL environment variable is required for E2E tests")
+		os.Exit(1)
 	}
 
 	if adminToken == "" {
@@ -229,4 +236,18 @@ func resolveModuleRoot() (string, error) {
 		return "", fmt.Errorf("not inside a Go module")
 	}
 	return filepath.Dir(gomod), nil
+}
+
+func requireGatewayURL(t *testing.T) {
+	t.Helper()
+	if gatewayURL == "" {
+		t.Skip("A7_GATEWAY_URL not set — skipping gateway traffic test")
+	}
+}
+
+func requireHTTPBin(t *testing.T) {
+	t.Helper()
+	if httpbinURL == "" {
+		t.Skip("HTTPBIN_URL not set — skipping httpbin-dependent test")
+	}
 }

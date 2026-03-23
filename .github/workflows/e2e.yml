@@ -1,57 +1,26 @@
 name: E2E Tests
 on:
   pull_request:
-    branches: [main]
+    branches: [main, master]
   push:
-    branches: [main]
+    branches: [main, master]
   workflow_dispatch:
 
 jobs:
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Only run if secrets are available (skip on forks).
+    if: github.repository == 'api7/a7'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: '1.22'
 
-      - name: Start API7 EE
-        working-directory: test/e2e
-        run: docker compose up -d --wait --wait-timeout 120
-
-      - name: Wait for API7 EE
-        run: |
-          for i in $(seq 1 60); do
-            if curl -sk https://127.0.0.1:7443/api/status; then
-              echo "API7 EE is ready"
-              break
-            fi
-            echo "Waiting for API7 EE... ($i/60)"
-            sleep 2
-          done
-
-      - name: Get admin token
-        id: token
-        run: |
-          TOKEN=$(curl -sk https://127.0.0.1:7443/api/login -d '{"username":"admin","password":"admin"}' | jq -r '.token')
-          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
-
       - name: Run E2E tests
         env:
-          A7_ADMIN_URL: https://127.0.0.1:7443
-          A7_GATEWAY_URL: http://127.0.0.1:9080
-          A7_TOKEN: ${{ steps.token.outputs.token }}
+          A7_ADMIN_URL: ${{ secrets.DEMO_WEBSITE }}
+          A7_TOKEN: ${{ secrets.DEMO_TOKEN }}
           A7_GATEWAY_GROUP: default
-          HTTPBIN_URL: http://127.0.0.1:8080
         run: make test-e2e
-
-      - name: Dump docker logs on failure
-        if: failure()
-        working-directory: test/e2e
-        run: docker compose logs
-
-      - name: Stop API7 EE
-        if: always()
-        working-directory: test/e2e
-        run: docker compose down -v
