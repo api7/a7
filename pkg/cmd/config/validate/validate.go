@@ -208,6 +208,12 @@ func hasRouteURI(r api.Route) bool {
 			return true
 		}
 	}
+	// API7 EE uses "paths" instead of "uri"/"uris".
+	for _, p := range r.Paths {
+		if strings.TrimSpace(p) != "" {
+			return true
+		}
+	}
 	return false
 }
 

@@ -44,4 +44,4 @@ docker-down:
 	docker compose -f test/e2e/docker-compose.yml down -v
 
 test-e2e:
-	go test ./test/e2e/... -count=1 -v -tags=e2e -timeout 15m
+	go test ./test/e2e/... -count=1 -v -tags=e2e -timeout 25m

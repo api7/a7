@@ -88,23 +88,15 @@ func actionRun(opts *Options) error {
 		}
 	}
 
-	bodyReq := api.PluginMetadata{Metadata: metadata}
-
 	client := api.NewClient(httpClient, cfg.BaseURL())
-	body, err := client.Put("/apisix/admin/plugin_metadata/"+opts.PluginName+"?gateway_group_id="+ggID, bodyReq)
+	body, err := client.Put("/apisix/admin/plugin_metadata/"+opts.PluginName+"?gateway_group_id="+ggID, metadata)
 	if err != nil {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
-	}
-
-	var updated api.PluginMetadata
-	if err := json.Unmarshal(body, &updated); err != nil {
-		return fmt.Errorf("failed to decode response: %w", err)
 	}
 
 	format := opts.Output
 	if format == "" {
 		format = "json"
 	}
-	exporter := cmdutil.NewExporter(format, opts.IO.Out)
-	return exporter.Write(updated)
+	return cmdutil.NewExporter(format, opts.IO.Out).Write(json.RawMessage(body))
 }

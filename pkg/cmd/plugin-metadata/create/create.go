@@ -103,6 +103,7 @@ func actionRun(opts *Options) error {
 		return err
 	}
 
+	// API7 EE expects raw metadata map as request body (e.g., {"log_format": {...}}).
 	metadata := map[string]interface{}{}
 	if opts.MetadataJSON != "" {
 		if err := json.Unmarshal([]byte(opts.MetadataJSON), &metadata); err != nil {
@@ -110,23 +111,15 @@ func actionRun(opts *Options) error {
 		}
 	}
 
-	bodyReq := api.PluginMetadata{Metadata: metadata}
-
 	client := api.NewClient(httpClient, cfg.BaseURL())
-	body, err := client.Put("/apisix/admin/plugin_metadata/"+opts.PluginName+"?gateway_group_id="+ggID, bodyReq)
+	body, err := client.Put("/apisix/admin/plugin_metadata/"+opts.PluginName+"?gateway_group_id="+ggID, metadata)
 	if err != nil {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
-	}
-
-	var created api.PluginMetadata
-	if err := json.Unmarshal(body, &created); err != nil {
-		return fmt.Errorf("failed to decode response: %w", err)
 	}
 
 	format := opts.Output
 	if format == "" {
 		format = "json"
 	}
-	exporter := cmdutil.NewExporter(format, opts.IO.Out)
-	return exporter.Write(created)
+	return cmdutil.NewExporter(format, opts.IO.Out).Write(json.RawMessage(body))
 }

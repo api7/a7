@@ -299,6 +299,28 @@ func upstreamNodePort() int {
 	return 80
 }
 
+// createTestRouteWithServiceViaCLI creates a route that belongs to an existing service.
+// The service must already exist. This is needed because API7 EE requires service_id for routes.
+func createTestRouteWithServiceViaCLI(t *testing.T, env []string, routeID, serviceID string) {
+	t.Helper()
+	routeJSON := fmt.Sprintf(`{
+		"id": %q,
+		"name": "e2e-route-%s",
+		"service_id": %q,
+		"paths": ["/test-%s"],
+		"upstream": {
+			"type": "roundrobin",
+			"nodes": [{"host": %q, "port": %d, "weight": 1}]
+		}
+	}`, routeID, routeID, serviceID, routeID, upstreamNodeHost(), upstreamNodePort())
+
+	tmpFile := filepath.Join(t.TempDir(), "route.json")
+	require.NoError(t, os.WriteFile(tmpFile, []byte(routeJSON), 0644))
+
+	stdout, stderr, err := runA7WithEnv(env, "route", "create", "-f", tmpFile, "-g", gatewayGroup)
+	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+}
+
 func resolveFirstGatewayGroupID() (string, error) {
 	req, err := http.NewRequest(http.MethodGet, adminURL+"/api/gateway_groups", nil)
 	if err != nil {

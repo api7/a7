@@ -66,20 +66,22 @@ func actionRun(opts *Options) error {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
 	}
 
-	var item api.PluginMetadata
-	if err := json.Unmarshal(body, &item); err != nil {
+	// API7 EE returns plugin metadata as a raw map (e.g., {"log_format": {...}}).
+	// After unwrapValueEnvelope, `body` is the raw metadata map directly.
+	var metadata map[string]interface{}
+	if err := json.Unmarshal(body, &metadata); err != nil {
 		return fmt.Errorf("failed to decode response: %w", err)
 	}
 
 	if opts.Output != "" {
 		exporter := cmdutil.NewExporter(opts.Output, opts.IO.Out)
-		return exporter.Write(item)
+		return exporter.Write(json.RawMessage(body))
 	}
 
-	metaJSON, _ := json.Marshal(item.Metadata)
+	metaJSON, _ := json.MarshalIndent(metadata, "", "  ")
 	tp := tableprinter.New(opts.IO.Out)
 	tp.SetHeaders("FIELD", "VALUE")
-	tp.AddRow("id", item.ID)
+	tp.AddRow("plugin", opts.PluginName)
 	tp.AddRow("metadata", string(metaJSON))
 	return tp.Render()
 }
