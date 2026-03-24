@@ -279,6 +279,26 @@ func upstreamNode() string {
 	return "127.0.0.1:80"
 }
 
+// upstreamNodeHost returns the host portion (without port) for array-format nodes.
+func upstreamNodeHost() string {
+	node := upstreamNode()
+	if idx := strings.LastIndex(node, ":"); idx > 0 {
+		return node[:idx]
+	}
+	return node
+}
+
+// upstreamNodePort returns the port portion for array-format nodes.
+func upstreamNodePort() int {
+	node := upstreamNode()
+	if idx := strings.LastIndex(node, ":"); idx > 0 {
+		port := 80
+		fmt.Sscanf(node[idx+1:], "%d", &port)
+		return port
+	}
+	return 80
+}
+
 func resolveFirstGatewayGroupID() (string, error) {
 	req, err := http.NewRequest(http.MethodGet, adminURL+"/api/gateway_groups", nil)
 	if err != nil {

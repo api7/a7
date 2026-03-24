@@ -25,7 +25,9 @@ routes:
     upstream:
       type: roundrobin
       nodes:
-        "127.0.0.1:8080": 1
+        - host: "127.0.0.1"
+          port: 8080
+          weight: 1
 `
 	tmpFile := filepath.Join(t.TempDir(), "sync-dryrun.yaml")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(syncYAML), 0644))
@@ -55,7 +57,9 @@ routes:
     upstream:
       type: roundrobin
       nodes:
-        "127.0.0.1:8080": 1
+        - host: "127.0.0.1"
+          port: 8080
+          weight: 1
 `, routeID, routeID)
 
 	syncFile := filepath.Join(t.TempDir(), "sync-create.yaml")

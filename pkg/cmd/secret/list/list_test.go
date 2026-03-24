@@ -35,7 +35,7 @@ func TestListSecrets_Table(t *testing.T) {
 	ios, _, out, _ := iostreams.Test()
 	registry := &httpmock.Registry{}
 
-	registry.Register(http.MethodGet, "/apisix/admin/secrets", httpmock.JSONResponse(`{
+	registry.Register(http.MethodGet, "/apisix/admin/secret_providers", httpmock.JSONResponse(`{
 		"total": 1,
 		"list": [{"id":"vault/s1","uri":"http://vault:8200","prefix":"kv"}]
 	}`))
@@ -68,7 +68,7 @@ func TestListSecrets_JSON(t *testing.T) {
 	ios, _, out, _ := iostreams.Test()
 	registry := &httpmock.Registry{}
 
-	registry.Register(http.MethodGet, "/apisix/admin/secrets", httpmock.JSONResponse(`{
+	registry.Register(http.MethodGet, "/apisix/admin/secret_providers", httpmock.JSONResponse(`{
 		"total": 1,
 		"list": [{"id":"vault/s1","uri":"http://vault:8200","prefix":"kv"}]
 	}`))

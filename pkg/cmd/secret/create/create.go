@@ -80,9 +80,9 @@ func actionRun(opts *Options) error {
 		client := api.NewClient(httpClient, cfg.BaseURL())
 		var body []byte
 		if id, ok := payload["id"]; ok {
-			body, err = client.Put(fmt.Sprintf("/apisix/admin/secrets/%v?gateway_group_id=%s", id, ggID), payload)
+			body, err = client.Put(fmt.Sprintf("/apisix/admin/secret_providers/%v?gateway_group_id=%s", id, ggID), payload)
 		} else {
-			body, err = client.Post("/apisix/admin/secrets?gateway_group_id="+ggID, payload)
+			body, err = client.Post("/apisix/admin/secret_providers?gateway_group_id="+ggID, payload)
 		}
 		if err != nil {
 			return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
@@ -123,7 +123,7 @@ func actionRun(opts *Options) error {
 	}
 
 	client := api.NewClient(httpClient, cfg.BaseURL())
-	body, err := client.Post("/apisix/admin/secrets?gateway_group_id="+ggID, bodyReq)
+	body, err := client.Post("/apisix/admin/secret_providers?gateway_group_id="+ggID, bodyReq)
 	if err != nil {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
 	}

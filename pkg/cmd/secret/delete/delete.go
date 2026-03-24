@@ -75,7 +75,7 @@ func actionRun(opts *Options) error {
 			return nil
 		}
 	}
-	if _, err := client.Delete("/apisix/admin/secrets/"+opts.ID, query); err != nil {
+	if _, err := client.Delete("/apisix/admin/secret_providers/"+opts.ID, query); err != nil {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
 	}
 

@@ -33,7 +33,7 @@ func (m *mockConfig) Save() error                                     { return n
 func TestCreateSecret_JSON(t *testing.T) {
 	ios, _, out, _ := iostreams.Test()
 	registry := &httpmock.Registry{}
-	registry.Register(http.MethodPost, "/apisix/admin/secrets", httpmock.JSONResponse(`{"id":"vault/s1","uri":"http://vault","prefix":"kv","token":"tok"}`))
+	registry.Register(http.MethodPost, "/apisix/admin/secret_providers", httpmock.JSONResponse(`{"id":"vault/s1","uri":"http://vault","prefix":"kv","token":"tok"}`))
 
 	opts := &Options{
 		IO:     ios,

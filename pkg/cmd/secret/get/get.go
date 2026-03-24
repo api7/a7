@@ -61,7 +61,7 @@ func actionRun(opts *Options) error {
 
 	client := api.NewClient(httpClient, cfg.BaseURL())
 	query := map[string]string{"gateway_group_id": ggID}
-	body, err := client.Get("/apisix/admin/secrets/"+opts.ID, query)
+	body, err := client.Get("/apisix/admin/secret_providers/"+opts.ID, query)
 	if err != nil {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
 	}

@@ -223,7 +223,7 @@ func putPathAndBody(resourceType, key string, payload map[string]interface{}) (s
 	case "protos":
 		return fmt.Sprintf("/apisix/admin/protos/%s", key), payload, nil
 	case "secrets":
-		return fmt.Sprintf("/apisix/admin/secrets/%s", key), payload, nil
+		return fmt.Sprintf("/apisix/admin/secret_providers/%s", key), payload, nil
 	case "plugin_metadata":
 		delete(payload, "plugin_name")
 		return fmt.Sprintf("/apisix/admin/plugin_metadata/%s", key), payload, nil
@@ -255,7 +255,7 @@ func deletePath(resourceType, key string) (string, error) {
 	case "protos":
 		return fmt.Sprintf("/apisix/admin/protos/%s", key), nil
 	case "secrets":
-		return fmt.Sprintf("/apisix/admin/secrets/%s", key), nil
+		return fmt.Sprintf("/apisix/admin/secret_providers/%s", key), nil
 	case "plugin_metadata":
 		return fmt.Sprintf("/apisix/admin/plugin_metadata/%s", key), nil
 	default:

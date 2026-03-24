@@ -32,7 +32,7 @@ func (m *mockConfig) Save() error                                     { return n
 func TestDeleteSecret(t *testing.T) {
 	ios, _, out, _ := iostreams.Test()
 	registry := &httpmock.Registry{}
-	registry.Register(http.MethodDelete, "/apisix/admin/secrets/vault/s1", httpmock.JSONResponse(`{}`))
+	registry.Register(http.MethodDelete, "/apisix/admin/secret_providers/vault/s1", httpmock.JSONResponse(`{}`))
 
 	opts := &Options{
 		IO:     ios,

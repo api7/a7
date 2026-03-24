@@ -78,7 +78,7 @@ func actionRun(opts *Options) error {
 			return err
 		}
 		client := api.NewClient(httpClient, cfg.BaseURL())
-		body, err := client.Put("/apisix/admin/secrets/"+opts.ID+"?gateway_group_id="+ggID, payload)
+		body, err := client.Put("/apisix/admin/secret_providers/"+opts.ID+"?gateway_group_id="+ggID, payload)
 		if err != nil {
 			return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
 		}
@@ -108,7 +108,7 @@ func actionRun(opts *Options) error {
 	}
 
 	client := api.NewClient(httpClient, cfg.BaseURL())
-	body, err := client.Put("/apisix/admin/secrets/"+opts.ID+"?gateway_group_id="+ggID, bodyReq)
+	body, err := client.Put("/apisix/admin/secret_providers/"+opts.ID+"?gateway_group_id="+ggID, bodyReq)
 	if err != nil {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
 	}

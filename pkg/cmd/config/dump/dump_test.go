@@ -47,7 +47,7 @@ func registerEmptyResources(reg *httpmock.Registry, skip map[string]bool) {
 		"/apisix/admin/consumer_groups",
 		"/apisix/admin/stream_routes",
 		"/apisix/admin/protos",
-		"/apisix/admin/secrets",
+		"/apisix/admin/secret_providers",
 	}
 	for _, path := range resources {
 		if skip != nil && skip[path] {
@@ -107,10 +107,10 @@ func TestConfigDump_RoutesOnly(t *testing.T) {
 func TestConfigDump_MultipleResources(t *testing.T) {
 	reg := &httpmock.Registry{}
 	registerEmptyResources(reg, map[string]bool{
-		"/apisix/admin/routes":       true,
-		"/apisix/admin/services":     true,
-		"/apisix/admin/secrets":      true,
-		"/apisix/admin/plugins/list": true,
+		"/apisix/admin/routes":           true,
+		"/apisix/admin/services":         true,
+		"/apisix/admin/secret_providers": true,
+		"/apisix/admin/plugins/list":     true,
 	})
 
 	reg.Register(http.MethodGet, "/apisix/admin/routes", httpmock.JSONResponse(`{
@@ -121,7 +121,7 @@ func TestConfigDump_MultipleResources(t *testing.T) {
 		"total": 1,
 		"list": [{"id":"1","name":"svc-1","upstream_id":"1"}]
 	}`))
-	reg.Register(http.MethodGet, "/apisix/admin/secrets", httpmock.JSONResponse(`{
+	reg.Register(http.MethodGet, "/apisix/admin/secret_providers", httpmock.JSONResponse(`{
 		"total": 1,
 		"list": [{"id":"vault/my-vault","uri":"https://vault.example.com"}]
 	}`))

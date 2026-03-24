@@ -33,7 +33,7 @@ func (m *mockConfig) Save() error                                     { return n
 func TestCreatePluginMetadata_JSON(t *testing.T) {
 	ios, _, out, _ := iostreams.Test()
 	registry := &httpmock.Registry{}
-	registry.Register(http.MethodPost, "/apisix/admin/plugin_metadata/key-auth", httpmock.JSONResponse(`{"id":"key-auth","metadata":{"header":"x-api-key"}}`))
+	registry.Register(http.MethodPut, "/apisix/admin/plugin_metadata/key-auth", httpmock.JSONResponse(`{"id":"key-auth","metadata":{"header":"x-api-key"}}`))
 
 	opts := &Options{
 		IO:     ios,

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -112,7 +113,7 @@ func TestGatewayGroup_Alias(t *testing.T) {
 
 func TestGatewayGroup_CRUD(t *testing.T) {
 	env := setupEnv(t)
-	ggName := "E2E Test Gateway Group"
+	ggName := fmt.Sprintf("E2E Test GG %d", time.Now().UnixNano())
 
 	// API7 EE generates UUIDs for gateway groups; custom IDs are not supported.
 	ggJSON := fmt.Sprintf(`{

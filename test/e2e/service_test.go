@@ -35,9 +35,9 @@ func createTestServiceViaCLI(t *testing.T, env []string, id string) {
 		"name": "e2e-svc-%s",
 		"upstream": {
 			"type": "roundrobin",
-			"nodes": {"%s": 1}
+			"nodes": [{"host": %q, "port": %d, "weight": 1}]
 		}
-	}`, id, id, upstreamNode())
+	}`, id, id, upstreamNodeHost(), upstreamNodePort())
 
 	tmpFile := filepath.Join(t.TempDir(), "service.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(svcJSON), 0644))
@@ -86,9 +86,9 @@ func TestService_CRUD(t *testing.T) {
 		"name": "e2e-svc-updated",
 		"upstream": {
 			"type": "roundrobin",
-			"nodes": {"%s": 2}
+			"nodes": [{"host": %q, "port": %d, "weight": 2}]
 		}
-	}`, svcID, upstreamNode())
+	}`, svcID, upstreamNodeHost(), upstreamNodePort())
 	tmpFile := filepath.Join(t.TempDir(), "service-update.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(updateJSON), 0644))
 
@@ -127,14 +127,14 @@ func TestService_WithPlugins(t *testing.T) {
 		"name": "svc-with-plugins",
 		"upstream": {
 			"type": "roundrobin",
-			"nodes": {"%s": 1}
+			"nodes": [{"host": %q, "port": %d, "weight": 1}]
 		},
 		"plugins": {
 			"proxy-rewrite": {
 				"uri": "/get"
 			}
 		}
-	}`, svcID, upstreamNode())
+	}`, svcID, upstreamNodeHost(), upstreamNodePort())
 
 	tmpFile := filepath.Join(t.TempDir(), "service.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(svcJSON), 0644))

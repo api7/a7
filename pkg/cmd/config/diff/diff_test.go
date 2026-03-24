@@ -46,7 +46,7 @@ func registerEmptyResources(reg *httpmock.Registry, skip map[string]bool) {
 		"/apisix/admin/consumer_groups",
 		"/apisix/admin/stream_routes",
 		"/apisix/admin/protos",
-		"/apisix/admin/secrets",
+		"/apisix/admin/secret_providers",
 	}
 	for _, path := range resources {
 		if skip != nil && skip[path] {

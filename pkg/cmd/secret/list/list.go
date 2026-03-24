@@ -68,7 +68,7 @@ func actionRun(opts *Options) error {
 	if labelKey != "" {
 		query["label"] = labelKey
 	}
-	body, err := client.Get("/apisix/admin/secrets", query)
+	body, err := client.Get("/apisix/admin/secret_providers", query)
 	if err != nil {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
 	}

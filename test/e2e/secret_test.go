@@ -15,7 +15,7 @@ import (
 // deleteSecretViaAdmin deletes a secret provider via the Admin API.
 func deleteSecretViaAdmin(t *testing.T, secretManager, id string) {
 	t.Helper()
-	resp, err := runtimeAdminAPI("DELETE", fmt.Sprintf("/apisix/admin/secrets/%s/%s", secretManager, id), nil)
+	resp, err := runtimeAdminAPI("DELETE", fmt.Sprintf("/apisix/admin/secret_providers/%s/%s", secretManager, id), nil)
 	if err == nil {
 		resp.Body.Close()
 	}

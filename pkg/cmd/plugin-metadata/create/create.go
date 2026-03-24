@@ -83,7 +83,7 @@ func actionRun(opts *Options) error {
 		}
 
 		client := api.NewClient(httpClient, cfg.BaseURL())
-		body, err := client.Post("/apisix/admin/plugin_metadata/"+pluginName+"?gateway_group_id="+ggID, payload)
+		body, err := client.Put("/apisix/admin/plugin_metadata/"+pluginName+"?gateway_group_id="+ggID, payload)
 		if err != nil {
 			return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
 		}
@@ -113,7 +113,7 @@ func actionRun(opts *Options) error {
 	bodyReq := api.PluginMetadata{Metadata: metadata}
 
 	client := api.NewClient(httpClient, cfg.BaseURL())
-	body, err := client.Post("/apisix/admin/plugin_metadata/"+opts.PluginName+"?gateway_group_id="+ggID, bodyReq)
+	body, err := client.Put("/apisix/admin/plugin_metadata/"+opts.PluginName+"?gateway_group_id="+ggID, bodyReq)
 	if err != nil {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
 	}

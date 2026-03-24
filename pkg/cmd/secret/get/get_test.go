@@ -34,7 +34,7 @@ func (m *mockConfig) Save() error                                     { return n
 func TestGetSecret_Table(t *testing.T) {
 	ios, _, out, _ := iostreams.Test()
 	registry := &httpmock.Registry{}
-	registry.Register(http.MethodGet, "/apisix/admin/secrets/vault/s1", httpmock.JSONResponse(`{"id":"vault/s1","uri":"http://vault","prefix":"kv","token":"tok"}`))
+	registry.Register(http.MethodGet, "/apisix/admin/secret_providers/vault/s1", httpmock.JSONResponse(`{"id":"vault/s1","uri":"http://vault","prefix":"kv","token":"tok"}`))
 
 	opts := &Options{
 		IO:     ios,
@@ -64,7 +64,7 @@ func TestGetSecret_Table(t *testing.T) {
 func TestGetSecret_JSON(t *testing.T) {
 	ios, _, out, _ := iostreams.Test()
 	registry := &httpmock.Registry{}
-	registry.Register(http.MethodGet, "/apisix/admin/secrets/vault/s1", httpmock.JSONResponse(`{"id":"vault/s1","uri":"http://vault","prefix":"kv","token":"tok"}`))
+	registry.Register(http.MethodGet, "/apisix/admin/secret_providers/vault/s1", httpmock.JSONResponse(`{"id":"vault/s1","uri":"http://vault","prefix":"kv","token":"tok"}`))
 
 	opts := &Options{
 		IO:     ios,

@@ -47,6 +47,7 @@ func TestCredential_CRUD(t *testing.T) {
 
 	// Create credential
 	credJSON := `{
+		"name": "e2e-cred-crud",
 		"plugins": {
 			"key-auth": {
 				"key": "e2e-cred-key-12345"

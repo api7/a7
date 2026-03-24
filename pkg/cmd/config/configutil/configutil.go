@@ -157,7 +157,7 @@ func FetchRemoteConfig(client *api.Client, gatewayGroup string) (*api.ConfigFile
 	if err != nil {
 		return nil, err
 	}
-	secrets, err := fetchPaginated[api.Secret](client, "/apisix/admin/secrets", query)
+	secrets, err := fetchPaginated[api.Secret](client, "/apisix/admin/secret_providers", query)
 	if err != nil {
 		return nil, err
 	}

@@ -39,9 +39,9 @@ func createTestRouteViaCLI(t *testing.T, env []string, id string) string {
 		"paths": ["/test-%s"],
 		"upstream": {
 			"type": "roundrobin",
-			"nodes": {"%s": 1}
+			"nodes": [{"host": %q, "port": %d, "weight": 1}]
 		}
-	}`, id, id, id, upstreamNode())
+	}`, id, id, id, upstreamNodeHost(), upstreamNodePort())
 
 	tmpFile := filepath.Join(t.TempDir(), "route.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(routeJSON), 0644))
@@ -83,9 +83,9 @@ func TestRoute_CRUD(t *testing.T) {
 		"paths": ["/test-crud"],
 		"upstream": {
 			"type": "roundrobin",
-			"nodes": {"%s": 1}
+			"nodes": [{"host": %q, "port": %d, "weight": 1}]
 		}
-	}`, routeID, upstreamNode())
+	}`, routeID, upstreamNodeHost(), upstreamNodePort())
 	tmpFile := filepath.Join(t.TempDir(), "route.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(routeJSON), 0644))
 
@@ -111,9 +111,9 @@ func TestRoute_CRUD(t *testing.T) {
 		"paths": ["/test-updated"],
 		"upstream": {
 			"type": "roundrobin",
-			"nodes": {"%s": 1}
+			"nodes": [{"host": %q, "port": %d, "weight": 1}]
 		}
-	}`, routeID, upstreamNode())
+	}`, routeID, upstreamNodeHost(), upstreamNodePort())
 	tmpFile2 := filepath.Join(t.TempDir(), "route-update.json")
 	require.NoError(t, os.WriteFile(tmpFile2, []byte(updateJSON), 0644))
 
@@ -143,10 +143,10 @@ func TestRoute_CreateWithFlags(t *testing.T) {
 		"host": "test.example.com",
 		"upstream": {
 			"type": "roundrobin",
-			"nodes": {"%s": 1}
+			"nodes": [{"host": %q, "port": %d, "weight": 1}]
 		},
 		"labels": {"env": "test", "team": "e2e"}
-	}`, routeID, upstreamNode())
+	}`, routeID, upstreamNodeHost(), upstreamNodePort())
 
 	tmpFile := filepath.Join(t.TempDir(), "route.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(routeJSON), 0644))
@@ -173,14 +173,14 @@ func TestRoute_CreateWithPlugins(t *testing.T) {
 		"paths": ["/test-plugins"],
 		"upstream": {
 			"type": "roundrobin",
-			"nodes": {"%s": 1}
+			"nodes": [{"host": %q, "port": %d, "weight": 1}]
 		},
 		"plugins": {
 			"proxy-rewrite": {
 				"uri": "/get"
 			}
 		}
-	}`, routeID, upstreamNode())
+	}`, routeID, upstreamNodeHost(), upstreamNodePort())
 
 	tmpFile := filepath.Join(t.TempDir(), "route.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(routeJSON), 0644))
@@ -207,9 +207,9 @@ func TestRoute_Export(t *testing.T) {
 		"paths": ["/test-export"],
 		"upstream": {
 			"type": "roundrobin",
-			"nodes": {"%s": 1}
+			"nodes": [{"host": %q, "port": %d, "weight": 1}]
 		}
-	}`, routeID, upstreamNode())
+	}`, routeID, upstreamNodeHost(), upstreamNodePort())
 	tmpFile := filepath.Join(t.TempDir(), "route.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(routeJSON), 0644))
 
@@ -237,9 +237,9 @@ func TestRoute_ExportYAML(t *testing.T) {
 		"paths": ["/test-export-yaml"],
 		"upstream": {
 			"type": "roundrobin",
-			"nodes": {"%s": 1}
+			"nodes": [{"host": %q, "port": %d, "weight": 1}]
 		}
-	}`, routeID, upstreamNode())
+	}`, routeID, upstreamNodeHost(), upstreamNodePort())
 	tmpFile := filepath.Join(t.TempDir(), "route.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(routeJSON), 0644))
 
@@ -278,10 +278,10 @@ func TestRoute_ListWithLabel(t *testing.T) {
 		"paths": ["/test-label-filter"],
 		"upstream": {
 			"type": "roundrobin",
-			"nodes": {"%s": 1}
+			"nodes": [{"host": %q, "port": %d, "weight": 1}]
 		},
 		"labels": {"filter-test": "yes"}
-	}`, routeID, upstreamNode())
+	}`, routeID, upstreamNodeHost(), upstreamNodePort())
 
 	tmpFile := filepath.Join(t.TempDir(), "route.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(routeJSON), 0644))
@@ -309,14 +309,14 @@ func TestRoute_TrafficForwarding(t *testing.T) {
 		"paths": ["/e2e-traffic-test"],
 		"upstream": {
 			"type": "roundrobin",
-			"nodes": {"%s": 1}
+			"nodes": [{"host": %q, "port": %d, "weight": 1}]
 		},
 		"plugins": {
 			"proxy-rewrite": {
 				"uri": "/get"
 			}
 		}
-	}`, routeID, upstreamNode())
+	}`, routeID, upstreamNodeHost(), upstreamNodePort())
 
 	tmpFile := filepath.Join(t.TempDir(), "route.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(routeJSON), 0644))
