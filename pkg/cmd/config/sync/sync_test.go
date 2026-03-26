@@ -35,7 +35,6 @@ func (m *mockConfig) Save() error                                     { return n
 
 func registerEmptyResources(reg *httpmock.Registry, skip map[string]bool) {
 	resources := []string{
-		"/apisix/admin/routes",
 		"/apisix/admin/services",
 		"/apisix/admin/upstreams",
 		"/apisix/admin/consumers",
@@ -100,7 +99,11 @@ routes:
 
 func TestConfigSync_UpdatesExistingResources(t *testing.T) {
 	reg := &httpmock.Registry{}
-	registerEmptyResources(reg, map[string]bool{"/apisix/admin/routes": true})
+	registerEmptyResources(reg, map[string]bool{"/apisix/admin/services": true})
+	reg.Register(http.MethodGet, "/apisix/admin/services", httpmock.JSONResponse(`{
+		"total": 1,
+		"list": [{"id":"svc-1","name":"svc"}]
+	}`))
 	reg.Register(http.MethodGet, "/apisix/admin/routes", httpmock.JSONResponse(`{
 		"total":1,
 		"list":[{"id":"r1","uri":"/old","name":"old"}]
@@ -109,6 +112,9 @@ func TestConfigSync_UpdatesExistingResources(t *testing.T) {
 
 	local := writeConfig(t, `
 version: "1"
+services:
+  - id: svc-1
+    name: svc
 routes:
   - id: r1
     uri: /new
@@ -128,12 +134,17 @@ routes:
 
 func TestConfigSync_DeletesRemoteOnlyResources(t *testing.T) {
 	reg := &httpmock.Registry{}
-	registerEmptyResources(reg, map[string]bool{"/apisix/admin/routes": true})
+	registerEmptyResources(reg, map[string]bool{"/apisix/admin/services": true})
+	reg.Register(http.MethodGet, "/apisix/admin/services", httpmock.JSONResponse(`{
+		"total": 1,
+		"list": [{"id":"svc-1","name":"svc"}]
+	}`))
 	reg.Register(http.MethodGet, "/apisix/admin/routes", httpmock.JSONResponse(`{
 		"total":1,
 		"list":[{"id":"r-del","uri":"/gone"}]
 	}`))
 	reg.Register(http.MethodDelete, "/apisix/admin/routes/r-del", httpmock.JSONResponse(`{"message":"deleted"}`))
+	reg.Register(http.MethodDelete, "/apisix/admin/services/svc-1", httpmock.JSONResponse(`{"message":"deleted"}`))
 
 	local := writeConfig(t, `
 version: "1"
@@ -175,7 +186,11 @@ routes:
 
 func TestConfigSync_DeleteFalseSkipsDeletion(t *testing.T) {
 	reg := &httpmock.Registry{}
-	registerEmptyResources(reg, map[string]bool{"/apisix/admin/routes": true})
+	registerEmptyResources(reg, map[string]bool{"/apisix/admin/services": true})
+	reg.Register(http.MethodGet, "/apisix/admin/services", httpmock.JSONResponse(`{
+		"total": 1,
+		"list": [{"id":"svc-1","name":"svc"}]
+	}`))
 	reg.Register(http.MethodGet, "/apisix/admin/routes", httpmock.JSONResponse(`{
 		"total":1,
 		"list":[{"id":"r-del","uri":"/gone"}]

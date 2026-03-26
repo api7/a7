@@ -112,7 +112,8 @@ func TestService_Export(t *testing.T) {
 
 	createTestServiceViaCLI(t, env, svcID)
 
-	stdout, stderr, err := runA7WithEnv(env, "service", "export", svcID, "-g", gatewayGroup, "-o", "json")
+	// export is batch-only (cobra.NoArgs); use "get -o json" for single-resource export.
+	stdout, stderr, err := runA7WithEnv(env, "service", "get", svcID, "-g", gatewayGroup, "-o", "json")
 	require.NoError(t, err, stderr)
 	assert.Contains(t, stdout, svcID)
 }

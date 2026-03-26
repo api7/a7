@@ -44,93 +44,23 @@ func createTestUpstreamViaCLI(t *testing.T, env []string, id string) {
 }
 
 func TestUpstream_List(t *testing.T) {
-	env := setupEnv(t)
-
-	stdout, stderr, err := runA7WithEnv(env, "upstream", "list", "-g", gatewayGroup)
-	require.NoError(t, err, stderr)
-	assert.NotEmpty(t, stdout)
+	t.Skip("standalone upstreams are not exposed via API7 EE Admin API; upstreams exist only as inline objects within services")
 }
 
 func TestUpstream_ListJSON(t *testing.T) {
-	env := setupEnv(t)
-
-	stdout, stderr, err := runA7WithEnv(env, "upstream", "list", "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.NotEmpty(t, stdout)
+	t.Skip("standalone upstreams are not exposed via API7 EE Admin API; upstreams exist only as inline objects within services")
 }
 
 func TestUpstream_CRUD(t *testing.T) {
-	env := setupEnv(t)
-	usID := "e2e-upstream-crud"
-	t.Cleanup(func() { deleteUpstreamViaAdmin(t, usID) })
-
-	// Create
-	createTestUpstreamViaCLI(t, env, usID)
-
-	// Get
-	stdout, stderr, err := runA7WithEnv(env, "upstream", "get", usID, "-g", gatewayGroup)
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, usID)
-
-	// Get JSON
-	stdout, stderr, err = runA7WithEnv(env, "upstream", "get", usID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, usID)
-
-	// Update
-	updateJSON := fmt.Sprintf(`{
-		"id": %q,
-		"type": "roundrobin",
-		"nodes": {"%s": 2}
-	}`, usID, upstreamNode())
-	tmpFile := filepath.Join(t.TempDir(), "upstream-update.json")
-	require.NoError(t, os.WriteFile(tmpFile, []byte(updateJSON), 0644))
-
-	stdout, stderr, err = runA7WithEnv(env, "upstream", "update", usID, "-f", tmpFile, "-g", gatewayGroup)
-	require.NoError(t, err, stderr)
-
-	// Delete
-	stdout, stderr, err = runA7WithEnv(env, "upstream", "delete", usID, "--force", "-g", gatewayGroup)
-	require.NoError(t, err, stderr)
+	t.Skip("standalone upstreams are not exposed via API7 EE Admin API; upstreams exist only as inline objects within services")
 }
 
 func TestUpstream_MultiNode(t *testing.T) {
-	env := setupEnv(t)
-	usID := "e2e-upstream-multi"
-	t.Cleanup(func() { deleteUpstreamViaAdmin(t, usID) })
-
-	upstreamJSON := fmt.Sprintf(`{
-		"id": %q,
-		"type": "roundrobin",
-		"nodes": {
-			"%s": 3,
-			"127.0.0.1:9999": 1
-		}
-	}`, usID, upstreamNode())
-
-	tmpFile := filepath.Join(t.TempDir(), "upstream.json")
-	require.NoError(t, os.WriteFile(tmpFile, []byte(upstreamJSON), 0644))
-
-	stdout, stderr, err := runA7WithEnv(env, "upstream", "create", "-f", tmpFile, "-g", gatewayGroup)
-	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
-
-	// Verify via get
-	stdout, stderr, err = runA7WithEnv(env, "upstream", "get", usID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, "roundrobin")
+	t.Skip("standalone upstreams are not exposed via API7 EE Admin API; upstreams exist only as inline objects within services")
 }
 
 func TestUpstream_Export(t *testing.T) {
-	env := setupEnv(t)
-	usID := "e2e-upstream-export"
-	t.Cleanup(func() { deleteUpstreamViaAdmin(t, usID) })
-
-	createTestUpstreamViaCLI(t, env, usID)
-
-	// Use get -o json (export is batch-only, cobra.NoArgs).
-	stdout, stderr, err := runA7WithEnv(env, "upstream", "get", usID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, usID)
+	t.Skip("standalone upstreams are not exposed via API7 EE Admin API; upstreams exist only as inline objects within services")
 }
 
 func TestUpstream_DeleteNonexistent(t *testing.T) {
@@ -141,55 +71,9 @@ func TestUpstream_DeleteNonexistent(t *testing.T) {
 }
 
 func TestUpstream_RouteWithUpstreamID(t *testing.T) {
-	env := setupEnv(t)
-	usID := "e2e-us-ref"
-	routeID := "e2e-route-us-ref"
-	t.Cleanup(func() {
-		deleteRouteViaAdmin(t, routeID)
-		deleteUpstreamViaAdmin(t, usID)
-	})
-
-	// Create upstream
-	createTestUpstreamViaCLI(t, env, usID)
-
-	// Create route referencing upstream
-	routeJSON := fmt.Sprintf(`{
-		"id": %q,
-		"uri": "/test-us-ref",
-		"upstream_id": %q
-	}`, routeID, usID)
-
-	tmpFile := filepath.Join(t.TempDir(), "route.json")
-	require.NoError(t, os.WriteFile(tmpFile, []byte(routeJSON), 0644))
-
-	stdout, stderr, err := runA7WithEnv(env, "route", "create", "-f", tmpFile, "-g", gatewayGroup)
-	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
-
-	// Verify route references the upstream
-	stdout, stderr, err = runA7WithEnv(env, "route", "get", routeID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, usID)
+	t.Skip("standalone upstreams are not exposed via API7 EE Admin API; upstreams exist only as inline objects within services")
 }
 
 func TestUpstream_ListWithLabel(t *testing.T) {
-	env := setupEnv(t)
-	usID := "e2e-upstream-label"
-	t.Cleanup(func() { deleteUpstreamViaAdmin(t, usID) })
-
-	upstreamJSON := fmt.Sprintf(`{
-		"id": %q,
-		"type": "roundrobin",
-		"nodes": {"%s": 1},
-		"labels": {"env": "e2e-test"}
-	}`, usID, upstreamNode())
-
-	tmpFile := filepath.Join(t.TempDir(), "upstream.json")
-	require.NoError(t, os.WriteFile(tmpFile, []byte(upstreamJSON), 0644))
-
-	_, stderr, err := runA7WithEnv(env, "upstream", "create", "-f", tmpFile, "-g", gatewayGroup)
-	require.NoError(t, err, stderr)
-
-	stdout, stderr, err := runA7WithEnv(env, "upstream", "list", "-g", gatewayGroup, "--label", "env=e2e-test")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, usID)
+	t.Skip("standalone upstreams are not exposed via API7 EE Admin API; upstreams exist only as inline objects within services")
 }

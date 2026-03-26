@@ -117,11 +117,14 @@ func FetchRemoteConfig(client *api.Client, gatewayGroup string) (*api.ConfigFile
 		query["gateway_group_id"] = gatewayGroup
 	}
 
-	routes, err := fetchPaginated[api.Route](client, "/apisix/admin/routes", query)
+	services, err := fetchPaginated[api.Service](client, "/apisix/admin/services", query)
 	if err != nil {
 		return nil, err
 	}
-	services, err := fetchPaginated[api.Service](client, "/apisix/admin/services", query)
+
+	// API7 EE requires service_id when listing routes with access tokens.
+	// Fetch routes per service and aggregate.
+	routes, err := fetchRoutesForServices(client, services, query)
 	if err != nil {
 		return nil, err
 	}
@@ -435,6 +438,40 @@ func fetchPaginated[T any](client *api.Client, path string, extraQuery map[strin
 	}
 
 	return items, nil
+}
+
+func fetchRoutesForServices(client *api.Client, services []api.Service, baseQuery map[string]string) ([]api.Route, error) {
+	seen := make(map[string]bool)
+	var allRoutes []api.Route
+	for _, svc := range services {
+		if svc.ID == "" {
+			continue
+		}
+		q := make(map[string]string, len(baseQuery)+1)
+		for k, v := range baseQuery {
+			q[k] = v
+		}
+		q["service_id"] = svc.ID
+		routes, err := fetchPaginated[api.Route](client, "/apisix/admin/routes", q)
+		if err != nil {
+			if cmdutil.IsOptionalResourceError(err) {
+				continue
+			}
+			return nil, err
+		}
+		for _, r := range routes {
+			key := r.ID
+			if key == "" {
+				allRoutes = append(allRoutes, r)
+				continue
+			}
+			if !seen[key] {
+				seen[key] = true
+				allRoutes = append(allRoutes, r)
+			}
+		}
+	}
+	return allRoutes, nil
 }
 
 func fetchPluginMetadata(client *api.Client, query map[string]string) ([]api.PluginMetadataEntry, error) {

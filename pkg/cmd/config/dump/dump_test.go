@@ -35,9 +35,12 @@ func (m *mockConfig) RemoveContext(name string) error                 { return n
 func (m *mockConfig) SetCurrentContext(name string) error             { return nil }
 func (m *mockConfig) Save() error                                     { return nil }
 
+// registerEmptyResources registers empty list responses for all resource endpoints.
+// Note: /apisix/admin/routes is NOT registered here because routes are now fetched
+// per-service via fetchRoutesForServices(). Tests that need routes must also register
+// services and the routes endpoint separately.
 func registerEmptyResources(reg *httpmock.Registry, skip map[string]bool) {
 	resources := []string{
-		"/apisix/admin/routes",
 		"/apisix/admin/services",
 		"/apisix/admin/upstreams",
 		"/apisix/admin/consumers",
@@ -72,8 +75,11 @@ func newFactory(reg *httpmock.Registry, ios *iostreams.IOStreams) *cmd.Factory {
 
 func TestConfigDump_RoutesOnly(t *testing.T) {
 	reg := &httpmock.Registry{}
-	registerEmptyResources(reg, map[string]bool{"/apisix/admin/routes": true})
-	// a7 returns items directly in list (no key/value wrapper)
+	registerEmptyResources(reg, map[string]bool{"/apisix/admin/services": true})
+	reg.Register(http.MethodGet, "/apisix/admin/services", httpmock.JSONResponse(`{
+		"total": 1,
+		"list": [{"id":"svc-1","name":"svc"}]
+	}`))
 	reg.Register(http.MethodGet, "/apisix/admin/routes", httpmock.JSONResponse(`{
 		"total": 1,
 		"list": [
@@ -81,6 +87,7 @@ func TestConfigDump_RoutesOnly(t *testing.T) {
 				"id": "1",
 				"name": "hello-route",
 				"uri": "/hello",
+				"service_id": "svc-1",
 				"create_time": 1714100000,
 				"update_time": 1714200000
 			}
@@ -107,7 +114,6 @@ func TestConfigDump_RoutesOnly(t *testing.T) {
 func TestConfigDump_MultipleResources(t *testing.T) {
 	reg := &httpmock.Registry{}
 	registerEmptyResources(reg, map[string]bool{
-		"/apisix/admin/routes":           true,
 		"/apisix/admin/services":         true,
 		"/apisix/admin/secret_providers": true,
 		"/apisix/admin/plugins/list":     true,
@@ -201,10 +207,14 @@ func TestConfigDump_YAMLOutput(t *testing.T) {
 
 func TestConfigDump_FileFlag(t *testing.T) {
 	reg := &httpmock.Registry{}
-	registerEmptyResources(reg, map[string]bool{"/apisix/admin/routes": true})
+	registerEmptyResources(reg, map[string]bool{"/apisix/admin/services": true})
+	reg.Register(http.MethodGet, "/apisix/admin/services", httpmock.JSONResponse(`{
+		"total": 1,
+		"list": [{"id":"svc-1","name":"svc"}]
+	}`))
 	reg.Register(http.MethodGet, "/apisix/admin/routes", httpmock.JSONResponse(`{
 		"total": 1,
-		"list": [{"id":"1","uri":"/hello"}]
+		"list": [{"id":"1","uri":"/hello","service_id":"svc-1"}]
 	}`))
 
 	ios, _, stdout, _ := iostreams.Test()

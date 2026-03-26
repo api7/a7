@@ -15,16 +15,24 @@ import (
 )
 
 type Options struct {
-	IO              *iostreams.IOStreams
-	Client          func() (*http.Client, error)
-	Config          func() (config.Config, error)
-	Output          string
-	ID              string
-	GatewayGroupIDs []string
+	IO             *iostreams.IOStreams
+	Client         func() (*http.Client, error)
+	Config         func() (config.Config, error)
+	Output         string
+	ID             string
+	GatewayGroupID string
+	Version        string
 }
 
-type publishRequest struct {
-	GatewayGroupIDs []string `json:"gateway_group_ids"`
+type publishPayload struct {
+	CreateNewVersion bool             `json:"create_new_version"`
+	GatewayGroupID   string           `json:"gateway_group_id"`
+	Services         []publishService `json:"services"`
+}
+
+type publishService struct {
+	ServiceID string `json:"service_id"`
+	Version   string `json:"version"`
 }
 
 func NewCmd(f *cmd.Factory) *cobra.Command {
@@ -40,13 +48,14 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 		},
 	}
 
-	c.Flags().StringSliceVar(&opts.GatewayGroupIDs, "gateway-group-id", nil, "Gateway group ID (repeatable)")
+	c.Flags().StringVar(&opts.GatewayGroupID, "gateway-group-id", "", "Gateway group ID to publish to (required)")
+	c.Flags().StringVar(&opts.Version, "version", "1.0.0", "Version label for the published service")
 
 	return c
 }
 
 func actionRun(opts *Options) error {
-	if len(opts.GatewayGroupIDs) == 0 {
+	if opts.GatewayGroupID == "" {
 		return fmt.Errorf("required flag(s) \"gateway-group-id\" not set")
 	}
 
@@ -61,12 +70,17 @@ func actionRun(opts *Options) error {
 	}
 
 	client := api.NewClient(httpClient, cfg.BaseURL())
-	body, err := client.Post(
-		fmt.Sprintf("/api/services/template/%s/publish", opts.ID),
-		publishRequest{GatewayGroupIDs: opts.GatewayGroupIDs},
-	)
+	payload := publishPayload{
+		CreateNewVersion: true,
+		GatewayGroupID:   opts.GatewayGroupID,
+		Services: []publishService{
+			{ServiceID: opts.ID, Version: opts.Version},
+		},
+	}
+
+	body, err := client.Post("/api/services/publish", payload)
 	if err != nil {
-		return err
+		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
 	}
 
 	var resp map[string]interface{}

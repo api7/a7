@@ -22,6 +22,15 @@ func deleteServiceTemplateViaAdmin(t *testing.T, id string) {
 	}
 }
 
+// deletePublishedServiceViaAdmin unpublishes a service from a gateway group.
+func deletePublishedServiceViaAdmin(t *testing.T, gatewayGroupID, serviceID string) {
+	t.Helper()
+	resp, err := adminAPI("DELETE", fmt.Sprintf("/api/gateway_groups/%s/services/%s", gatewayGroupID, serviceID), nil)
+	if err == nil {
+		resp.Body.Close()
+	}
+}
+
 // createTestServiceTemplateViaCLI creates a service template via CLI and returns its API-generated ID.
 // API7 EE generates UUIDs for service templates; custom IDs are not supported.
 func createTestServiceTemplateViaCLI(t *testing.T, env []string, name string) string {
@@ -160,7 +169,10 @@ func TestServiceTemplate_Publish(t *testing.T) {
 	stName := "e2e-template-publish"
 
 	stID := createTestServiceTemplateViaCLI(t, env, stName)
-	t.Cleanup(func() { deleteServiceTemplateViaAdmin(t, stID) })
+	t.Cleanup(func() {
+		deletePublishedServiceViaAdmin(t, gatewayGroup, stID)
+		deleteServiceTemplateViaAdmin(t, stID)
+	})
 
 	// Publish to the default gateway group.
 	stdout, stderr, err := runA7WithEnv(env, "service-template", "publish", stID,

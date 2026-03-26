@@ -36,7 +36,6 @@ func (m *mockConfig) Save() error                                     { return n
 
 func registerEmptyResources(reg *httpmock.Registry, skip map[string]bool) {
 	resources := []string{
-		"/apisix/admin/routes",
 		"/apisix/admin/services",
 		"/apisix/admin/upstreams",
 		"/apisix/admin/consumers",
@@ -78,8 +77,11 @@ func writeConfig(t *testing.T, content string) string {
 
 func TestConfigDiff_CreateUpdateDelete(t *testing.T) {
 	reg := &httpmock.Registry{}
-	registerEmptyResources(reg, map[string]bool{"/apisix/admin/routes": true})
-	// a7: items directly in list
+	registerEmptyResources(reg, map[string]bool{"/apisix/admin/services": true})
+	reg.Register(http.MethodGet, "/apisix/admin/services", httpmock.JSONResponse(`{
+		"total": 2,
+		"list": [{"id":"svc-1","name":"svc-1"},{"id":"svc-2","name":"svc-2"}]
+	}`))
 	reg.Register(http.MethodGet, "/apisix/admin/routes", httpmock.JSONResponse(`{
 		"total": 2,
 		"list": [
@@ -117,7 +119,11 @@ routes:
 
 func TestConfigDiff_NoDiff(t *testing.T) {
 	reg := &httpmock.Registry{}
-	registerEmptyResources(reg, map[string]bool{"/apisix/admin/routes": true})
+	registerEmptyResources(reg, map[string]bool{"/apisix/admin/services": true})
+	reg.Register(http.MethodGet, "/apisix/admin/services", httpmock.JSONResponse(`{
+		"total": 1,
+		"list": [{"id":"svc-1","name":"svc"}]
+	}`))
 	reg.Register(http.MethodGet, "/apisix/admin/routes", httpmock.JSONResponse(`{
 		"total": 1,
 		"list": [{"id":"r1","uri":"/same","name":"same"}]
@@ -125,6 +131,9 @@ func TestConfigDiff_NoDiff(t *testing.T) {
 
 	local := writeConfig(t, `
 version: "1"
+services:
+  - id: svc-1
+    name: svc
 routes:
   - id: r1
     uri: /same
@@ -143,7 +152,11 @@ routes:
 
 func TestConfigDiff_EmptyLocal(t *testing.T) {
 	reg := &httpmock.Registry{}
-	registerEmptyResources(reg, map[string]bool{"/apisix/admin/routes": true})
+	registerEmptyResources(reg, map[string]bool{"/apisix/admin/services": true})
+	reg.Register(http.MethodGet, "/apisix/admin/services", httpmock.JSONResponse(`{
+		"total": 1,
+		"list": [{"id":"svc-1","name":"svc"}]
+	}`))
 	reg.Register(http.MethodGet, "/apisix/admin/routes", httpmock.JSONResponse(`{
 		"total": 1,
 		"list": [{"id":"r1","uri":"/same","name":"same"}]
