@@ -70,12 +70,9 @@ Bulk operations are planned for the following resources:
 
 - `route`
 - `service`
-- `upstream`
 - `consumer`
 - `ssl`
 - `global-rule`
-- `plugin-config`
-- `consumer-group`
 - `stream-route`
 - `proto`
 - `secret`

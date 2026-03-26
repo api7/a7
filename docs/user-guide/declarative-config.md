@@ -8,16 +8,13 @@ The declarative config file supports YAML and JSON. It is organized into section
 
 ### EE Resource Sections
 
-A7 supports 16 resource types in its declarative configuration:
+A7 supports the following resource types in its declarative configuration:
 
 - `routes`
 - `services`
-- `upstreams`
 - `consumers`
 - `ssl`
 - `global_rules`
-- `plugin_configs`
-- `consumer_groups`
 - `stream_routes`
 - `protos`
 - `secrets`
@@ -26,6 +23,8 @@ A7 supports 16 resource types in its declarative configuration:
 - `service_templates` (Control Plane resource)
 - `credentials` (Nested under consumers)
 - `canary_release`
+
+> **Note:** `upstreams`, `plugin_configs`, and `consumer_groups` are not exposed via the API7 EE Admin API and are excluded from declarative config operations.
 
 ### Structure with Gateway Groups
 
@@ -37,16 +36,23 @@ gateway_groups:
   - name: "default"
     routes:
       - id: "route-1"
-        uri: "/api/v1/*"
-        upstream_id: "upstream-1"
-    upstreams:
-      - id: "upstream-1"
-        nodes:
-          "127.0.0.1:8080": 1
+        paths:
+          - "/api/v1/*"
+        service_id: "service-1"
+    services:
+      - id: "service-1"
+        name: "my-service"
+        upstream:
+          type: roundrobin
+          nodes:
+            - host: "127.0.0.1"
+              port: 8080
+              weight: 1
   - name: "prod"
     routes:
       - id: "route-prod"
-        uri: "/prod/*"
+        paths:
+          - "/prod/*"
 ```
 
 ## Commands
@@ -131,13 +137,10 @@ a7 config sync -f production.yaml -g prod
 
 To ensure referential integrity, `a7 config sync` applies changes in a specific order:
 
-1. `upstreams`
-2. `services`
-3. `plugin_configs`
-4. `consumer_groups`
-5. `consumers`
-6. `credentials`
-7. `routes`
+1. `services`
+2. `consumers`
+3. `credentials`
+4. `routes`
 
 When deleting resources (`--delete=true`), the order is reversed to prevent dependency violations.
 

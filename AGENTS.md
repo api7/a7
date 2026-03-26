@@ -35,7 +35,7 @@ a7/
 │   ├── root/root.go              # Root command registration
 │   ├── factory.go                # Factory DI container
 │   ├── route/                    # Published route commands
-│   ├── upstream/                 # Published upstream commands
+│   ├── upstream/                 # ⚠️ NOT EXPOSED in API7 EE — upstreams are inline-only (code kept for potential future support)
 │   ├── service/                  # Published service commands
 │   ├── consumer/                 # Consumer commands
 │   ├── ssl/                      # SSL certificate commands
@@ -105,6 +105,14 @@ a7/
 - Auth tokens use `a7ee` prefix (access token).
 - PATCH endpoints use JSON Patch (RFC 6902) arrays, not merge-patch.
 - Enterprise-specific resources: gateway groups, service templates, RBAC (users/roles/policies), developer portal, audit logs, custom plugins, service registries, tokens.
+
+### Resources NOT Exposed in API7 EE
+The following APISIX resources do **not** have REST API endpoints in API7 Enterprise Edition:
+- **Standalone Upstream** (`/apisix/admin/upstreams`): Returns "resource not found". Upstreams exist only inline within services and routes.
+- **Consumer Group** (`/apisix/admin/consumer_groups`): No endpoint exposed.
+- **Plugin Config** (`/apisix/admin/plugin_configs`): No endpoint exposed.
+
+The `pkg/cmd/upstream/` code directory is kept for potential future support, but these commands are non-functional against API7 EE.
 
 ### How to Add a New Command
 1. Read `PRD.md` for the resource spec and `docs/api7ee-api-spec.md` for the API.

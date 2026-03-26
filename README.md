@@ -6,9 +6,9 @@
 
 ## Features
 
-- **Resource CRUD** — Create, list, get, update, and delete 16 API7 EE resource types:
+- **Resource CRUD** — Create, list, get, update, and delete 13 API7 EE resource types:
   - **Control Plane**: Gateway Group, Service Template
-  - **Runtime**: Route, Upstream, Service, Consumer, SSL Certificate, Plugin, Global Rule, Stream Route, Plugin Config, Plugin Metadata, Consumer Group, Credential, Secret, Proto
+  - **Runtime**: Route, Service, Consumer, SSL Certificate, Plugin, Global Rule, Stream Route, Plugin Metadata, Credential, Secret, Proto
 - **Context management** — Switch between multiple API7 EE instances (`a7 context create`, `a7 context use`, `a7 context list`)
 - **Gateway group scoping** — All runtime operations are scoped to a gateway group via `--gateway-group` flag or context config
 - **Rich output** — Human-friendly tables in TTY, machine-readable JSON/YAML in pipes (`--output json|yaml|table`)
@@ -72,18 +72,11 @@ a7 gateway-group get <id> --output json
 ### 3. Create resources
 
 ```bash
-# Create an upstream
-a7 upstream create \
-  --name my-upstream \
-  --type roundrobin \
-  --nodes "httpbin.org:80=1"
+# Create a service with inline upstream
+a7 service create -g default -f service.yaml
 
 # Create a route
-a7 route create \
-  --name my-route \
-  --uri "/api/v1/*" \
-  --methods GET,POST \
-  --upstream-id <upstream-id>
+a7 route create -g default -f route.yaml
 ```
 
 ### 4. Read and explore
@@ -114,13 +107,9 @@ a7 route update <id> \
 ### 6. Clean up
 
 ```bash
-# Delete the route and upstream
-a7 route delete <id>
-a7 upstream delete <id>
-
-# Verify they're gone
-a7 route list
-a7 upstream list
+# Delete the route and service
+a7 route delete <id> -g default --force
+a7 service delete <id> -g default --force
 ```
 
 ## Commands
@@ -149,16 +138,13 @@ a7 upstream list
 | Command | Alias | Actions | Description |
 |---------|-------|---------|-------------|
 | `a7 route` | `rt` | list, get, create, update, delete | Manage routes |
-| `a7 upstream` | `us` | list, get, create, update, delete | Manage upstreams |
 | `a7 service` | `svc` | list, get, create, update, delete | Manage runtime services |
 | `a7 consumer` | `c` | list, get, create, update, delete | Manage consumers |
 | `a7 ssl` | — | list, get, create, update, delete | Manage SSL certificates |
 | `a7 plugin` | `pl` | list, get | Manage plugins |
 | `a7 global-rule` | `gr` | list, get, create, update, delete | Manage global rules |
 | `a7 stream-route` | `sr` | list, get, create, update, delete | Manage stream routes |
-| `a7 plugin-config` | `pc` | list, get, create, update, delete | Manage plugin configs |
 | `a7 plugin-metadata` | `pm` | get, create, update, delete | Manage plugin metadata |
-| `a7 consumer-group` | `cg` | list, get, create, update, delete | Manage consumer groups |
 | `a7 credential` | `cred` | list, get, create, update, delete | Manage consumer credentials |
 | `a7 secret` | `sec` | list, get, create, update, delete | Manage secret providers |
 | `a7 proto` | `pb` | list, get, create, update, delete | Manage protobuf definitions |
@@ -247,7 +233,7 @@ See [AGENTS.md](AGENTS.md) for the full development guide, coding conventions, a
 - [Coding Standards](docs/coding-standards.md)
 - [Testing Strategy](docs/testing-strategy.md)
 - [Development Roadmap](docs/roadmap.md)
-- [User Guides](docs/user-guide/) — Per-resource guides for all 16 resource types
+- [User Guides](docs/user-guide/) — Per-resource guides for all supported resource types
 
 ## Contributing
 

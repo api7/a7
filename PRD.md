@@ -16,7 +16,7 @@
 ## Goals and Non-Goals
 
 ### Goals
-- Provide full CRUD operations for all API7 EE resources (both control-plane `/api/*` and APISIX admin `/apisix/admin/*` endpoints).
+- Provide full CRUD operations for all API7 EE resources (both control-plane `/api/*` and APISIX admin `/apisix/admin/*` endpoints). Note: 3 APISIX resources (standalone upstream, consumer group, plugin config) are not exposed in API7 EE.
 - Support **multiple authentication modes**: access tokens (X-API-KEY with `a7ee` prefix) and session-based login.
 - Implement **gateway group** scoping for all runtime operations (enterprise-specific concept).
 - Implement context/profile management for switching between multiple API7 EE instances.
@@ -128,7 +128,7 @@ All runtime commands require `--gateway-group <id>` (or default from context).
 - `a7 service list|get|create|update|delete|export --gateway-group <id>`
 
 #### Upstreams
-- `a7 upstream list|get|create|update|delete|export --gateway-group <id>`
+> **⚠️ NOT SUPPORTED**: Standalone upstreams are not exposed via the API7 EE Admin API. Upstreams exist only as inline objects within services and routes. The `a7 upstream` commands exist for APISIX compatibility but will not work against API7 EE.
 
 #### Consumers
 - `a7 consumer list|get|create|update|delete|export --gateway-group <id>`
@@ -137,7 +137,7 @@ All runtime commands require `--gateway-group <id>` (or default from context).
 - `a7 credential list|get|create|update|delete --consumer <username> --gateway-group <id>`
 
 #### Consumer Groups
-- `a7 consumer-group list|get|create|update|delete|export --gateway-group <id>`
+> **⚠️ NOT SUPPORTED**: Consumer groups are not exposed via the API7 EE Admin API. The `a7 consumer-group` commands exist for APISIX compatibility but will not work against API7 EE.
 
 #### SSL Certificates
 - `a7 ssl list|get|create|update|delete|export --gateway-group <id>`
@@ -152,7 +152,7 @@ All runtime commands require `--gateway-group <id>` (or default from context).
 - `a7 stream-route list|get|create|update|delete|export --gateway-group <id>`
 
 #### Plugin Config
-- `a7 plugin-config list|get|create|update|delete|export --gateway-group <id>`
+> **⚠️ NOT SUPPORTED**: Plugin configs are not exposed via the API7 EE Admin API. The `a7 plugin-config` commands exist for APISIX compatibility but will not work against API7 EE.
 
 #### Plugin Metadata
 - `a7 plugin-metadata get|create|update|delete --gateway-group <id>` (no list — keyed by plugin name)
@@ -190,16 +190,16 @@ All runtime commands require `--gateway-group <id>` (or default from context).
 1. ✅ Gateway Group CRUD (list, get, create, update, delete).
 2. ✅ Service Template CRUD + publish.
 3. ✅ Route CRUD.
-4. ✅ Upstream CRUD.
+4. ✅ Upstream CRUD. ⚠️ Not functional in API7 EE (standalone upstreams not exposed).
 5. ✅ Service (runtime) CRUD.
 6. ✅ Consumer CRUD.
 7. ✅ SSL CRUD.
 8. ✅ Plugin list + get.
 9. ✅ Global Rule CRUD.
 10. ✅ Stream Route CRUD.
-11. ✅ Plugin Config CRUD.
+11. ✅ Plugin Config CRUD. ⚠️ Not functional in API7 EE (plugin_config not exposed).
 12. ✅ Plugin Metadata CRUD (no list).
-13. ✅ Consumer Group CRUD.
+13. ✅ Consumer Group CRUD. ⚠️ Not functional in API7 EE (consumer_group not exposed).
 14. ✅ Credential CRUD (nested under consumer).
 15. ✅ Secret CRUD.
 16. ✅ Proto CRUD.
@@ -317,7 +317,7 @@ The following table tracks feature parity between a7 and [a6](https://github.com
 
 | Feature | a6 | a7 | Notes |
 |---------|----|----|-------|
-| Resource CRUD (14 types) | ✅ | ✅ (16 types) | a7 adds gateway-group, service-template |
+| Resource CRUD (14 types) | ✅ | ✅ (13 functional in API7 EE) | a7 adds gateway-group, service-template; 3 APISIX resources (upstream, consumer-group, plugin-config) not exposed in API7 EE |
 | Context management | ✅ | ✅ | |
 | Shell completions | ✅ | ✅ | |
 | JSON/YAML/table output | ✅ | ✅ | |

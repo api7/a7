@@ -21,16 +21,14 @@ docs/
     ├── gateway-group.md           # Gateway group commands (EE)
     ├── service-template.md        # Service template commands (EE)
     ├── route.md                   # Route command reference
-    ├── upstream.md                # Upstream command reference
+    ├── upstream.md                # ⚠️ Deprecated — upstreams are inline-only in API7 EE
     ├── service.md                 # Service command reference
     ├── consumer.md                # Consumer command reference
     ├── ssl.md                     # SSL command reference
     ├── plugin.md                  # Plugin command reference
     ├── global-rule.md             # Global rule command reference
     ├── stream-route.md            # Stream route command reference
-    ├── plugin-config.md           # Plugin config command reference
     ├── plugin-metadata.md         # Plugin metadata command reference
-    ├── consumer-group.md          # Consumer group command reference
     ├── credential.md              # Credential command reference
     ├── secret.md                  # Secret command reference
     ├── proto.md                   # Proto command reference
@@ -40,7 +38,7 @@ docs/
     ├── custom-plugin.md           # Custom plugins (EE)
     ├── service-registry.md        # Service registries (EE)
     ├── token.md                   # Access tokens (EE)
-    └── ...                        # Total 29 files in user-guide
+    └── ...                        # Total 27 files in user-guide
 ```
 
 ### Mandatory Documentation Rules

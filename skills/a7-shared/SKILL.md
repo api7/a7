@@ -13,7 +13,6 @@ metadata:
   apisix_version: ">=3.0.0"
   a7_commands:
     - a7 route
-    - a7 upstream
     - a7 service
     - a7 consumer
     - a7 ssl
@@ -29,7 +28,7 @@ metadata:
 ## What is a7
 
 a7 is a Go CLI for API7 Enterprise Edition (API7 EE). It provides imperative CRUD
-for 16 resource types, declarative config sync, context management, and debug tooling.
+for 13 resource types, declarative config sync, context management, and debug tooling.
 
 - **Binary**: `a7`
 - **Module**: `github.com/api7/a7`
@@ -49,7 +48,7 @@ a7/
 │   ├── root/root.go                # Root command, registers all subcommands
 │   ├── factory.go                  # DI: IOStreams, HttpClient, Config
 │   ├── route/                      # a7 route list|get|create|update|delete -g <group>
-│   ├── upstream/                   # a7 upstream list|get|create|update|delete|health -g <group>
+│   ├── upstream/                   # ⚠️ NOT EXPOSED in API7 EE — upstreams are inline-only (defined within services/routes)
 │   ├── service/                    # a7 service ... -g <group>
 │   ├── gateway-group/              # a7 gateway-group list|get|create|update|delete
 │   ├── service-template/           # a7 service-template list|get|create|update|delete
@@ -126,12 +125,10 @@ For `update` actions that use `PATCH`, a7 implements JSON Patch (RFC 6902) suppo
 | Service Template | `id` | `/api/services/template` |
 | Route | `id` | `/apisix/admin/routes` |
 | Service | `id` | `/apisix/admin/services` |
-| Upstream | `id` | `/apisix/admin/upstreams` |
+| Upstream | `id` | ⚠️ NOT EXPOSED — upstreams are inline-only in API7 EE (defined within services/routes) |
 | Consumer | `username` | `/apisix/admin/consumers` |
 | SSL | `id` | `/apisix/admin/ssl` |
 | Global Rule | `id` | `/apisix/admin/global_rules` |
-| Plugin Config | `id` | `/apisix/admin/plugin_configs` |
-| Consumer Group | `id` | `/apisix/admin/consumer_groups` |
 | Stream Route | `id` | `/apisix/admin/stream_routes` |
 | Proto | `id` | `/apisix/admin/protos` |
 | Secret | `id` | `/apisix/admin/secrets/{manager}/{id}` |
@@ -164,11 +161,17 @@ a7 config sync -f config.yaml --gateway-group default
 version: "1"
 routes:
   - id: my-route
-    uri: /api/*
-    upstream_id: my-upstream
-upstreams:
-  - id: my-upstream
-    type: roundrobin
-    nodes:
-      "httpbin:8080": 1
+    name: my-route
+    paths:
+      - /api/*
+    service_id: my-service
+services:
+  - id: my-service
+    name: my-service
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: httpbin
+          port: 8080
+          weight: 1
 ```
