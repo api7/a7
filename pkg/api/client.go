@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
 // Client is a thin wrapper around net/http for the API7 EE Admin API.
@@ -30,7 +31,10 @@ func NewAuthenticatedClient(apiKey string, tlsSkipVerify bool, caCert string) *h
 		apiKey: apiKey,
 		base:   defaultTransport(tlsSkipVerify, caCert),
 	}
-	return &http.Client{Transport: transport}
+	return &http.Client{
+		Transport: transport,
+		Timeout:   30 * time.Second,
+	}
 }
 
 // apiKeyTransport injects the X-API-KEY header into every request.
