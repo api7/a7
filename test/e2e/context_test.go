@@ -20,6 +20,7 @@ func TestContext_CreateAndUse(t *testing.T) {
 		"--token", "test123",
 		"--gateway-group", "default",
 		"--tls-skip-verify",
+		"--skip-validation",
 	)
 	require.NoError(t, err, stderr)
 
@@ -33,6 +34,7 @@ func TestContext_CreateAndUse(t *testing.T) {
 		"--token", "test123",
 		"--gateway-group", "default",
 		"--tls-skip-verify",
+		"--skip-validation",
 	)
 	require.NoError(t, err, stderr)
 
@@ -47,9 +49,9 @@ func TestContext_CreateAndUse(t *testing.T) {
 func TestContext_List(t *testing.T) {
 	env := []string{"A7_CONFIG_DIR=" + t.TempDir()}
 
-	_, stderr, err := runA7WithEnv(env, "context", "create", "local", "--server", "https://localhost:7443")
+	_, stderr, err := runA7WithEnv(env, "context", "create", "local", "--server", "https://localhost:7443", "--skip-validation")
 	require.NoError(t, err, stderr)
-	_, stderr, err = runA7WithEnv(env, "context", "create", "staging", "--server", "https://localhost:7443")
+	_, stderr, err = runA7WithEnv(env, "context", "create", "staging", "--server", "https://localhost:7443", "--skip-validation")
 	require.NoError(t, err, stderr)
 
 	stdout, stderr, err := runA7WithEnv(env, "context", "list")
@@ -66,9 +68,9 @@ func TestContext_List(t *testing.T) {
 func TestContext_Delete(t *testing.T) {
 	env := []string{"A7_CONFIG_DIR=" + t.TempDir()}
 
-	_, stderr, err := runA7WithEnv(env, "context", "create", "ctx-to-delete", "--server", "https://localhost:7443")
+	_, stderr, err := runA7WithEnv(env, "context", "create", "ctx-to-delete", "--server", "https://localhost:7443", "--skip-validation")
 	require.NoError(t, err, stderr)
-	_, stderr, err = runA7WithEnv(env, "context", "create", "staging", "--server", "https://localhost:7443")
+	_, stderr, err = runA7WithEnv(env, "context", "create", "staging", "--server", "https://localhost:7443", "--skip-validation")
 	require.NoError(t, err, stderr)
 
 	_, stderr, err = runA7WithEnv(env, "context", "delete", "ctx-to-delete")
@@ -83,10 +85,10 @@ func TestContext_Delete(t *testing.T) {
 func TestContext_CreateDuplicate(t *testing.T) {
 	env := []string{"A7_CONFIG_DIR=" + t.TempDir()}
 
-	_, stderr, err := runA7WithEnv(env, "context", "create", "local", "--server", "https://localhost:7443")
+	_, stderr, err := runA7WithEnv(env, "context", "create", "local", "--server", "https://localhost:7443", "--skip-validation")
 	require.NoError(t, err, stderr)
 
-	_, stderr, err = runA7WithEnv(env, "context", "create", "local", "--server", "https://localhost:7443")
+	_, stderr, err = runA7WithEnv(env, "context", "create", "local", "--server", "https://localhost:7443", "--skip-validation")
 	require.Error(t, err)
 	assert.Contains(t, stderr, "already exists")
 }
@@ -102,7 +104,7 @@ func TestContext_UseNonExistent(t *testing.T) {
 func TestContext_DeleteActive(t *testing.T) {
 	env := []string{"A7_CONFIG_DIR=" + t.TempDir()}
 
-	_, stderr, err := runA7WithEnv(env, "context", "create", "local", "--server", "https://localhost:7443")
+	_, stderr, err := runA7WithEnv(env, "context", "create", "local", "--server", "https://localhost:7443", "--skip-validation")
 	require.NoError(t, err, stderr)
 
 	_, stderr, err = runA7WithEnv(env, "context", "delete", "local")
@@ -124,6 +126,7 @@ func TestContext_CreateWithCACert(t *testing.T) {
 		"--token", "test123",
 		"--gateway-group", "default",
 		"--ca-cert", fakeCA,
+		"--skip-validation",
 	)
 	require.NoError(t, err, stderr)
 }

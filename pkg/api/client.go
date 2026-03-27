@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 )
 
 // Client is a thin wrapper around net/http for the API7 EE Admin API.
@@ -33,7 +32,6 @@ func NewAuthenticatedClient(apiKey string, tlsSkipVerify bool, caCert string) *h
 	}
 	return &http.Client{
 		Transport: transport,
-		Timeout:   30 * time.Second,
 	}
 }
 

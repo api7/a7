@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -58,6 +59,7 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 
 func validateContext(ctx config.Context) error {
 	httpClient := api.NewAuthenticatedClient(ctx.Token, ctx.TLSSkipVerify, ctx.CACert)
+	httpClient.Timeout = 10 * time.Second
 	client := api.NewClient(httpClient, ctx.Server)
 
 	// Test connectivity with lightweight API call
