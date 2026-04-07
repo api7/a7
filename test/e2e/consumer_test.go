@@ -3,6 +3,7 @@
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -14,6 +15,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// waitForGatewayStatus polls the gateway until the desired status is observed
+// or the timeout expires. Each request is bound to the remaining deadline so a
+// stalled HTTP call cannot outlive the caller-provided timeout.
 func waitForGatewayStatus(url string, buildRequest func() (*http.Request, error), want func(int) bool, timeout time.Duration) (int, error) {
 	deadline := time.Now().Add(timeout)
 	lastStatus := 0
@@ -23,7 +27,10 @@ func waitForGatewayStatus(url string, buildRequest func() (*http.Request, error)
 		if err != nil {
 			return 0, err
 		}
+		ctx, cancel := context.WithDeadline(context.Background(), deadline)
+		req = req.WithContext(ctx)
 		resp, err := insecureClient.Do(req)
+		cancel()
 		if err != nil {
 			lastErr = err
 			time.Sleep(500 * time.Millisecond)

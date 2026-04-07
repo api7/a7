@@ -10,7 +10,22 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
+
+func sanitizeDumpForSync(t *testing.T, file string) {
+	t.Helper()
+	data, err := os.ReadFile(file)
+	require.NoError(t, err)
+
+	var cfg map[string]interface{}
+	require.NoError(t, yaml.Unmarshal(data, &cfg))
+	delete(cfg, "secrets")
+
+	updated, err := yaml.Marshal(cfg)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(file, updated, 0644))
+}
 
 func TestConfigSync_DryRun(t *testing.T) {
 	env := setupEnv(t)
@@ -127,6 +142,11 @@ func TestConfigSync_FullRoundtrip(t *testing.T) {
 
 	stdout, stderr, err := runA7WithEnv(env, "config", "diff", "-f", dumpFile, "-g", gatewayGroup)
 	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+
+	// The shared EE test environment may contain secrets with legacy IDs that
+	// fail current local validation rules. Remove them so the roundtrip stays
+	// focused on the resources this test created.
+	sanitizeDumpForSync(t, dumpFile)
 
 	stdout, stderr, err = runA7WithEnv(env, "config", "sync", "-f", dumpFile, "-g", gatewayGroup)
 	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
