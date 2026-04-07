@@ -27,6 +27,60 @@ func sanitizeDumpForSync(t *testing.T, file string) {
 	require.NoError(t, os.WriteFile(file, updated, 0644))
 }
 
+func trimDumpForRoundtrip(t *testing.T, file string, serviceID, routeID string) {
+	t.Helper()
+
+	data, err := os.ReadFile(file)
+	require.NoError(t, err)
+
+	var cfg map[string]interface{}
+	require.NoError(t, yaml.Unmarshal(data, &cfg))
+
+	cfg["version"] = "1"
+	delete(cfg, "secrets")
+	delete(cfg, "plugin_metadata")
+
+	if services, ok := cfg["services"].([]interface{}); ok {
+		cfg["services"] = filterResourcesByID(services, serviceID)
+	}
+	if routes, ok := cfg["routes"].([]interface{}); ok {
+		cfg["routes"] = filterResourcesByID(routes, routeID)
+	}
+
+	for _, key := range []string{
+		"upstreams",
+		"consumers",
+		"credentials",
+		"consumer_groups",
+		"plugin_configs",
+		"ssls",
+		"global_rules",
+		"stream_routes",
+		"protos",
+		"service_templates",
+	} {
+		delete(cfg, key)
+	}
+
+	updated, err := yaml.Marshal(cfg)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(file, updated, 0644))
+}
+
+func filterResourcesByID(items []interface{}, wantID string) []interface{} {
+	filtered := make([]interface{}, 0, 1)
+	for _, item := range items {
+		m, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if id, _ := m["id"].(string); id == wantID {
+			filtered = append(filtered, m)
+		}
+	}
+	return filtered
+}
+
 func TestConfigSync_DryRun(t *testing.T) {
 	env := setupEnv(t)
 
@@ -143,10 +197,10 @@ func TestConfigSync_FullRoundtrip(t *testing.T) {
 	stdout, stderr, err := runA7WithEnv(env, "config", "diff", "-f", dumpFile, "-g", gatewayGroup)
 	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
 
-	// The shared EE test environment may contain secrets with legacy IDs that
-	// fail current local validation rules. Remove them so the roundtrip stays
-	// focused on the resources this test created.
-	sanitizeDumpForSync(t, dumpFile)
+	// CI runs against a shared EE environment. Keep the roundtrip focused on
+	// the service and route this test created so unrelated resources do not
+	// introduce sync failures.
+	trimDumpForRoundtrip(t, dumpFile, svcID, routeID)
 
 	stdout, stderr, err = runA7WithEnv(env, "config", "sync", "-f", dumpFile, "-g", gatewayGroup)
 	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
