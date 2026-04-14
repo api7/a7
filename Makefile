@@ -44,4 +44,4 @@ docker-down:
 	docker compose -f test/e2e/docker-compose.yml down -v
 
 test-e2e:
-	go test ./test/e2e/... -count=1 -v -tags=e2e -timeout 25m
+	go run github.com/onsi/ginkgo/v2/ginkgo -r --procs=1 --tags=e2e --timeout=45m ./test/e2e/...

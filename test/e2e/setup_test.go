@@ -47,6 +47,17 @@ var (
 	}
 )
 
+type testTB interface {
+	Helper()
+	TempDir() string
+	Cleanup(func())
+	Errorf(string, ...interface{})
+	FailNow()
+	Fatalf(string, ...interface{})
+	Skip(...interface{})
+	Skipf(string, ...interface{})
+}
+
 func TestMain(m *testing.M) {
 	adminURL = envOrDefault("A7_ADMIN_URL", "")
 	gatewayURL = envOrDefault("A7_GATEWAY_URL", "")
@@ -215,7 +226,7 @@ func waitForHealthy(url string, timeout time.Duration) error {
 
 // setupEnv returns env vars and creates a context pointing at the real API7 EE instance.
 // Each test gets an isolated config directory to avoid context conflicts.
-func setupEnv(t *testing.T) []string {
+func setupEnv(t testTB) []string {
 	t.Helper()
 	env := []string{
 		"A7_CONFIG_DIR=" + t.TempDir(),
@@ -254,14 +265,14 @@ func resolveModuleRoot() (string, error) {
 	return filepath.Dir(gomod), nil
 }
 
-func requireGatewayURL(t *testing.T) {
+func requireGatewayURL(t testTB) {
 	t.Helper()
 	if gatewayURL == "" {
 		t.Skip("A7_GATEWAY_URL not set — skipping gateway traffic test")
 	}
 }
 
-func requireHTTPBin(t *testing.T) {
+func requireHTTPBin(t testTB) {
 	t.Helper()
 	if httpbinURL == "" {
 		t.Skip("HTTPBIN_URL not set — skipping httpbin-dependent test")
@@ -303,7 +314,7 @@ func upstreamNodePort() int {
 
 // createTestRouteWithServiceViaCLI creates a route that belongs to an existing service.
 // The service must already exist. This is needed because API7 EE requires service_id for routes.
-func createTestRouteWithServiceViaCLI(t *testing.T, env []string, routeID, serviceID string) {
+func createTestRouteWithServiceViaCLI(t testTB, env []string, routeID, serviceID string) {
 	t.Helper()
 	routeJSON := fmt.Sprintf(`{
 		"id": %q,

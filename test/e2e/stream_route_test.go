@@ -13,7 +13,7 @@ import (
 )
 
 // deleteStreamRouteViaAdmin deletes a stream route via the Admin API.
-func deleteStreamRouteViaAdmin(t *testing.T, id string) {
+func deleteStreamRouteViaAdmin(t testTB, id string) {
 	t.Helper()
 	resp, err := runtimeAdminAPI("DELETE", fmt.Sprintf("/apisix/admin/stream_routes/%s", id), nil)
 	if err == nil {

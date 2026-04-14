@@ -14,13 +14,13 @@ import (
 )
 
 // deleteServiceViaCLI deletes a service using the a7 CLI.
-func deleteServiceViaCLI(t *testing.T, env []string, id string) {
+func deleteServiceViaCLI(t testTB, env []string, id string) {
 	t.Helper()
 	_, _, _ = runA7WithEnv(env, "service", "delete", id, "--force", "-g", gatewayGroup)
 }
 
 // deleteServiceViaAdmin deletes a service via the Admin API (cleanup).
-func deleteServiceViaAdmin(t *testing.T, id string) {
+func deleteServiceViaAdmin(t testTB, id string) {
 	t.Helper()
 	resp, err := runtimeAdminAPI("DELETE", fmt.Sprintf("/apisix/admin/services/%s", id), nil)
 	if err != nil {
@@ -37,7 +37,7 @@ func deleteServiceViaAdmin(t *testing.T, id string) {
 }
 
 // createTestServiceViaCLI creates a service via CLI.
-func createTestServiceViaCLI(t *testing.T, env []string, id string) {
+func createTestServiceViaCLI(t testTB, env []string, id string) {
 	t.Helper()
 	svcJSON := fmt.Sprintf(`{
 		"id": %q,

@@ -33,10 +33,13 @@ type Options struct {
 func NewCmd(f *cmd.Factory) *cobra.Command {
 	opts := &Options{IO: f.IOStreams, Client: f.HttpClient, Config: f.Config}
 	c := &cobra.Command{
-		Use:   "create",
+		Use:   "create [provider/id]",
 		Short: "Create a secret provider",
-		Args:  cobra.NoArgs,
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				opts.ID = args[0]
+			}
 			opts.Output, _ = c.Flags().GetString("output")
 			opts.GatewayGroup, _ = c.Flags().GetString("gateway-group")
 			return actionRun(opts)

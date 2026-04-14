@@ -50,13 +50,13 @@ func waitForGatewayStatus(url string, buildRequest func() (*http.Request, error)
 }
 
 // deleteConsumerViaCLI deletes a consumer using the a7 CLI.
-func deleteConsumerViaCLI(t *testing.T, env []string, username string) {
+func deleteConsumerViaCLI(t testTB, env []string, username string) {
 	t.Helper()
 	_, _, _ = runA7WithEnv(env, "consumer", "delete", username, "--force", "-g", gatewayGroup)
 }
 
 // deleteConsumerViaAdmin deletes a consumer via the Admin API (cleanup).
-func deleteConsumerViaAdmin(t *testing.T, username string) {
+func deleteConsumerViaAdmin(t testTB, username string) {
 	t.Helper()
 	resp, err := runtimeAdminAPI("DELETE", fmt.Sprintf("/apisix/admin/consumers/%s", username), nil)
 	if err == nil {
@@ -66,7 +66,7 @@ func deleteConsumerViaAdmin(t *testing.T, username string) {
 
 // createTestConsumerViaCLI creates a consumer via CLI.
 // API7 EE does not allow auth plugins in the consumer body; use credentials instead.
-func createTestConsumerViaCLI(t *testing.T, env []string, username string) {
+func createTestConsumerViaCLI(t testTB, env []string, username string) {
 	t.Helper()
 	consumerJSON := fmt.Sprintf(`{
 		"username": %q,

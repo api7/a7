@@ -17,13 +17,13 @@ import (
 )
 
 // deleteRouteViaCLI deletes a route using the a7 CLI.
-func deleteRouteViaCLI(t *testing.T, env []string, id string) {
+func deleteRouteViaCLI(t testTB, env []string, id string) {
 	t.Helper()
 	_, _, _ = runA7WithEnv(env, "route", "delete", id, "--force", "-g", gatewayGroup)
 }
 
 // deleteRouteViaAdmin deletes a route via the Admin API (cleanup).
-func deleteRouteViaAdmin(t *testing.T, id string) {
+func deleteRouteViaAdmin(t testTB, id string) {
 	t.Helper()
 	resp, err := runtimeAdminAPI("DELETE", fmt.Sprintf("/apisix/admin/routes/%s", id), nil)
 	if err == nil {
