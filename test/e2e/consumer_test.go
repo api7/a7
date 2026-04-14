@@ -5,6 +5,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -37,13 +38,14 @@ func waitForGatewayStatus(url string, buildRequest func() (*http.Request, error)
 			continue
 		}
 		lastStatus = resp.StatusCode
+		_, _ = io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 		if want(resp.StatusCode) {
 			return resp.StatusCode, nil
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
-	if lastErr != nil {
+	if lastStatus == 0 && lastErr != nil {
 		return lastStatus, lastErr
 	}
 	return lastStatus, nil
@@ -59,8 +61,18 @@ func deleteConsumerViaCLI(t testTB, env []string, username string) {
 func deleteConsumerViaAdmin(t testTB, username string) {
 	t.Helper()
 	resp, err := runtimeAdminAPI("DELETE", fmt.Sprintf("/apisix/admin/consumers/%s", username), nil)
-	if err == nil {
-		resp.Body.Close()
+	if resp != nil {
+		defer resp.Body.Close()
+	}
+	if err != nil {
+		t.Fatalf("delete consumer %s via admin API failed: %v", username, err)
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("delete consumer %s via admin API returned %d: %s", username, resp.StatusCode, string(body))
 	}
 }
 

@@ -38,7 +38,12 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) > 0 {
-				opts.ID = args[0]
+				if opts.ID != "" && opts.ID != args[0] {
+					return fmt.Errorf("positional secret provider id %q conflicts with --id %q", args[0], opts.ID)
+				}
+				if opts.ID == "" {
+					opts.ID = args[0]
+				}
 			}
 			opts.Output, _ = c.Flags().GetString("output")
 			opts.GatewayGroup, _ = c.Flags().GetString("gateway-group")
@@ -98,7 +103,7 @@ func actionRun(opts *Options) error {
 		return cmdutil.NewExporter(format, opts.IO.Out).Write(json.RawMessage(body))
 	}
 	if opts.ID == "" {
-		return fmt.Errorf("--id is required")
+		return fmt.Errorf("secret provider id is required; use a positional arg or --id")
 	}
 
 	httpClient, err := opts.Client()

@@ -41,10 +41,18 @@ func trimDumpForRoundtrip(t *testing.T, file string, serviceID, routeID string) 
 	delete(cfg, "plugin_metadata")
 
 	if services, ok := cfg["services"].([]interface{}); ok {
-		cfg["services"] = filterResourcesByID(services, serviceID)
+		filteredServices := filterResourcesByID(services, serviceID)
+		if len(filteredServices) == 0 {
+			t.Fatalf("roundtrip dump is missing expected service %q", serviceID)
+		}
+		cfg["services"] = filteredServices
 	}
 	if routes, ok := cfg["routes"].([]interface{}); ok {
-		cfg["routes"] = filterResourcesByID(routes, routeID)
+		filteredRoutes := filterResourcesByID(routes, routeID)
+		if len(filteredRoutes) == 0 {
+			t.Fatalf("roundtrip dump is missing expected route %q", routeID)
+		}
+		cfg["routes"] = filteredRoutes
 	}
 
 	for _, key := range []string{

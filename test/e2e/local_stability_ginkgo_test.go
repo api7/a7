@@ -8,11 +8,28 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+func isKnownSecretCapabilityGap(stdout, stderr string) bool {
+	combined := stdout + "\n" + stderr
+	for _, needle := range []string{
+		"resource not found",
+		"secret provider",
+		"vault",
+		"not configured",
+		"unsupported",
+	} {
+		if strings.Contains(strings.ToLower(combined), needle) {
+			return true
+		}
+	}
+	return false
+}
 
 var _ = Describe("Local Stability", Ordered, func() {
 	It("runs the binary and reaches the control plane", func() {
@@ -100,7 +117,10 @@ var _ = Describe("Local Stability", Ordered, func() {
 
 		stdout, stderr, err := runA7WithEnv(env, "secret", "create", secretID, "-f", tmpFile, "-g", gatewayGroup)
 		if err != nil {
-			Skip(fmt.Sprintf("secret create failed in this environment: stdout=%s stderr=%s", stdout, stderr))
+			if isKnownSecretCapabilityGap(stdout, stderr) {
+				Skip(fmt.Sprintf("secret create is unavailable in this environment: stdout=%s stderr=%s", stdout, stderr))
+			}
+			Fail(fmt.Sprintf("secret create failed unexpectedly: stdout=%s stderr=%s", stdout, stderr))
 		}
 
 		stdout, stderr, err = runA7WithEnv(env, "secret", "get", secretID, "-g", gatewayGroup, "-o", "json")

@@ -4,6 +4,7 @@ package e2e
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,8 +17,18 @@ import (
 func deleteStreamRouteViaAdmin(t testTB, id string) {
 	t.Helper()
 	resp, err := runtimeAdminAPI("DELETE", fmt.Sprintf("/apisix/admin/stream_routes/%s", id), nil)
-	if err == nil {
-		resp.Body.Close()
+	if resp != nil {
+		defer resp.Body.Close()
+	}
+	if err != nil {
+		t.Fatalf("delete stream route %s via admin API failed: %v", id, err)
+	}
+	if resp.StatusCode == 404 {
+		return
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("delete stream route %s via admin API returned %d: %s", id, resp.StatusCode, string(body))
 	}
 }
 
