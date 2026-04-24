@@ -1,0 +1,141 @@
+package list
+
+import (
+	"encoding/json"
+	"net/http"
+	"strings"
+	"testing"
+
+	"github.com/api7/a7/internal/config"
+	"github.com/api7/a7/pkg/api"
+	"github.com/api7/a7/pkg/httpmock"
+	"github.com/api7/a7/pkg/iostreams"
+)
+
+type mockConfig struct {
+	baseURL      string
+	token        string
+	gatewayGroup string
+}
+
+func (m *mockConfig) BaseURL() string                                 { return m.baseURL }
+func (m *mockConfig) Token() string                                   { return m.token }
+func (m *mockConfig) GatewayGroup() string                            { return m.gatewayGroup }
+func (m *mockConfig) TLSSkipVerify() bool                             { return false }
+func (m *mockConfig) CACert() string                                  { return "" }
+func (m *mockConfig) CurrentContext() string                          { return "test" }
+func (m *mockConfig) Contexts() []config.Context                      { return nil }
+func (m *mockConfig) GetContext(name string) (*config.Context, error) { return nil, nil }
+func (m *mockConfig) AddContext(ctx config.Context) error             { return nil }
+func (m *mockConfig) RemoveContext(name string) error                 { return nil }
+func (m *mockConfig) SetCurrentContext(name string) error             { return nil }
+func (m *mockConfig) Save() error                                     { return nil }
+
+func TestListStreamRoutes_Table(t *testing.T) {
+	ios, _, out, _ := iostreams.Test()
+	registry := &httpmock.Registry{}
+
+	registry.Register(http.MethodGet, "/apisix/admin/stream_routes", httpmock.JSONResponse(`{
+		"total": 2,
+		"list": [
+			{"id":"sr1","desc":"mysql","server_port":3306,"sni":"db.local"},
+			{"id":"sr2","desc":"redis","server_port":6379,"sni":"cache.local"}
+		]
+	}`))
+
+	opts := &Options{
+		IO:     ios,
+		Client: func() (*http.Client, error) { return registry.GetClient(), nil },
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
+		},
+		GatewayGroup: "gg1",
+	}
+
+	if err := actionRun(opts); err != nil {
+		t.Fatalf("actionRun failed: %v", err)
+	}
+
+	output := out.String()
+	if !strings.Contains(output, "ID") || !strings.Contains(output, "DESCRIPTION") || !strings.Contains(output, "SERVER_PORT") || !strings.Contains(output, "SNI") {
+		t.Fatalf("table headers missing: %q", output)
+	}
+	if !strings.Contains(output, "sr1") || !strings.Contains(output, "mysql") || !strings.Contains(output, "3306") || !strings.Contains(output, "db.local") {
+		t.Fatalf("first row data missing: %q", output)
+	}
+
+	registry.Verify(t)
+}
+
+func TestListStreamRoutes_JSON(t *testing.T) {
+	ios, _, out, _ := iostreams.Test()
+	registry := &httpmock.Registry{}
+
+	registry.Register(http.MethodGet, "/apisix/admin/stream_routes", httpmock.JSONResponse(`{
+		"total": 1,
+		"list": [{"id":"sr1","desc":"mysql","server_port":3306,"sni":"db.local"}]
+	}`))
+
+	opts := &Options{
+		IO:           ios,
+		Client:       func() (*http.Client, error) { return registry.GetClient(), nil },
+		Output:       "json",
+		GatewayGroup: "gg1",
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
+		},
+	}
+
+	if err := actionRun(opts); err != nil {
+		t.Fatalf("actionRun failed: %v", err)
+	}
+
+	var items []api.StreamRoute
+	if err := json.Unmarshal([]byte(out.String()), &items); err != nil {
+		t.Fatalf("failed to parse JSON output: %v", err)
+	}
+	if len(items) != 1 || items[0].ID != "sr1" {
+		t.Fatalf("unexpected items: %+v", items)
+	}
+
+	registry.Verify(t)
+}
+
+func TestListStreamRoutes_MissingGatewayGroup(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+
+	opts := &Options{
+		IO:     ios,
+		Client: func() (*http.Client, error) { return (&httpmock.Registry{}).GetClient(), nil },
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: ""}, nil
+		},
+	}
+
+	err := actionRun(opts)
+	if err == nil || !strings.Contains(err.Error(), "gateway group is required") {
+		t.Fatalf("expected gateway group error, got: %v", err)
+	}
+}
+
+func TestListStreamRoutes_APIError(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	registry := &httpmock.Registry{}
+	registry.Register(http.MethodGet, "/apisix/admin/stream_routes", httpmock.StringResponse(http.StatusInternalServerError, `{"message":"boom"}`))
+
+	opts := &Options{
+		IO:           ios,
+		Client:       func() (*http.Client, error) { return registry.GetClient(), nil },
+		GatewayGroup: "gg1",
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
+		},
+	}
+
+	err := actionRun(opts)
+	if err == nil || !strings.Contains(err.Error(), "status 500") {
+		t.Fatalf("expected API error with status 500, got: %v", err)
+	}
+
+	registry.Verify(t)
+}
