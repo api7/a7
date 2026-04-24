@@ -43,6 +43,9 @@ docker-up:
 docker-down:
 	docker compose -f test/e2e/docker-compose.yml down -v
 
+# test-e2e and test-e2e-full intentionally share the same Ginkgo entrypoint.
+# The default CI stays narrower via runtime guards such as requireGatewayURL,
+# requireHTTPBin, and A7_E2E_ENABLE_GATEWAY_GROUP_CRUD.
 test-e2e:
 	go run github.com/onsi/ginkgo/v2/ginkgo -r --procs=1 --tags=e2e --timeout=45m ./test/e2e/...
 

@@ -5,6 +5,8 @@ package e2e
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
@@ -15,11 +17,24 @@ import (
 )
 
 // deleteGatewayGroupViaAdmin deletes a gateway group via the control-plane API.
-func deleteGatewayGroupViaAdmin(t *testing.T, id string) {
+func deleteGatewayGroupViaAdmin(t testTB, id string) {
 	t.Helper()
 	resp, err := adminAPI("DELETE", fmt.Sprintf("/api/gateway_groups/%s", id), nil)
-	if err == nil {
-		resp.Body.Close()
+	if resp != nil {
+		defer resp.Body.Close()
+	}
+	if err != nil {
+		t.Fatalf("delete gateway group %s via admin API failed: %v", id, err)
+	}
+	body, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		t.Fatalf("delete gateway group %s via admin API returned unreadable body: %v", id, readErr)
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		t.Fatalf("delete gateway group %s via admin API returned %d: %s", id, resp.StatusCode, string(body))
 	}
 }
 

@@ -31,8 +31,8 @@ func waitForGatewayStatus(url string, buildRequest func() (*http.Request, error)
 		ctx, cancel := context.WithDeadline(context.Background(), deadline)
 		req = req.WithContext(ctx)
 		resp, err := insecureClient.Do(req)
-		cancel()
 		if err != nil {
+			cancel()
 			lastErr = err
 			time.Sleep(500 * time.Millisecond)
 			continue
@@ -40,6 +40,7 @@ func waitForGatewayStatus(url string, buildRequest func() (*http.Request, error)
 		lastStatus = resp.StatusCode
 		_, _ = io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
+		cancel()
 		if want(resp.StatusCode) {
 			return resp.StatusCode, nil
 		}

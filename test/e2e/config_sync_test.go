@@ -41,20 +41,25 @@ func trimDumpForRoundtrip(t *testing.T, file string, serviceID, routeID string) 
 	delete(cfg, "secrets")
 	delete(cfg, "plugin_metadata")
 
-	if services, ok := cfg["services"].([]interface{}); ok {
-		filteredServices := filterResourcesByID(services, serviceID)
-		if len(filteredServices) == 0 {
-			t.Fatalf("roundtrip dump is missing expected service %q", serviceID)
-		}
-		cfg["services"] = filteredServices
+	services, ok := cfg["services"].([]interface{})
+	if !ok {
+		t.Fatalf("roundtrip dump missing services collection, got %T", cfg["services"])
 	}
-	if routes, ok := cfg["routes"].([]interface{}); ok {
-		filteredRoutes := filterResourcesByID(routes, routeID)
-		if len(filteredRoutes) == 0 {
-			t.Fatalf("roundtrip dump is missing expected route %q", routeID)
-		}
-		cfg["routes"] = filteredRoutes
+	filteredServices := filterResourcesByID(services, serviceID)
+	if len(filteredServices) == 0 {
+		t.Fatalf("roundtrip dump is missing expected service %q", serviceID)
 	}
+	cfg["services"] = filteredServices
+
+	routes, ok := cfg["routes"].([]interface{})
+	if !ok {
+		t.Fatalf("roundtrip dump missing routes collection, got %T", cfg["routes"])
+	}
+	filteredRoutes := filterResourcesByID(routes, routeID)
+	if len(filteredRoutes) == 0 {
+		t.Fatalf("roundtrip dump is missing expected route %q", routeID)
+	}
+	cfg["routes"] = filteredRoutes
 
 	for _, key := range []string{
 		"upstreams",
@@ -94,7 +99,6 @@ func isKnownRoundtripSyncGap(stdout, stderr string) bool {
 	combined := strings.ToLower(stdout + "\n" + stderr)
 	for _, needle := range []string{
 		"resource not found",
-		"not found",
 	} {
 		if strings.Contains(combined, needle) {
 			return true
