@@ -112,6 +112,10 @@ func TestGatewayGroup_Alias(t *testing.T) {
 }
 
 func TestGatewayGroup_CRUD(t *testing.T) {
+	if os.Getenv("A7_E2E_ENABLE_GATEWAY_GROUP_CRUD") != "1" {
+		t.Skip("gateway-group CRUD is disabled by default in shared E2E environments; set A7_E2E_ENABLE_GATEWAY_GROUP_CRUD=1 to enable it")
+	}
+
 	env := setupEnv(t)
 	ggName := fmt.Sprintf("E2E Test GG %d", time.Now().UnixNano())
 

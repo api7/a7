@@ -5,7 +5,7 @@
 - CLI behavior that depends on API7 EE or APISIX Admin API must be verified with E2E tests against a real environment.
 - Unit tests are only allowed for self-contained logic that does not need mocked external systems.
 - Do not add new command-level tests that mock the Admin API, gateway, or control-plane behavior.
-- New or modified E2E coverage must be written with Ginkgo.
+- Default E2E coverage should prioritize control-plane CLI roundtrips: create/update/delete/sync via `a7`, then read back state with `get`, `list`, or `config dump`.
 
 ## Test Pyramid For `a7`
 
@@ -31,11 +31,16 @@ Examples:
 Required targets:
 
 - all command flows that talk to API7 EE or APISIX Admin API
-- CRUD coverage for runtime resources
-- traffic assertions that require a real gateway
-- auth, route, service, secret, stream-route, and debug flows
+- CRUD coverage for control-plane resources
+- `config sync` followed by `config dump`/resource readback assertions
 
-E2E tests live in `test/e2e/` behind the `e2e` build tag and are run with Ginkgo.
+Optional targets outside the default CI path:
+
+- traffic assertions that require a real gateway
+- auth and forwarding behavior that depends on a live upstream
+- debug flows that require live gateway requests
+
+E2E tests live in `test/e2e/` behind the `e2e` build tag and are run through the Ginkgo entrypoint in `make test-e2e`.
 
 ## What To Remove
 
@@ -50,11 +55,20 @@ Required environment variables:
 - `A7_ADMIN_URL`
 - `A7_TOKEN`
 
-Optional but strongly recommended for traffic coverage:
+Optional for live gateway/data-plane coverage:
 
 - `A7_GATEWAY_URL`
 - `HTTPBIN_URL`
 - `A7_GATEWAY_GROUP`
+- `A7_E2E_ENABLE_GATEWAY_GROUP_CRUD=1` when you explicitly want to exercise gateway-group create/delete against an environment that supports it
+
+For local development, you can bring up the repository's Docker-based environment with:
+
+```bash
+make docker-up
+```
+
+and then set the matching environment variables before running `make test-e2e` or `make test-e2e-full`.
 
 ## Running Tests
 
@@ -70,6 +84,17 @@ E2E tests:
 make test-e2e
 ```
 
+Full local E2E with gateway/data-plane coverage:
+
+```bash
+make docker-up
+export A7_ADMIN_URL=...
+export A7_TOKEN=...
+export A7_GATEWAY_URL=...
+export HTTPBIN_URL=...
+make test-e2e-full
+```
+
 Equivalent direct command:
 
 ```bash
@@ -80,6 +105,7 @@ go run github.com/onsi/ginkgo/v2/ginkgo -r --procs=1 --tags=e2e --timeout=45m ./
 
 - Prefer `Ordered` suites only when resource lifecycle or environment reuse requires it.
 - Use shared helpers for context creation, cleanup, and propagation polling.
+- Keep default CI-friendly coverage focused on control-plane roundtrips and structured CLI readback assertions.
 - When live gateway behavior may depend on optional local infrastructure, fail only on product regressions and `Skip` on missing external capabilities.
 - Keep E2E assertions aligned with the current EE data model:
   - routes should use `service_id`

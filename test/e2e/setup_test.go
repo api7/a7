@@ -6,17 +6,22 @@
 //
 //   - A7_ADMIN_URL: API7 EE Dashboard/control-plane URL (required)
 //   - A7_TOKEN: API7 EE access token (required)
-//   - A7_GATEWAY_GROUP: Gateway group name (default: "default")
-//   - A7_GATEWAY_URL: Gateway data-plane URL (optional — gateway traffic tests skipped if empty)
-//   - HTTPBIN_URL: httpbin URL (optional — traffic forwarding tests skipped if empty)
+//   - A7_GATEWAY_GROUP: Gateway group name (default: "default"; resolved to the
+//     real UUID when unset or set to "default")
+//   - A7_GATEWAY_URL: Gateway data-plane URL (optional — only needed for live
+//     gateway/data-plane coverage)
+//   - HTTPBIN_URL: httpbin URL (optional — only needed for live traffic
+//     forwarding coverage)
 //
 // Run with: go test -v -tags e2e -count=1 -timeout 10m ./test/e2e/...
 package e2e
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -31,6 +36,7 @@ import (
 )
 
 var (
+	cliCommandTimeout = 90 * time.Second
 	binaryPath   string
 	adminURL     string // API7 EE Dashboard/control-plane URL (HTTPS)
 	gatewayURL   string // API7 EE Gateway URL (HTTP)
@@ -131,22 +137,32 @@ func TestMain(m *testing.M) {
 // runA7 executes the a7 binary with the given arguments and returns
 // captured stdout, stderr, and any error.
 func runA7(args ...string) (string, string, error) {
-	cmd := exec.Command(binaryPath, args...)
+	ctx, cancel := context.WithTimeout(context.Background(), cliCommandTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, binaryPath, args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err := cmd.Run()
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return stdout.String(), stderr.String(), fmt.Errorf("command timed out after %s: %w", cliCommandTimeout, ctx.Err())
+	}
 	return stdout.String(), stderr.String(), err
 }
 
 // runA7WithEnv executes the a7 binary with custom environment variables.
 func runA7WithEnv(env []string, args ...string) (string, string, error) {
-	cmd := exec.Command(binaryPath, args...)
+	ctx, cancel := context.WithTimeout(context.Background(), cliCommandTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, binaryPath, args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	cmd.Env = append(os.Environ(), env...)
 	err := cmd.Run()
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return stdout.String(), stderr.String(), fmt.Errorf("command timed out after %s: %w", cliCommandTimeout, ctx.Err())
+	}
 	return stdout.String(), stderr.String(), err
 }
 
@@ -226,6 +242,8 @@ func waitForHealthy(url string, timeout time.Duration) error {
 
 // setupEnv returns env vars and creates a context pointing at the real API7 EE instance.
 // Each test gets an isolated config directory to avoid context conflicts.
+// Control-plane tests only need adminURL/adminToken/gatewayGroup; gatewayURL and
+// httpbinURL are optional and only used by live data-plane coverage.
 func setupEnv(t testTB) []string {
 	t.Helper()
 	env := []string{

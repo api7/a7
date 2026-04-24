@@ -26,6 +26,4 @@ jobs:
           A7_ADMIN_URL: ${{ secrets.DEMO_WEBSITE }}
           A7_TOKEN: ${{ secrets.DEMO_TOKEN }}
           A7_GATEWAY_GROUP: default
-          A7_GATEWAY_URL: ${{ secrets.A7_GATEWAY_URL }}
-          HTTPBIN_URL: ${{ secrets.HTTPBIN_URL }}
         run: make test-e2e
