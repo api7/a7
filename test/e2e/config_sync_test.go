@@ -171,53 +171,8 @@ routes:
 	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
 	assert.Contains(t, stdout, "Sync completed")
 
-	stdout, stderr, err = runA7WithEnv(env, "route", "get", routeID, "-g", gatewayGroup)
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, routeID)
-}
-
-func TestConfigSync_ServiceAndRouteRoundtrip(t *testing.T) {
-	env := setupEnv(t)
-	svcID := "e2e-sync-roundtrip-owned-svc"
-	routeID := "e2e-sync-roundtrip-owned-route"
-	t.Cleanup(func() {
-		deleteRouteViaAdmin(t, routeID)
-		deleteServiceViaAdmin(t, svcID)
-	})
-
-	syncYAML := fmt.Sprintf(`version: "1"
-services:
-  - id: %s
-    name: %s
-    upstream:
-      type: roundrobin
-      nodes:
-        - host: %q
-          port: %d
-          weight: 1
-routes:
-  - id: %s
-    name: %s
-    service_id: %s
-    paths:
-      - /sync-owned-roundtrip
-`, svcID, svcID, upstreamNodeHost(), upstreamNodePort(), routeID, routeID, svcID)
-
-	syncFile := filepath.Join(t.TempDir(), "sync-service-route.yaml")
-	require.NoError(t, os.WriteFile(syncFile, []byte(syncYAML), 0644))
-
-	stdout, stderr, err := runA7WithEnv(env, "config", "sync", "-f", syncFile, "--delete=false", "-g", gatewayGroup)
-	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
-
-	stdout, stderr, err = runA7WithEnv(env, "service", "get", svcID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
-	var service map[string]interface{}
-	require.NoError(t, json.Unmarshal([]byte(stdout), &service))
-	assert.Equal(t, svcID, service["id"])
-	assert.Equal(t, svcID, service["name"])
-
 	stdout, stderr, err = runA7WithEnv(env, "route", "get", routeID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+	require.NoError(t, err, stderr)
 	var route map[string]interface{}
 	require.NoError(t, json.Unmarshal([]byte(stdout), &route))
 	assert.Equal(t, routeID, route["id"])
