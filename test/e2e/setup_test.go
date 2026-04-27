@@ -36,13 +36,14 @@ import (
 )
 
 var (
-	cliCommandTimeout = 90 * time.Second
-	binaryPath   string
-	adminURL     string // API7 EE Dashboard/control-plane URL (HTTPS)
-	gatewayURL   string // API7 EE Gateway URL (HTTP)
-	httpbinURL   string
-	adminToken   string // API7 EE access token (a7ee prefix)
-	gatewayGroup = "default"
+	cliCommandTimeout    = 90 * time.Second
+	configCommandTimeout = 4 * time.Minute
+	binaryPath           string
+	adminURL             string // API7 EE Dashboard/control-plane URL (HTTPS)
+	gatewayURL           string // API7 EE Gateway URL (HTTP)
+	httpbinURL           string
+	adminToken           string // API7 EE access token (a7ee prefix)
+	gatewayGroup         = "default"
 
 	// httpClient with TLS skip verify for self-signed certs.
 	insecureClient = &http.Client{
@@ -52,6 +53,16 @@ var (
 		Timeout: 30 * time.Second,
 	}
 )
+
+func commandTimeout(args []string) time.Duration {
+	if len(args) >= 2 && args[0] == "config" {
+		switch args[1] {
+		case "dump", "sync", "diff":
+			return configCommandTimeout
+		}
+	}
+	return cliCommandTimeout
+}
 
 type testTB interface {
 	Helper()
@@ -137,7 +148,8 @@ func TestMain(m *testing.M) {
 // runA7 executes the a7 binary with the given arguments and returns
 // captured stdout, stderr, and any error.
 func runA7(args ...string) (string, string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), cliCommandTimeout)
+	timeout := commandTimeout(args)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, binaryPath, args...)
 	var stdout, stderr bytes.Buffer
@@ -145,14 +157,15 @@ func runA7(args ...string) (string, string, error) {
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		return stdout.String(), stderr.String(), fmt.Errorf("command timed out after %s: %w", cliCommandTimeout, ctx.Err())
+		return stdout.String(), stderr.String(), fmt.Errorf("command timed out after %s: %w", timeout, ctx.Err())
 	}
 	return stdout.String(), stderr.String(), err
 }
 
 // runA7WithEnv executes the a7 binary with custom environment variables.
 func runA7WithEnv(env []string, args ...string) (string, string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), cliCommandTimeout)
+	timeout := commandTimeout(args)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, binaryPath, args...)
 	var stdout, stderr bytes.Buffer
@@ -161,7 +174,7 @@ func runA7WithEnv(env []string, args ...string) (string, string, error) {
 	cmd.Env = append(os.Environ(), env...)
 	err := cmd.Run()
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		return stdout.String(), stderr.String(), fmt.Errorf("command timed out after %s: %w", cliCommandTimeout, ctx.Err())
+		return stdout.String(), stderr.String(), fmt.Errorf("command timed out after %s: %w", timeout, ctx.Err())
 	}
 	return stdout.String(), stderr.String(), err
 }
