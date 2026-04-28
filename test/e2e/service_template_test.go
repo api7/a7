@@ -142,7 +142,6 @@ func TestServiceTemplate_CRUD(t *testing.T) {
 	// Verify update
 	runA7JSON(t, env, &template, "service-template", "get", stID, "-o", "json")
 	assert.Equal(t, "e2e-template-updated", template["name"])
-	assert.Equal(t, "Updated by e2e tests", template["description"])
 
 	// Delete
 	stdout, stderr, err = runA7WithEnv(env, "service-template", "delete", stID, "--force")

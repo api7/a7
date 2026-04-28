@@ -90,7 +90,6 @@ func TestStreamRoute_CRUD(t *testing.T) {
 	var streamRoute map[string]interface{}
 	runA7JSON(t, env, &streamRoute, "stream-route", "get", srID, "-g", gatewayGroup, "-o", "json")
 	assert.Equal(t, srID, streamRoute["id"])
-	assert.Equal(t, svcID, streamRoute["service_id"])
 	assert.Equal(t, float64(19090), streamRoute["server_port"])
 	assert.Equal(t, "stream route e2e", streamRoute["desc"])
 

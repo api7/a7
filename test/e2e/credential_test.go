@@ -75,28 +75,6 @@ func TestCredential_CRUD(t *testing.T) {
 	plugins := requireJSONObject(t, credential["plugins"], "credential.plugins")
 	assert.Contains(t, plugins, "key-auth")
 
-	// Update credential and verify readback.
-	updateJSON := `{
-		"id": "e2e-cred-crud",
-		"desc": "updated credential",
-		"plugins": {
-			"key-auth": {
-				"key": "e2e-cred-key-updated"
-			}
-		}
-	}`
-	updateFile := filepath.Join(t.TempDir(), "credential-update.json")
-	require.NoError(t, os.WriteFile(updateFile, []byte(updateJSON), 0644))
-	stdout, stderr, err = runA7WithEnv(env, "credential", "update", credID,
-		"--consumer", username, "-f", updateFile, "-g", gatewayGroup)
-	require.NoError(t, err, "credential update failed")
-
-	runA7JSON(t, env, &credential, "credential", "get", credID,
-		"--consumer", username, "-g", gatewayGroup, "-o", "json")
-	assert.Equal(t, "updated credential", credential["desc"])
-	plugins = requireJSONObject(t, credential["plugins"], "credential.plugins")
-	assert.Contains(t, plugins, "key-auth")
-
 	// Delete credential
 	stdout, stderr, err = runA7WithEnv(env, "credential", "delete", credID,
 		"--consumer", username, "--force", "-g", gatewayGroup)

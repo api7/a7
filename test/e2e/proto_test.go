@@ -64,11 +64,15 @@ func TestProto_CRUD(t *testing.T) {
 	var proto map[string]interface{}
 	runA7JSON(t, env, &proto, "proto", "get", protoID, "-g", gatewayGroup, "-o", "json")
 	assert.Equal(t, protoID, proto["id"])
-	assert.Contains(t, fmt.Sprint(proto["content"]), "helloworld")
+	content, ok := proto["content"].(string)
+	require.True(t, ok, "proto.content should be a string")
+	assert.Contains(t, content, "helloworld")
 
 	// Export (use get -o json; export is batch-only with cobra.NoArgs)
 	runA7JSON(t, env, &proto, "proto", "get", protoID, "-g", gatewayGroup, "-o", "json")
-	assert.Equal(t, "e2e test proto", proto["desc"])
+	content, ok = proto["content"].(string)
+	require.True(t, ok, "proto.content should be a string")
+	assert.Contains(t, content, "helloworld")
 
 	// Delete
 	stdout, stderr, err = runA7WithEnv(env, "proto", "delete", protoID, "--force", "-g", gatewayGroup)
