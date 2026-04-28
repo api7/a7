@@ -17,7 +17,7 @@ metadata:
     - a7 ssl list
     - a7 ssl get
     - a7 ssl delete
-    - a7 upstream create
+    - a7 service create
     - a7 route create
 ---
 
@@ -74,25 +74,41 @@ EOF
 - `client.ca`: CA certificate used to verify client certificates.
 - `client.depth`: (optional) Maximum certificate chain depth for verification.
 
-### 2. Create a route on the protected domain
+### 2. Create a service for the protected backend
 
 ```bash
-a7 route create --gateway-group default -f - <<'EOF'
+a7 service create --gateway-group default -f - <<'EOF'
 {
-  "id": "secure-api",
-  "uri": "/api/*",
-  "host": "api.example.com",
+  "id": "secure-api-service",
+  "name": "secure-api-service",
   "upstream": {
     "type": "roundrobin",
-    "nodes": {
-      "backend:8080": 1
-    }
+    "nodes": [
+      {
+        "host": "backend",
+        "port": 8080,
+        "weight": 1
+      }
+    ]
   }
 }
 EOF
 ```
 
-### 3. Test with client certificate
+### 3. Create a route on the protected domain
+
+```bash
+a7 route create --gateway-group default -f - <<'EOF'
+{
+  "id": "secure-api",
+  "paths": ["/api/*"],
+  "host": "api.example.com",
+  "service_id": "secure-api-service"
+}
+EOF
+```
+
+### 4. Test with client certificate
 
 ```bash
 # With valid client cert — succeeds
@@ -107,39 +123,57 @@ curl --cacert ca.crt https://api.example.com:9443/api/health
 
 Configure API7 EE to present a client certificate when connecting to backends.
 
-### 1. Create upstream with TLS client certificate
+### 1. Prepare upstream client certificates
+
+Create the upstream client SSL certificate and CA certificate in API7 EE first, then note their IDs/names. The recommended API7 Enterprise workflow is:
+
+1. Add an SSL Certificate using the certificate that API7 EE should present to the upstream.
+2. Add a CA Certificate used to verify the upstream server certificate.
+3. Select both certificates in the published service's upstream connection configuration.
+
+If you use `a7 ssl create` to upload the client SSL certificate, keep the PEM material in a local file that is not committed, and pass the file with `-f`.
+
+### 2. Create service with HTTPS upstream
 
 ```bash
-a7 upstream create --gateway-group default -f - <<'EOF'
+a7 service create --gateway-group default -f - <<'EOF'
 {
-  "id": "mtls-backend",
-  "type": "roundrobin",
-  "scheme": "https",
-  "nodes": {
-    "secure-backend:443": 1
-  },
-  "tls": {
-    "client_cert": "<CLIENT_CERTIFICATE_PEM>",
-    "client_key": "<CLIENT_PRIVATE_KEY_PEM>"
+  "id": "mtls-backend-service",
+  "name": "mtls-backend-service",
+  "upstream": {
+    "type": "roundrobin",
+    "scheme": "https",
+    "nodes": [
+      {
+        "host": "secure-backend",
+        "port": 443,
+        "weight": 1
+      }
+    ],
+    "tls": {
+      "client_cert_id": "<UPSTREAM_CLIENT_CERTIFICATE_ID>"
+    }
   }
 }
 EOF
 ```
 
 **Fields**:
-- `scheme`: Must be `"https"` for TLS connections to upstream.
-- `tls.client_cert`: Client certificate API7 EE presents to the upstream.
-- `tls.client_key`: Private key for the client certificate.
-- `pass_host`: Set to `"pass"` (default) or `"rewrite"` if upstream expects a specific Host header.
+- `upstream.scheme`: Must be `"https"` for TLS connections to upstream.
+- `upstream.nodes`: Backend nodes as `[{ "host": "...", "port": 443, "weight": 1 }]`.
+- `upstream.tls.client_cert_id`: Client certificate object API7 EE presents to the upstream.
+- `upstream.pass_host`: Set to `"pass"` (default) or `"rewrite"` if upstream expects a specific Host header.
 
-### 2. Create route using this upstream
+Configure the upstream CA certificate in the published service's upstream connection configuration if API7 EE should verify the upstream server certificate.
+
+### 3. Create route using this service
 
 ```bash
 a7 route create --gateway-group default -f - <<'EOF'
 {
   "id": "api",
-  "uri": "/api/*",
-  "upstream_id": "mtls-backend"
+  "paths": ["/api/*"],
+  "service_id": "mtls-backend-service"
 }
 EOF
 ```
@@ -165,20 +199,26 @@ a7 ssl create --gateway-group default -f - <<'EOF'
 EOF
 ```
 
-### 2. Upstream for API7 EE → backend mTLS
+### 2. Service for API7 EE → backend mTLS
 
 ```bash
-a7 upstream create --gateway-group default -f - <<'EOF'
+a7 service create --gateway-group default -f - <<'EOF'
 {
-  "id": "secure-backend",
-  "type": "roundrobin",
-  "scheme": "https",
-  "nodes": {
-    "internal-service:443": 1
-  },
-  "tls": {
-    "client_cert": "<API7_CLIENT_CERT>",
-    "client_key": "<API7_CLIENT_KEY>"
+  "id": "secure-backend-service",
+  "name": "secure-backend-service",
+  "upstream": {
+    "type": "roundrobin",
+    "scheme": "https",
+    "nodes": [
+      {
+        "host": "internal-service",
+        "port": 443,
+        "weight": 1
+      }
+    ],
+    "tls": {
+      "client_cert_id": "<UPSTREAM_CLIENT_CERTIFICATE_ID>"
+    }
   }
 }
 EOF
@@ -190,9 +230,9 @@ EOF
 a7 route create --gateway-group default -f - <<'EOF'
 {
   "id": "e2e-mtls-api",
-  "uri": "/api/*",
+  "paths": ["/api/*"],
   "host": "api.example.com",
-  "upstream_id": "secure-backend"
+  "service_id": "secure-backend-service"
 }
 EOF
 ```
@@ -265,26 +305,24 @@ ssls:
         -----BEGIN CERTIFICATE-----
         <CA certificate for client verification>
         -----END CERTIFICATE-----
-upstreams:
-  - id: secure-backend
-    type: roundrobin
-    scheme: https
-    nodes:
-      "backend:443": 1
-    tls:
-      client_cert: |
-        -----BEGIN CERTIFICATE-----
-        <client certificate for upstream>
-        -----END CERTIFICATE-----
-      client_key: |
-        -----BEGIN RSA PRIVATE KEY-----
-        <client private key for upstream>
-        -----END RSA PRIVATE KEY-----
+services:
+  - id: secure-backend-service
+    name: secure-backend-service
+    upstream:
+      type: roundrobin
+      scheme: https
+      nodes:
+        - host: backend
+          port: 443
+          weight: 1
+      tls:
+        client_cert_id: upstream-client-cert
 routes:
   - id: mtls-api
-    uri: /api/*
+    paths:
+      - /api/*
     host: api.example.com
-    upstream_id: secure-backend
+    service_id: secure-backend-service
 ```
 
 ## Troubleshooting
@@ -293,8 +331,8 @@ routes:
 |---------|-------|-----|
 | SSL handshake failure (client side) | Client cert not signed by the CA in `client.ca` | Verify CA chain; check that client cert is signed by the correct CA |
 | "no required SSL certificate" | Client didn't send a certificate | Configure client to present cert (`--cert` in curl) |
-| 502 to upstream | Upstream rejects API7 EE's client cert | Verify `tls.client_cert` is signed by the upstream's trusted CA |
+| 502 to upstream | Upstream rejects API7 EE's client cert | Verify `upstream.tls.client_cert_id` points to a certificate signed by the upstream's trusted CA |
 | Certificate expired | TLS cert past validity date | Rotate certificate with `a7 ssl update` |
 | SNI mismatch | Domain doesn't match `snis` list | Add the domain to the `snis` array |
 | Command failed with 401 | Invalid token | Refresh your token using `a7 context create` |
-| Upstream not found | Different gateway group | Ensure `--gateway-group` matches where resources were created |
+| Service not found | Different gateway group | Ensure `--gateway-group` matches where resources were created |
