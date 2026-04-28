@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -64,9 +63,11 @@ func TestGlobalRule_CRUD(t *testing.T) {
 	assert.Contains(t, stdout, grID)
 
 	// Get JSON
-	stdout, stderr, err = runA7WithEnv(env, "global-rule", "get", grID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, "prometheus")
+	var globalRule map[string]interface{}
+	runA7JSON(t, env, &globalRule, "global-rule", "get", grID, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, grID, globalRule["id"])
+	plugins := requireJSONObject(t, globalRule["plugins"], "global_rule.plugins")
+	assert.Contains(t, plugins, "prometheus")
 
 	// Update — API7 EE requires exactly one plugin per global rule.
 	updateJSON := fmt.Sprintf(`{
@@ -82,13 +83,16 @@ func TestGlobalRule_CRUD(t *testing.T) {
 	require.NoError(t, err, stderr)
 
 	// Export (use get -o json; export is batch-only with cobra.NoArgs)
-	stdout, stderr, err = runA7WithEnv(env, "global-rule", "get", grID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, "prometheus")
+	runA7JSON(t, env, &globalRule, "global-rule", "get", grID, "-g", gatewayGroup, "-o", "json")
+	plugins = requireJSONObject(t, globalRule["plugins"], "global_rule.plugins")
+	prometheus := requireJSONObject(t, plugins["prometheus"], "global_rule.plugins.prometheus")
+	assert.Equal(t, true, prometheus["prefer_name"])
 
 	// Delete
 	stdout, stderr, err = runA7WithEnv(env, "global-rule", "delete", grID, "--force", "-g", gatewayGroup)
 	require.NoError(t, err, stderr)
+	_, _, err = runA7WithEnv(env, "global-rule", "get", grID, "-g", gatewayGroup)
+	assert.Error(t, err)
 }
 
 func TestGlobalRule_DeleteNonexistent(t *testing.T) {
@@ -122,8 +126,11 @@ func TestGlobalRule_SkillExample(t *testing.T) {
 	require.NoError(t, err, stderr)
 
 	// Verify
-	stdout, stderr, err := runA7WithEnv(env, "global-rule", "get", grID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, "ip-restriction")
-	_ = strings.Contains(stdout, "whitelist") // ensure plugin config persisted
+	var globalRule map[string]interface{}
+	runA7JSON(t, env, &globalRule, "global-rule", "get", grID, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, grID, globalRule["id"])
+	plugins := requireJSONObject(t, globalRule["plugins"], "global_rule.plugins")
+	ipRestriction := requireJSONObject(t, plugins["ip-restriction"], "global_rule.plugins.ip-restriction")
+	whitelist := requireJSONArray(t, ipRestriction["whitelist"], "global_rule.plugins.ip-restriction.whitelist")
+	assert.Contains(t, whitelist, "10.0.0.0/8")
 }

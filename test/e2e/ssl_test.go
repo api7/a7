@@ -69,7 +69,7 @@ func TestSSL_CRUD(t *testing.T) {
 	require.NoError(t, os.WriteFile(tmpFile, []byte(sslJSON), 0644))
 
 	stdout, stderr, err := runA7WithEnv(env, "ssl", "create", "-f", tmpFile, "-g", gatewayGroup)
-	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+	require.NoError(t, err, "ssl create failed")
 
 	// Get
 	stdout, stderr, err = runA7WithEnv(env, "ssl", "get", sslID, "-g", gatewayGroup)
@@ -77,18 +77,22 @@ func TestSSL_CRUD(t *testing.T) {
 	assert.Contains(t, stdout, sslID)
 
 	// Get JSON
-	stdout, stderr, err = runA7WithEnv(env, "ssl", "get", sslID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, "e2e-test.example.com")
+	var ssl map[string]interface{}
+	runA7JSON(t, env, &ssl, "ssl", "get", sslID, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, sslID, ssl["id"])
+	snis := requireJSONArray(t, ssl["snis"], "ssl.snis")
+	assert.Contains(t, snis, "e2e-test.example.com")
 
 	// Export (use get -o json; export is batch-only with cobra.NoArgs)
-	stdout, stderr, err = runA7WithEnv(env, "ssl", "get", sslID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, "e2e-test.example.com")
+	runA7JSON(t, env, &ssl, "ssl", "get", sslID, "-g", gatewayGroup, "-o", "json")
+	snis = requireJSONArray(t, ssl["snis"], "ssl.snis")
+	assert.Contains(t, snis, "e2e-test.example.com")
 
 	// Delete
 	stdout, stderr, err = runA7WithEnv(env, "ssl", "delete", sslID, "--force", "-g", gatewayGroup)
 	require.NoError(t, err, stderr)
+	_, _, err = runA7WithEnv(env, "ssl", "get", sslID, "-g", gatewayGroup)
+	assert.Error(t, err)
 }
 
 func TestSSL_DeleteNonexistent(t *testing.T) {

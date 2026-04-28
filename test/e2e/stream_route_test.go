@@ -87,19 +87,34 @@ func TestStreamRoute_CRUD(t *testing.T) {
 	assert.Contains(t, stdout, srID)
 
 	// Get JSON
-	stdout, stderr, err = runA7WithEnv(env, "stream-route", "get", srID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, "19090")
-	assert.Contains(t, stdout, "stream route e2e")
+	var streamRoute map[string]interface{}
+	runA7JSON(t, env, &streamRoute, "stream-route", "get", srID, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, srID, streamRoute["id"])
+	assert.Equal(t, float64(19090), streamRoute["server_port"])
+	assert.Equal(t, "stream route e2e", streamRoute["desc"])
 
-	// Export (use get -o json; export is batch-only with cobra.NoArgs)
-	stdout, stderr, err = runA7WithEnv(env, "stream-route", "get", srID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, "19090")
+	// Update and verify readback.
+	updateJSON := fmt.Sprintf(`{
+		"id": %q,
+		"name": "e2e-stream-route-updated",
+		"service_id": %q,
+		"server_port": 19091,
+		"desc": "stream route e2e updated"
+	}`, srID, svcID)
+	updateFile := filepath.Join(t.TempDir(), "stream-route-update.json")
+	require.NoError(t, os.WriteFile(updateFile, []byte(updateJSON), 0644))
+	stdout, stderr, err = runA7WithEnv(env, "stream-route", "update", srID, "-f", updateFile, "-g", gatewayGroup)
+	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+
+	runA7JSON(t, env, &streamRoute, "stream-route", "get", srID, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, float64(19091), streamRoute["server_port"])
+	assert.Equal(t, "stream route e2e updated", streamRoute["desc"])
 
 	// Delete
 	stdout, stderr, err = runA7WithEnv(env, "stream-route", "delete", srID, "--force", "-g", gatewayGroup)
 	require.NoError(t, err, stderr)
+	_, _, err = runA7WithEnv(env, "stream-route", "get", srID, "-g", gatewayGroup)
+	assert.Error(t, err)
 }
 
 func TestStreamRoute_DeleteNonexistent(t *testing.T) {

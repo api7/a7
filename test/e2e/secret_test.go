@@ -66,7 +66,7 @@ func TestSecret_CRUD(t *testing.T) {
 	// Create
 	stdout, stderr, err := runA7WithEnv(env, "secret", "create", secretID, "-f", tmpFile, "-g", gatewayGroup)
 	if err != nil {
-		t.Skipf("secret create failed (vault may not be configured): %s %s", stdout, stderr)
+		t.Skip("secret create failed (vault may not be configured)")
 	}
 
 	// Get
@@ -75,13 +75,32 @@ func TestSecret_CRUD(t *testing.T) {
 	assert.Contains(t, stdout, "vault")
 
 	// Get JSON
-	stdout, stderr, err = runA7WithEnv(env, "secret", "get", secretID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, "vault.example.com")
+	var secret map[string]interface{}
+	runA7JSON(t, env, &secret, "secret", "get", secretID, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, secretID, secret["id"])
+	assert.Equal(t, "https://vault.example.com", secret["uri"])
+	assert.Equal(t, "kv/apisix", secret["prefix"])
+
+	// Update and verify readback.
+	updateJSON := `{
+		"uri": "https://vault-updated.example.com",
+		"prefix": "kv/apisix-updated",
+		"token": "updated-vault-token"
+	}`
+	updateFile := filepath.Join(t.TempDir(), "secret-update.json")
+	require.NoError(t, os.WriteFile(updateFile, []byte(updateJSON), 0644))
+	stdout, stderr, err = runA7WithEnv(env, "secret", "update", secretID, "-f", updateFile, "-g", gatewayGroup)
+	require.NoError(t, err, "secret update failed")
+
+	runA7JSON(t, env, &secret, "secret", "get", secretID, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, "https://vault-updated.example.com", secret["uri"])
+	assert.Equal(t, "kv/apisix-updated", secret["prefix"])
 
 	// Delete
 	stdout, stderr, err = runA7WithEnv(env, "secret", "delete", secretID, "--force", "-g", gatewayGroup)
 	require.NoError(t, err, stderr)
+	_, _, err = runA7WithEnv(env, "secret", "get", secretID, "-g", gatewayGroup)
+	assert.Error(t, err)
 }
 
 func TestSecret_DeleteNonexistent(t *testing.T) {

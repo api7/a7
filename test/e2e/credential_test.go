@@ -59,7 +59,7 @@ func TestCredential_CRUD(t *testing.T) {
 
 	stdout, stderr, err := runA7WithEnv(env, "credential", "create", credID,
 		"--consumer", username, "-f", tmpFile, "-g", gatewayGroup)
-	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+	require.NoError(t, err, "credential create failed")
 
 	// Get
 	stdout, stderr, err = runA7WithEnv(env, "credential", "get", credID,
@@ -68,15 +68,20 @@ func TestCredential_CRUD(t *testing.T) {
 	assert.Contains(t, stdout, credID)
 
 	// Get JSON
-	stdout, stderr, err = runA7WithEnv(env, "credential", "get", credID,
+	var credential map[string]interface{}
+	runA7JSON(t, env, &credential, "credential", "get", credID,
 		"--consumer", username, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, "key-auth")
+	assert.Equal(t, credID, credential["id"])
+	plugins := requireJSONObject(t, credential["plugins"], "credential.plugins")
+	assert.Contains(t, plugins, "key-auth")
 
 	// Delete credential
 	stdout, stderr, err = runA7WithEnv(env, "credential", "delete", credID,
 		"--consumer", username, "--force", "-g", gatewayGroup)
 	require.NoError(t, err, stderr)
+	_, _, err = runA7WithEnv(env, "credential", "get", credID,
+		"--consumer", username, "-g", gatewayGroup)
+	assert.Error(t, err)
 }
 
 func TestCredential_RequiresConsumerFlag(t *testing.T) {
