@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -43,22 +42,34 @@ func deleteRouteViaAdmin(t testTB, id string) {
 
 func TestRoute_List(t *testing.T) {
 	env := setupEnv(t)
+	svcID := "e2e-service-route-list"
+	routeID := "e2e-route-list"
+	t.Cleanup(func() {
+		deleteRouteViaAdmin(t, routeID)
+		deleteServiceViaAdmin(t, svcID)
+	})
+	createTestServiceViaCLI(t, env, svcID)
+	createTestRouteWithServiceViaCLI(t, env, routeID, svcID)
 
-	stdout, stderr, err := runA7WithEnv(env, "route", "list", "-g", gatewayGroup)
-	if err != nil {
-		t.Skipf("route list failed (API7 EE may use different endpoint): stderr=%s", stderr)
-	}
-	assert.NotEmpty(t, stdout)
+	stdout, stderr, err := runA7WithEnv(env, "route", "list", "-g", gatewayGroup, "--service-id", svcID)
+	require.NoError(t, err, stderr)
+	assert.Contains(t, stdout, routeID)
 }
 
 func TestRoute_ListJSON(t *testing.T) {
 	env := setupEnv(t)
+	svcID := "e2e-service-route-list-json"
+	routeID := "e2e-route-list-json"
+	t.Cleanup(func() {
+		deleteRouteViaAdmin(t, routeID)
+		deleteServiceViaAdmin(t, svcID)
+	})
+	createTestServiceViaCLI(t, env, svcID)
+	createTestRouteWithServiceViaCLI(t, env, routeID, svcID)
 
-	stdout, stderr, err := runA7WithEnv(env, "route", "list", "-g", gatewayGroup, "-o", "json")
-	if err != nil {
-		t.Skipf("route list failed (API7 EE may use different endpoint): stderr=%s", stderr)
-	}
-	assert.NotEmpty(t, stdout)
+	stdout, stderr, err := runA7WithEnv(env, "route", "list", "-g", gatewayGroup, "--service-id", svcID, "-o", "json")
+	require.NoError(t, err, stderr)
+	assert.Contains(t, stdout, routeID)
 }
 
 func TestRoute_CRUD(t *testing.T) {
@@ -292,10 +303,7 @@ func TestRoute_ListWithLabel(t *testing.T) {
 	stdout, stderr, err := runA7WithEnv(env, "route", "create", "-f", tmpFile, "-g", gatewayGroup)
 	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
 
-	stdout, stderr, err = runA7WithEnv(env, "route", "list", "-g", gatewayGroup, "--label", "filter-test=yes")
-	if err != nil && strings.Contains(stderr, `parameter "service_id" in query has an error`) {
-		t.Skipf("route list with label requires service_id in current EE API: %s", stderr)
-	}
+	stdout, stderr, err = runA7WithEnv(env, "route", "list", "-g", gatewayGroup, "--service-id", svcID, "--label", "filter-test=yes")
 	require.NoError(t, err, stderr)
 	assert.Contains(t, stdout, routeID)
 }
