@@ -83,13 +83,9 @@ a7 service create --gateway-group default -f - <<'EOF'
   "name": "secure-api-service",
   "upstream": {
     "type": "roundrobin",
-    "nodes": [
-      {
-        "host": "backend",
-        "port": 8080,
-        "weight": 1
-      }
-    ]
+    "nodes": {
+      "backend:8080": 1
+    }
   }
 }
 EOF
@@ -123,7 +119,17 @@ curl --cacert ca.crt https://api.example.com:9443/api/health
 
 Configure API7 EE to present a client certificate when connecting to backends.
 
-### 1. Create service with TLS client certificate
+### 1. Prepare upstream client certificates
+
+Create the upstream client SSL certificate and CA certificate in API7 EE first, then note their IDs/names. The recommended API7 Enterprise workflow is:
+
+1. Add an SSL Certificate using the certificate API7 EE should present to the upstream.
+2. Add a CA Certificate used to verify the upstream server certificate.
+3. Select both certificates in the published service's upstream connection configuration.
+
+If you use `a7 ssl create` to upload the client SSL certificate, keep the PEM material in a local file that is not committed, and pass the file with `-f`.
+
+### 2. Create service with HTTPS upstream
 
 ```bash
 a7 service create --gateway-group default -f - <<'EOF'
@@ -133,16 +139,11 @@ a7 service create --gateway-group default -f - <<'EOF'
   "upstream": {
     "type": "roundrobin",
     "scheme": "https",
-    "nodes": [
-      {
-        "host": "secure-backend",
-        "port": 443,
-        "weight": 1
-      }
-    ],
+    "nodes": {
+      "secure-backend:443": 1
+    },
     "tls": {
-      "client_cert": "<CLIENT_CERTIFICATE_PEM>",
-      "client_key": "<CLIENT_PRIVATE_KEY_PEM>"
+      "client_cert_id": "<UPSTREAM_CLIENT_CERTIFICATE_ID>"
     }
   }
 }
@@ -150,12 +151,14 @@ EOF
 ```
 
 **Fields**:
-- `scheme`: Must be `"https"` for TLS connections to upstream.
-- `tls.client_cert`: Client certificate API7 EE presents to the upstream.
-- `tls.client_key`: Private key for the client certificate.
-- `pass_host`: Set to `"pass"` (default) or `"rewrite"` if upstream expects a specific Host header.
+- `upstream.scheme`: Must be `"https"` for TLS connections to upstream.
+- `upstream.nodes`: Backend nodes as `{"host:port": weight}`.
+- `upstream.tls.client_cert_id`: Client certificate object API7 EE presents to the upstream.
+- `upstream.pass_host`: Set to `"pass"` (default) or `"rewrite"` if upstream expects a specific Host header.
 
-### 2. Create route using this service
+Configure the upstream CA certificate in the published service's upstream connection configuration if API7 EE should verify the upstream server certificate.
+
+### 3. Create route using this service
 
 ```bash
 a7 route create --gateway-group default -f - <<'EOF'
@@ -198,16 +201,11 @@ a7 service create --gateway-group default -f - <<'EOF'
   "upstream": {
     "type": "roundrobin",
     "scheme": "https",
-    "nodes": [
-      {
-        "host": "internal-service",
-        "port": 443,
-        "weight": 1
-      }
-    ],
+    "nodes": {
+      "internal-service:443": 1
+    },
     "tls": {
-      "client_cert": "<API7_CLIENT_CERT>",
-      "client_key": "<API7_CLIENT_KEY>"
+      "client_cert_id": "<UPSTREAM_CLIENT_CERTIFICATE_ID>"
     }
   }
 }
@@ -302,18 +300,9 @@ services:
       type: roundrobin
       scheme: https
       nodes:
-        - host: backend
-          port: 443
-          weight: 1
+        "backend:443": 1
       tls:
-        client_cert: |
-          -----BEGIN CERTIFICATE-----
-          <client certificate for upstream>
-          -----END CERTIFICATE-----
-        client_key: |
-          -----BEGIN RSA PRIVATE KEY-----
-          <client private key for upstream>
-          -----END RSA PRIVATE KEY-----
+        client_cert_id: upstream-client-cert
 routes:
   - id: mtls-api
     paths:
@@ -328,7 +317,7 @@ routes:
 |---------|-------|-----|
 | SSL handshake failure (client side) | Client cert not signed by the CA in `client.ca` | Verify CA chain; check that client cert is signed by the correct CA |
 | "no required SSL certificate" | Client didn't send a certificate | Configure client to present cert (`--cert` in curl) |
-| 502 to upstream | Upstream rejects API7 EE's client cert | Verify `tls.client_cert` is signed by the upstream's trusted CA |
+| 502 to upstream | Upstream rejects API7 EE's client cert | Verify `upstream.tls.client_cert_id` points to a certificate signed by the upstream's trusted CA |
 | Certificate expired | TLS cert past validity date | Rotate certificate with `a7 ssl update` |
 | SNI mismatch | Domain doesn't match `snis` list | Add the domain to the `snis` array |
 | Command failed with 401 | Invalid token | Refresh your token using `a7 context create` |
