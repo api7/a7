@@ -82,7 +82,7 @@ func TestGetSecret_JSON(t *testing.T) {
 	}
 
 	var item api.Secret
-	if err := json.Unmarshal([]byte(out.String()), &item); err != nil {
+	if err := json.Unmarshal(out.Bytes(), &item); err != nil {
 		t.Fatalf("failed to parse output: %v", err)
 	}
 	if item.ID != "vault/s1" || item.Prefix != "kv" {

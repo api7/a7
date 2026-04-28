@@ -18,7 +18,6 @@ metadata:
     - a7 ssl get
     - a7 ssl delete
     - a7 upstream create
-    - a7 upstream update
     - a7 route create
 ---
 

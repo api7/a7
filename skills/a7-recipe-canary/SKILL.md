@@ -13,6 +13,7 @@ metadata:
   apisix_version: ">=3.0.0"
   a7_commands:
     - a7 upstream create
+    - a7 upstream update
     - a7 route create
     - a7 route update
     - a7 route get

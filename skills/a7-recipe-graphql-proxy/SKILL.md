@@ -14,7 +14,7 @@ metadata:
     - a7 route create
     - a7 route update
     - a7 config sync
-    - a7 consumer-restriction create
+    - a7 consumer create
 ---
 
 # a7-recipe-graphql-proxy

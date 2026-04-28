@@ -72,7 +72,7 @@ func TestListProtos_JSON(t *testing.T) {
 		t.Fatalf("actionRun failed: %v", err)
 	}
 	var items []api.Proto
-	if err := json.Unmarshal([]byte(out.String()), &items); err != nil {
+	if err := json.Unmarshal(out.Bytes(), &items); err != nil {
 		t.Fatalf("failed to parse output: %v", err)
 	}
 	if len(items) != 1 || items[0].ID != "p1" {

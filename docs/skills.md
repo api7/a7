@@ -13,8 +13,8 @@ skills/
 ├── a7-shared/SKILL.md               # Core a7 conventions (shared skill)
 ├── a7-plugin-ai-proxy/SKILL.md      # AI Gateway plugin skill
 ├── a7-plugin-key-auth/SKILL.md      # key-auth plugin skill
-├── a7-recipe-gateway-group/SKILL.md # Gateway group management recipe
-├── a7-persona-platform-eng/SKILL.md # Platform Engineer persona
+├── a7-recipe-canary/SKILL.md        # Canary release recipe
+├── a7-persona-operator/SKILL.md     # Operator persona
 └── ...
 ```
 
@@ -28,8 +28,8 @@ Skills follow a naming convention with four types:
 |--------|------|-------------|---------|
 | `a7-shared` | Shared | Core project conventions and patterns | `a7-shared` |
 | `a7-plugin-*` | Plugin | One API7 EE plugin — config, examples, gateway group scoping | `a7-plugin-ai-proxy` |
-| `a7-recipe-*` | Recipe | Multi-step operational task (e.g., setting up a service template) | `a7-recipe-service-template` |
-| `a7-persona-*` | Persona | Role-specific workflow guidance | `a7-persona-platform-eng` |
+| `a7-recipe-*` | Recipe | Multi-step operational task | `a7-recipe-canary` |
+| `a7-persona-*` | Persona | Role-specific workflow guidance | `a7-persona-operator` |
 
 ### Naming Rules
 
@@ -106,13 +106,19 @@ The body content depends on the skill type:
 
 ## CI Validation
 
-Every PR that modifies `skills/` is validated by `scripts/validate-skills.sh`. The script checks:
+Every PR validates `skills/` with `scripts/validate-skills.sh`. The script checks:
 
 1. Every `skills/*/SKILL.md` has valid YAML frontmatter
 2. Required fields `name` and `description` are present
 3. `name` matches the directory name
 4. `name` follows kebab-case pattern
 5. `description` is non-empty
+6. skill names are unique
+
+The E2E suite also contains static skill checks under `test/e2e/skills`.
+Those checks keep this document aligned with the actual `skills/` inventory and
+prevent references to known removed commands such as the old health and portal
+commands.
 
 Run locally:
 
@@ -128,18 +134,65 @@ make validate-skills
 4. Run validation: `make validate-skills`
 5. Update this document if adding a new skill type or category
 
-## Skill Roadmap
+## Current Inventory
 
-| PR | Skills | Description |
-|----|--------|-------------|
-| PR-28 | 1 | Infrastructure + `a7-shared` |
-| PR-29 | 6 | AI Gateway plugins (ai-proxy, ai-prompt-template, ai-prompt-decorator, ai-content-moderation, ai-rag, ai-token-limiter) |
-| PR-30 | 5 | Enterprise core (gateway-group, service-template, rbac, portal, audit-log) |
-| PR-31 | 5 | Authentication plugins (key-auth, jwt-auth, basic-auth, openid-connect, wolf-rbac) |
-| PR-32 | 4 | Security + rate limiting (ip-restriction, cors, limit-count, limit-req) |
-| PR-33 | 5 | Traffic + transformation (proxy-rewrite, response-rewrite, traffic-split, redirect, grpc-transcode) |
-| PR-34 | 5 | Operational recipes (blue-green, canary, circuit-breaker, health-check, service-registry) |
-| PR-35 | 6 | Observability (prometheus, skywalking, zipkin, http-logger, kafka-logger, datadog) |
-| PR-36 | 3 | Advanced recipes + personas |
+The repository currently contains 40 skills:
 
-**Total**: 40 skills across 9 PRs.
+**Shared**
+
+- `a7-shared`
+
+**Personas**
+
+- `a7-persona-developer`
+- `a7-persona-operator`
+
+**Plugin Skills**
+
+- `a7-plugin-ai-content-moderation`
+- `a7-plugin-ai-prompt-decorator`
+- `a7-plugin-ai-prompt-template`
+- `a7-plugin-ai-proxy`
+- `a7-plugin-basic-auth`
+- `a7-plugin-consumer-restriction`
+- `a7-plugin-cors`
+- `a7-plugin-datadog`
+- `a7-plugin-ext-plugin`
+- `a7-plugin-fault-injection`
+- `a7-plugin-grpc-transcode`
+- `a7-plugin-hmac-auth`
+- `a7-plugin-http-logger`
+- `a7-plugin-ip-restriction`
+- `a7-plugin-jwt-auth`
+- `a7-plugin-kafka-logger`
+- `a7-plugin-key-auth`
+- `a7-plugin-limit-count`
+- `a7-plugin-limit-req`
+- `a7-plugin-openid-connect`
+- `a7-plugin-prometheus`
+- `a7-plugin-proxy-rewrite`
+- `a7-plugin-redirect`
+- `a7-plugin-response-rewrite`
+- `a7-plugin-serverless`
+- `a7-plugin-skywalking`
+- `a7-plugin-traffic-split`
+- `a7-plugin-wolf-rbac`
+- `a7-plugin-zipkin`
+
+**Recipe Skills**
+
+- `a7-recipe-api-versioning`
+- `a7-recipe-blue-green`
+- `a7-recipe-canary`
+- `a7-recipe-circuit-breaker`
+- `a7-recipe-graphql-proxy`
+- `a7-recipe-health-check`
+- `a7-recipe-mtls`
+- `a7-recipe-multi-tenant`
+
+## Current Compatibility Notes
+
+- Route examples should use the current API7 EE model: create a service, then create routes with `service_id`.
+- Auth examples should use `consumer create` plus `credential create`; do not put auth plugin credentials directly in the consumer body.
+- Standalone upstream workflows are not the preferred `a7` path for current API7 EE. Use service inline upstreams and service-backed routes unless you are intentionally documenting APISIX-compatible behavior.
+- Gateway/httpbin traffic checks are optional for `a7`; the default CI focuses on CLI-driven control-plane resource CRUD and structured `get/list/dump` assertions.

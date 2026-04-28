@@ -52,7 +52,7 @@ func TestUpdateStreamRoute_Success(t *testing.T) {
 	}
 
 	var item api.StreamRoute
-	if err := json.Unmarshal([]byte(out.String()), &item); err != nil {
+	if err := json.Unmarshal(out.Bytes(), &item); err != nil {
 		t.Fatalf("failed to parse JSON output: %v", err)
 	}
 	if item.ID != "sr1" {

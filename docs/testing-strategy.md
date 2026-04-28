@@ -6,6 +6,8 @@
 - Unit tests are only allowed for self-contained logic that does not need mocked external systems.
 - Do not add new command-level tests that mock the Admin API, gateway, or control-plane behavior.
 - Default E2E coverage should prioritize control-plane CLI roundtrips: create/update/delete/sync via `a7`, then read back state with `get`, `list`, or `config dump`.
+- GitHub CI uses repository-configured external environment variables and does not bootstrap API7 with Docker Compose.
+- The Docker Compose stack under `test/e2e/` is for local testing and debugging.
 
 ## Test Pyramid For `a7`
 
@@ -40,6 +42,10 @@ Optional targets outside the default CI path:
 - auth and forwarding behavior that depends on a live upstream
 - debug flows that require live gateway requests
 
+Full gateway/data-plane traffic validation belongs in the gateway repository.
+For `a7`, prefer validating CLI behavior by creating, updating, reading, and
+deleting resources through the CLI itself.
+
 E2E tests live in `test/e2e/` behind the `e2e` build tag and are run through the Ginkgo entrypoint in `make test-e2e`.
 
 ## What To Remove
@@ -62,7 +68,10 @@ Optional for live gateway/data-plane coverage:
 - `A7_GATEWAY_GROUP`
 - `A7_E2E_ENABLE_GATEWAY_GROUP_CRUD=1` when you explicitly want to exercise gateway-group create/delete against an environment that supports it
 
-For local development, you can bring up the repository's Docker-based environment with:
+CI provides `A7_ADMIN_URL` and `A7_TOKEN` through repository secrets, and sets
+`A7_GATEWAY_GROUP` to the fixed value `default` in the workflow. For local
+development, you can either point these variables at an existing API7
+environment or bring up the repository's Docker-based environment with:
 
 ```bash
 make docker-up
@@ -94,6 +103,9 @@ export A7_GATEWAY_URL=...
 export HTTPBIN_URL=...
 make test-e2e-full
 ```
+
+`test-e2e-full` is intended for local/debug use. It should not be treated as the
+default CI contract for `a7`.
 
 Equivalent direct command:
 

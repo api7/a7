@@ -2,6 +2,7 @@ package update
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -99,7 +100,7 @@ func actionRun(opts *Options) error {
 	client := api.NewClient(httpClient, cfg.BaseURL())
 	_, err = client.Put("/apisix/admin/consumers/"+opts.Username+"?gateway_group_id="+ggID, body)
 	if err != nil {
-		return fmt.Errorf(cmdutil.FormatAPIError(err))
+		return errors.New(cmdutil.FormatAPIError(err))
 	}
 
 	output := opts.Output

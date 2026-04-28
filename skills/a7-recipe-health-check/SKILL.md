@@ -13,9 +13,8 @@ metadata:
   apisix_version: ">=3.0.0"
   a7_commands:
     - a7 upstream create
-    - a7 upstream update
     - a7 upstream get
-    - a7 upstream health
+    - a7 config sync
 ---
 
 # a7-recipe-health-check
@@ -192,11 +191,13 @@ a7 upstream create --gateway-group default -f - <<'EOF'
 EOF
 ```
 
-### 4. Check upstream health status
+### 4. Verify the referencing route and upstream
 
 ```bash
-# View health status of all nodes in a gateway group
-a7 upstream health backend --gateway-group default
+# Current a7 does not expose a standalone upstream-health command.
+# Verify the upstream/route wiring and use gateway observability for node state.
+a7 upstream get backend --gateway-group default --output json
+a7 route list --gateway-group default --output json
 ```
 
 ## Common Patterns
@@ -321,6 +322,6 @@ routes:
 | Probe hitting wrong endpoint | Default `http_path` is `/` | Set `http_path` to your actual health endpoint |
 | TLS probe fails | Certificate verification fails | Set `https_verify_certificate: false` or fix certificates |
 | Health checks too aggressive | Low thresholds with flaky endpoints | Increase `failures` threshold and `interval` |
-| `a7 upstream health` shows no data | API7 EE hasn't started health checks yet | Wait for the first probe interval to complete |
+| No standalone health command | Current a7 does not expose upstream health status | Verify service/route config with `a7 service get` and use gateway observability |
 | Command failed with 401 | Invalid token | Refresh your token using `a7 context create` |
 | Upstream not found | Different gateway group | Ensure `--gateway-group` matches the group where upstream was created |

@@ -141,7 +141,7 @@ func actionRun(opts *Options) error {
 	client := api.NewClient(httpClient, cfg.BaseURL())
 	_, err = client.Post("/apisix/admin/ssls?gateway_group_id="+ggID, body)
 	if err != nil {
-		return fmt.Errorf(cmdutil.FormatAPIError(err))
+		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
 	}
 
 	output := opts.Output

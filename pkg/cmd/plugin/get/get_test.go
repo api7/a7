@@ -51,7 +51,7 @@ func TestPluginGet_JSONOutput(t *testing.T) {
 	}
 
 	var got map[string]interface{}
-	if err := json.Unmarshal([]byte(out.String()), &got); err != nil {
+	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
 		t.Fatalf("failed to parse output: %v", err)
 	}
 	if got["name"] != "key-auth" {

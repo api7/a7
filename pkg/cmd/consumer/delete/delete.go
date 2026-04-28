@@ -2,6 +2,7 @@ package delete
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -82,7 +83,7 @@ func actionRun(opts *Options) error {
 	}
 	_, err = client.Delete("/apisix/admin/consumers/"+opts.Username, map[string]string{"gateway_group_id": ggID})
 	if err != nil {
-		return fmt.Errorf(cmdutil.FormatAPIError(err))
+		return errors.New(cmdutil.FormatAPIError(err))
 	}
 
 	_, err = fmt.Fprintf(opts.IO.Out, "consumer %q deleted\n", opts.Username)

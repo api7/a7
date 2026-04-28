@@ -14,12 +14,11 @@ metadata:
     - a7 gateway-group list
     - a7 gateway-group create
     - a7 route list
-    - a7 upstream health
+    - a7 service list
     - a7 config sync
     - a7 config dump
     - a7 debug logs
     - a7 debug trace
-    - a7 health
 ---
 
 # a7-persona-operator
@@ -54,9 +53,6 @@ a7 context create prod-ee \
 # Switch context
 a7 context use prod-ee
 
-# Verify connectivity
-a7 health
-
 # List available Gateway Groups
 a7 gateway-group list
 ```
@@ -67,13 +63,14 @@ a7 gateway-group list
 
 ```bash
 # Check if the Dashboard and CLI are connected
-a7 health
+a7 gateway-group list
 
 # Verify status of a specific Gateway Group
 a7 gateway-group get internal-apps
 
-# Check upstream health within a group
-a7 upstream health <upstream-id> -g internal-apps
+# Inspect deployed services and routes within a group
+a7 service list -g internal-apps
+a7 route list -g internal-apps
 ```
 
 ### 2. Configuration Audit & Drift Detection
@@ -199,7 +196,7 @@ EOF
 |-----------|--------|---------|
 | New Team Onboarding | Create Gateway Group & Assign RBAC | `a7 gateway-group create <name>` |
 | Configuration Drift | Compare local YAML with Live | `a7 config diff -g <group> -f <file>` |
-| Upstream Timeout | Check health & logs | `a7 upstream health <id> -g <group>` |
+| Backend Timeout | Check route/service config and logs | `a7 route get <id> -g <group>` and `a7 debug logs` |
 | Security Breach | Block IP via Global Rule | `a7 global-rule create -g <group> -f block.json` |
 | Compliance Audit | Dump all configs for review | `a7 config dump -g <group>` |
 | Version Upgrade | Validate then Sync | `a7 config validate` then `a7 config sync` |
@@ -212,5 +209,5 @@ EOF
 4. **Audit Logs**: Regularly review the Dashboard audit logs for any CLI-initiated changes.
 5. **HTTPS Only**: Always use the HTTPS port (`7443`) for the Control Plane.
 6. **Config as Code**: Store all Gateway Group configurations in Git. Treat the Dashboard as a projection of your repository.
-7. **Health Checks**: Always enable active health checks for upstreams to allow the gateway to self-heal.
+7. **Backend Health**: Manage backend health through service/route upstream configuration and gateway observability.
 8. **Context Awareness**: Use descriptive names for contexts (e.g., `hk-region-prod`, `us-west-staging`) to avoid confusion in multi-region setups.
