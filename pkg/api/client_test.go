@@ -21,7 +21,9 @@ func TestClient_Get(t *testing.T) {
 			t.Errorf("expected path /routes, got %s", r.URL.Path)
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(expectedBody))
+		if _, err := w.Write([]byte(expectedBody)); err != nil {
+			t.Errorf("failed to write response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -63,7 +65,9 @@ func TestClient_Post(t *testing.T) {
 		}
 
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte(expectedBody))
+		if _, err := w.Write([]byte(expectedBody)); err != nil {
+			t.Errorf("failed to write response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -97,7 +101,9 @@ func TestClient_Put(t *testing.T) {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(expectedBody))
+		if _, err := w.Write([]byte(expectedBody)); err != nil {
+			t.Errorf("failed to write response: %v", err)
+		}
 	}))
 	defer server.Close()
 

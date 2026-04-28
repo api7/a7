@@ -63,7 +63,7 @@ func TestGetConsumerGroup_JSON(t *testing.T) {
 		t.Fatalf("actionRun failed: %v", err)
 	}
 	var item api.ConsumerGroup
-	if err := json.Unmarshal([]byte(out.String()), &item); err != nil {
+	if err := json.Unmarshal(out.Bytes(), &item); err != nil {
 		t.Fatalf("failed to parse json output: %v", err)
 	}
 	if item.ID != "cg1" {
