@@ -12,6 +12,7 @@ concurrency:
 
 jobs:
   test:
+    name: Go Test (${{ matrix.go-version }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -33,6 +34,7 @@ jobs:
         run: go vet ./...
 
   lint:
+    name: Go Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
