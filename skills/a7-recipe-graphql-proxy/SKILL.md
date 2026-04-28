@@ -2,7 +2,7 @@
 name: a7-recipe-graphql-proxy
 description: >-
   Recipe skill for implementing GraphQL proxying patterns using API7 Enterprise Edition (API7 EE)
-  and the a7 CLI. Covers operation-based routing, per-operation rate limiting, 
+  and the a7 CLI. Covers operation-based routing, per-operation rate limiting,
   REST-to-GraphQL conversion, and enterprise security for GraphQL APIs.
 version: "1.0.0"
 author: API7.ai Contributors
@@ -11,75 +11,111 @@ metadata:
   category: recipe
   apisix_version: ">=3.0.0"
   a7_commands:
+    - a7 service create
+    - a7 service get
     - a7 route create
     - a7 route update
-    - a7 config sync
+    - a7 route get
     - a7 consumer create
+    - a7 credential create
 ---
 
 # a7-recipe-graphql-proxy
 
 ## Overview
 
-API7 Enterprise Edition (API7 EE) provides advanced support for GraphQL by exposing internal variables that allow for routing and policy enforcement based on the GraphQL query structure. This is all managed through the **Gateway Group** scoped architecture of the a7 CLI.
+API7 EE can route and protect GraphQL traffic by using GraphQL variables from
+the parsed request body:
 
-Key GraphQL Variables:
-- `graphql_name`: The operation name (e.g., `"getUser"`).
-- `graphql_operation`: The type of operation (`"query"`, `"mutation"`, or `"subscription"`).
-- `graphql_root_fields`: The top-level fields requested (e.g., `["user", "profile"]`).
+- `graphql_name`: operation name, such as `getUser`.
+- `graphql_operation`: operation type, such as `query` or `mutation`.
+- `graphql_root_fields`: top-level fields requested by the operation.
+
+Use the current a7 service-backed route model:
+
+1. Create services for the GraphQL backends.
+2. Create routes with `paths` and `service_id`.
+3. Add GraphQL `vars` and plugins through `a7 route create/update -f` payloads.
 
 ## When to Use
 
-- **Separation of Concerns**: Routing read-only queries to one backend and mutations to another.
-- **Granular Rate Limiting**: Applying stricter limits on expensive mutations than on simple queries.
-- **Access Control**: Restricting sensitive GraphQL operations to specific consumer groups.
-- **Modernization**: Using `degraphql` to expose a legacy REST API for a GraphQL-first frontend.
-- **Enterprise Security**: Adding auth and WAF layers to GraphQL endpoints in a specific **Gateway Group**.
+- Route read-only GraphQL queries and mutations to different backends.
+- Apply tighter limits to expensive operations.
+- Expose REST-style paths that are translated to GraphQL with `degraphql`.
+- Protect sensitive GraphQL operations with auth and access-control plugins.
 
-## Approach A: Operation-Based Routing (by Gateway Group)
+## Approach A: Operation-Based Routing
 
-In an enterprise environment, you may want to route different GraphQL operations to specific microservices or database clusters within your **Gateway Group**.
+Create separate services for read and write GraphQL traffic.
 
-### 1. Route Queries to Read-Only Backend
+```bash
+a7 service create -g prod-group -f - <<'EOF'
+{
+  "id": "gql-read-service",
+  "name": "gql-read-service",
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": [
+      {"host": "gql-read-replica", "port": 4000, "weight": 1}
+    ]
+  }
+}
+EOF
+
+a7 service create -g prod-group -f - <<'EOF'
+{
+  "id": "gql-write-service",
+  "name": "gql-write-service",
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": [
+      {"host": "gql-primary-db", "port": 4000, "weight": 1}
+    ]
+  }
+}
+EOF
+```
+
+Route GraphQL queries to the read service:
 
 ```bash
 a7 route create -g prod-group -f - <<'EOF'
 {
   "id": "gql-queries",
-  "uri": "/graphql",
-  "vars": [["graphql_operation", "==", "query"]],
-  "upstream": {
-    "type": "roundrobin",
-    "nodes": { "gql-read-replica:4000": 1 }
-  }
+  "name": "gql-queries",
+  "paths": ["/graphql"],
+  "service_id": "gql-read-service",
+  "vars": [["graphql_operation", "==", "query"]]
 }
 EOF
 ```
 
-### 2. Route Mutations to Primary Backend
+Route GraphQL mutations to the write service:
 
 ```bash
 a7 route create -g prod-group -f - <<'EOF'
 {
   "id": "gql-mutations",
-  "uri": "/graphql",
-  "vars": [["graphql_operation", "==", "mutation"]],
-  "upstream": {
-    "type": "roundrobin",
-    "nodes": { "gql-primary-db:4000": 1 }
-  }
+  "name": "gql-mutations",
+  "paths": ["/graphql"],
+  "service_id": "gql-write-service",
+  "vars": [["graphql_operation", "==", "mutation"]]
 }
 EOF
 ```
 
+Use route priorities if a generic `/graphql` route overlaps with more specific
+GraphQL operation routes.
+
 ## Approach B: Per-Operation Rate Limiting
 
-Differentiate between heavy queries and frequent mutations by applying separate `limit-count` plugins.
+Apply stricter limits to mutation traffic. Include the `service_id` in update
+payloads so the route remains bound to the intended service.
 
 ```bash
-# Expensive Mutations: 50 req/min
 a7 route update gql-mutations -g prod-group -f - <<'EOF'
 {
+  "service_id": "gql-write-service",
   "plugins": {
     "key-auth": {},
     "limit-count": {
@@ -95,107 +131,133 @@ a7 route update gql-mutations -g prod-group -f - <<'EOF'
 EOF
 ```
 
-## Approach C: REST-to-GraphQL with degraphql
-
-The `degraphql` plugin allows you to map a RESTful URI to a specific GraphQL query on the backend. This is useful for providing a stable REST interface while migrating to a GraphQL backend.
+Create consumers and credentials separately:
 
 ```bash
+a7 consumer create -g prod-group --username frontend-app
+a7 credential create -g prod-group --consumer frontend-app --plugins-json '{"key-auth":{"key":"frontend-secret"}}'
+```
+
+## Approach C: REST-to-GraphQL with degraphql
+
+The `degraphql` plugin maps a REST-style path to a GraphQL query on the backend.
+
+```bash
+a7 service create -g prod-group -f - <<'EOF'
+{
+  "id": "graphql-engine-service",
+  "name": "graphql-engine-service",
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": [
+      {"host": "graphql-engine", "port": 8080, "weight": 1}
+    ]
+  }
+}
+EOF
+
 a7 route create -g prod-group -f - <<'EOF'
 {
   "id": "rest-bridge-user",
-  "uri": "/api/users/:id",
+  "name": "rest-bridge-user",
+  "paths": ["/api/users/:id"],
   "methods": ["GET"],
+  "service_id": "graphql-engine-service",
   "plugins": {
     "degraphql": {
       "query": "query getUser($id: ID!) { user(id: $id) { name email profile { bio } } }",
       "variables": ["id"]
     }
-  },
-  "upstream": {
-    "type": "roundrobin",
-    "nodes": { "graphql-engine:8080": 1 }
   }
 }
 EOF
 ```
 
-## Approach D: Restricting Operations by Consumer Group
+## Approach D: Restrict Mutations
 
-Use the `consumer-restriction` plugin within your **Gateway Group** to limit who can perform specific GraphQL mutations.
+Use `consumer-restriction` to limit mutation routes to selected consumers or
+consumer groups.
 
 ```bash
 a7 route update gql-mutations -g prod-group -f - <<'EOF'
 {
+  "service_id": "gql-write-service",
   "plugins": {
     "key-auth": {},
     "consumer-restriction": {
-      "type": "consumer_group",
-      "whitelist": ["admin-group", "system-accounts"],
+      "type": "consumer_name",
+      "whitelist": ["admin-client", "system-client"],
       "rejected_code": 403,
-      "rejected_msg": "Only admins can perform mutations"
+      "rejected_msg": "Only approved clients can perform mutations"
     }
   }
 }
 EOF
 ```
 
-## Declarative GraphQL Management
+## Declarative Management Notes
 
-Manage your GraphQL infrastructure across multiple Gateway Groups using `a7 config sync`.
+`a7 config sync` can manage services and normal service-backed routes. GraphQL
+operation matching currently requires raw route payload fields such as `vars`,
+so use `a7 route create/update -f` for those operation-specific routes.
 
 ```yaml
-# graphql-infra.yaml
-gateway_groups:
-  - id: prod-group
-    routes:
-      - id: gql-main
-        uri: "/graphql"
-        upstream:
-          nodes: { "gql-svc:4000": 1 }
-        plugins:
-          key-auth: {}
-          # Global security for all GQL traffic
-          ip-restriction:
-            whitelist: ["10.0.0.0/8"]
-      - id: gql-analytics
-        uri: "/graphql"
-        priority: 10
-        vars: [["graphql_name", "==", "getDailyStats"]]
-        upstream:
-          nodes: { "analytics-svc:4000": 1 }
+version: "1"
+services:
+  - id: graphql-engine-service
+    name: graphql-engine-service
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: graphql-engine
+          port: 8080
+          weight: 1
+routes:
+  - id: rest-bridge-user
+    name: rest-bridge-user
+    paths:
+      - /api/users/:id
+    methods:
+      - GET
+    service_id: graphql-engine-service
+    plugins:
+      degraphql:
+        query: "query getUser($id: ID!) { user(id: $id) { name email profile { bio } } }"
+        variables:
+          - id
 ```
 
-Apply the configuration:
+Apply it to one gateway group:
+
 ```bash
-a7 config sync -g prod-group -f graphql-infra.yaml
+a7 config sync -g prod-group -f graphql-rest-bridge.yaml
 ```
-
-## Important Considerations
-
-- **Gateway Group Scope**: All GraphQL routes, upstreams, and consumers MUST be scoped to a `--gateway-group`.
-- **Admin API Port**: Use `7443` (HTTPS) for all `a7` CLI operations.
-- **Authentication**: Use the `--token` flag to authenticate with the API7 EE dashboard.
-- **Body Parsing**: API7 EE parses GraphQL from the request body. Large query strings may hit the `client_max_body_size` limit.
-- **Priority**: Use the `priority` field when you have overlapping URIs (e.g., a generic `/graphql` and a specific `/graphql` for one operation name).
-- **Batched Requests**: The current GraphQL variable extraction logic operates on the first operation in a batched request.
 
 ## Verification
 
 ```bash
-# Test basic query
-curl -X POST https://gateway.prod.example.com/graphql \
-  -H "Content-Type: application/json" \
-  -H "X-API-TOKEN: your-token" \
-  -d '{"query": "query { health { status } }"}'
-
-# Test mutation access control
-curl -X POST https://gateway.prod.example.com/graphql \
-  -H "Content-Type: application/json" \
-  -H "X-API-TOKEN: user-token" \
-  -d '{"query": "mutation { deleteUser(id: 1) { success } }"}'
-# Should return 403 if user is not in the whitelist
-
-# Test REST-to-GraphQL
-curl -i https://gateway.prod.example.com/api/users/123
-# Returns the mapped GraphQL response
+a7 service get gql-read-service -g prod-group -o json
+a7 route get gql-queries -g prod-group -o json
+a7 route get gql-mutations -g prod-group -o json
 ```
+
+Traffic verification requires a deployed gateway and GraphQL backend:
+
+```bash
+curl -X POST https://gateway.prod.example.com/graphql \
+  -H "Content-Type: application/json" \
+  -H "apikey: frontend-secret" \
+  -d '{"query": "query getUser { user(id: 1) { name } }"}'
+
+curl -X POST https://gateway.prod.example.com/graphql \
+  -H "Content-Type: application/json" \
+  -H "apikey: frontend-secret" \
+  -d '{"query": "mutation deleteUser { deleteUser(id: 1) { success } }"}'
+```
+
+## Important Considerations
+
+- Body parsing is required for GraphQL variables to be available.
+- Batched requests may only expose variables for the first operation.
+- Use route priorities when multiple routes share `/graphql`.
+- Keep auth credentials under `a7 credential`, not embedded directly in the consumer.
