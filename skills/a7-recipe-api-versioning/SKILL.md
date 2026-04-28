@@ -13,7 +13,8 @@ metadata:
   a7_commands:
     - a7 route create
     - a7 route update
-    - a7 upstream create
+    - a7 service create
+    - a7 service update
     - a7 config sync
     - a7 gateway-group get
 ---

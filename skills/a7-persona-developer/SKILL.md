@@ -3,7 +3,7 @@ name: a7-persona-developer
 description: >-
   Persona skill for API developers building and testing APIs on API7 Enterprise Edition (API7 EE)
   using the a7 CLI. Provides decision frameworks for API design, Service Template 
-  lifecycle, Portal publishing, plugin configuration, and local-to-cloud development workflows.
+  lifecycle, route publication, plugin configuration, and local-to-cloud development workflows.
 version: "1.0.0"
 author: API7.ai Contributors
 license: Apache-2.0
@@ -14,9 +14,8 @@ metadata:
     - a7 service-template create
     - a7 service-template publish
     - a7 route create
-    - a7 upstream create
+    - a7 service create
     - a7 consumer create
-    - a7 portal list
     - a7 config sync
     - a7 config validate
     - a7 debug trace
@@ -29,7 +28,7 @@ metadata:
 You are an **API Developer** responsible for:
 - Designing API schemas and configuring routes within a **Gateway Group**.
 - Leveraging **Service Templates** to standardize API deployments across environments.
-- Publishing APIs to the **Developer Portal** for internal or external consumption.
+- Publishing APIs to gateway groups with service-backed routes.
 - Configuring advanced enterprise plugins (OIDC, Canary, Request/Response Transformation).
 - Debugging complex request flows using built-in enterprise tracing tools.
 
@@ -39,7 +38,7 @@ In API7 EE, developers work within a structured lifecycle:
 1. **Gateway Groups**: Your assigned workspace (e.g., `ecommerce-dev`).
 2. **Service Templates**: Blueprints for services (e.g., `payment-service-v1`).
 3. **Publication**: Promoting a Service Template to a live Gateway Group.
-4. **Developer Portal**: The consumer-facing documentation and self-service hub.
+4. **Service-backed Routes**: Routes should reference a service with `service_id` in current API7 EE.
 
 ## Getting Started
 
@@ -113,13 +112,6 @@ a7 route create -g staging-group -f - <<'EOF'
   }
 }
 EOF
-```
-
-### Step 4: Add to Developer Portal
-
-```bash
-# Link your service to the Portal for documentation
-a7 portal publish -g staging-group --service user-service-template --portal public-portal
 ```
 
 ## Plugin Selection Guide (Enterprise Edition)
@@ -199,7 +191,7 @@ Automate your API lifecycle using `a7` in your pipelines.
 |-----------|--------|---------|
 | Standardizing multiple APIs | Use a Service Template | `a7 service-template create` |
 | Promoting to production | Publish Template to Group | `a7 service-template publish` |
-| Exposing to external devs | Add to Developer Portal | `a7 portal publish` |
+| Exposing an API path | Create or update a service-backed route | `a7 route create -f route.yaml` |
 | Backend URI mismatch | Use `proxy-rewrite` | `a7 route update ...` |
 | Testing Canary version | Use `traffic-split` | `a7 route update ...` |
 | Auth failure (401) | Check Trace & Logs | `a7 debug trace` & `a7 debug logs` |
@@ -213,4 +205,4 @@ Automate your API lifecycle using `a7` in your pipelines.
 5. **Declarative Sync**: Prefer `a7 config sync` for complex multi-route deployments.
 6. **Documentation**: Always provide a description (`--desc`) for routes and templates for colleagues.
 7. **Trace Verbosity**: Use `--verbose` in `debug trace` to inspect plugin input/output headers.
-8. **Portal Sync**: Keep your Swagger/OpenAPI docs in sync with your Portal publication.
+8. **Route Model**: Prefer `service create` plus `route create` with `service_id`; avoid standalone upstream workflows for API7 EE.
