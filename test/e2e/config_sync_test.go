@@ -182,8 +182,12 @@ routes:
 	require.NoError(t, err, stderr)
 	dumped, err := os.ReadFile(dumpFile)
 	require.NoError(t, err)
-	assert.Contains(t, string(dumped), routeID)
-	assert.Contains(t, string(dumped), svcID)
+	var dumpedCfg map[string]interface{}
+	require.NoError(t, yaml.Unmarshal(dumped, &dumpedCfg))
+	services := requireJSONArray(t, dumpedCfg["services"], "dump.services")
+	routes := requireJSONArray(t, dumpedCfg["routes"], "dump.routes")
+	assert.NotEmpty(t, filterResourcesByID(services, svcID))
+	assert.NotEmpty(t, filterResourcesByID(routes, routeID))
 }
 
 func TestConfigSync_DeleteFalse(t *testing.T) {

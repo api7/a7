@@ -28,6 +28,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -183,10 +184,29 @@ func runA7WithEnv(env []string, args ...string) (string, string, error) {
 // command arguments that already request JSON output, usually with "-o json".
 func runA7JSON(t testTB, env []string, out interface{}, args ...string) string {
 	t.Helper()
-	stdout, stderr, err := runA7WithEnv(env, args...)
-	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
-	require.NoError(t, json.Unmarshal([]byte(stdout), out), "stdout=%s", stdout)
+	stdout, _, err := runA7WithEnv(env, args...)
+	require.NoError(t, err, "a7 command failed: args=%v", args)
+
+	value := reflect.ValueOf(out)
+	require.True(t, value.Kind() == reflect.Ptr && !value.IsNil(), "out must be a non-nil pointer")
+	value.Elem().Set(reflect.Zero(value.Elem().Type()))
+
+	require.NoError(t, json.Unmarshal([]byte(stdout), out), "a7 returned non-JSON output: args=%v", args)
 	return stdout
+}
+
+func requireJSONObject(t testTB, value interface{}, name string) map[string]interface{} {
+	t.Helper()
+	object, ok := value.(map[string]interface{})
+	require.True(t, ok, "%s should be a JSON object", name)
+	return object
+}
+
+func requireJSONArray(t testTB, value interface{}, name string) []interface{} {
+	t.Helper()
+	array, ok := value.([]interface{})
+	require.True(t, ok, "%s should be a JSON array", name)
+	return array
 }
 
 // adminAPI sends an HTTP request to the API7 EE Dashboard API.

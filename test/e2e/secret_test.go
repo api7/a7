@@ -66,7 +66,7 @@ func TestSecret_CRUD(t *testing.T) {
 	// Create
 	stdout, stderr, err := runA7WithEnv(env, "secret", "create", secretID, "-f", tmpFile, "-g", gatewayGroup)
 	if err != nil {
-		t.Skipf("secret create failed (vault may not be configured): %s %s", stdout, stderr)
+		t.Skip("secret create failed (vault may not be configured)")
 	}
 
 	// Get
@@ -90,7 +90,7 @@ func TestSecret_CRUD(t *testing.T) {
 	updateFile := filepath.Join(t.TempDir(), "secret-update.json")
 	require.NoError(t, os.WriteFile(updateFile, []byte(updateJSON), 0644))
 	stdout, stderr, err = runA7WithEnv(env, "secret", "update", secretID, "-f", updateFile, "-g", gatewayGroup)
-	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+	require.NoError(t, err, "secret update failed")
 
 	runA7JSON(t, env, &secret, "secret", "get", secretID, "-g", gatewayGroup, "-o", "json")
 	assert.Equal(t, "https://vault-updated.example.com", secret["uri"])

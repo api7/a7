@@ -113,7 +113,8 @@ func TestRoute_CRUD(t *testing.T) {
 	runA7JSON(t, env, &route, "route", "get", routeID, "-g", gatewayGroup, "-o", "json")
 	assert.Equal(t, "e2e-route-crud-updated", route["name"])
 	assert.Equal(t, svcID, route["service_id"])
-	assert.Contains(t, fmt.Sprint(route["paths"]), "/test-updated")
+	paths := requireJSONArray(t, route["paths"], "route.paths")
+	assert.Contains(t, paths, "/test-updated")
 
 	// Delete
 	stdout, stderr, err = runA7WithEnv(env, "route", "delete", routeID, "--force", "-g", gatewayGroup)
@@ -155,9 +156,11 @@ func TestRoute_CreateWithFlags(t *testing.T) {
 	assert.Equal(t, "flagged-route", route["name"])
 	assert.Equal(t, svcID, route["service_id"])
 	assert.Equal(t, "test.example.com", route["host"])
-	assert.Contains(t, fmt.Sprint(route["methods"]), "GET")
-	assert.Contains(t, fmt.Sprint(route["labels"]), "env")
-	assert.Contains(t, fmt.Sprint(route["labels"]), "team")
+	methods := requireJSONArray(t, route["methods"], "route.methods")
+	assert.Contains(t, methods, "GET")
+	labels := requireJSONObject(t, route["labels"], "route.labels")
+	assert.Equal(t, "test", labels["env"])
+	assert.Equal(t, "e2e", labels["team"])
 }
 
 func TestRoute_CreateWithPlugins(t *testing.T) {
@@ -193,7 +196,8 @@ func TestRoute_CreateWithPlugins(t *testing.T) {
 	runA7JSON(t, env, &route, "route", "get", routeID, "-g", gatewayGroup, "-o", "json")
 	assert.Equal(t, routeID, route["id"])
 	assert.Equal(t, svcID, route["service_id"])
-	assert.Contains(t, fmt.Sprint(route["plugins"]), "proxy-rewrite")
+	plugins := requireJSONObject(t, route["plugins"], "route.plugins")
+	assert.Contains(t, plugins, "proxy-rewrite")
 }
 
 func TestRoute_Export(t *testing.T) {

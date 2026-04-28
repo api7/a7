@@ -157,7 +157,8 @@ func TestService_WithPlugins(t *testing.T) {
 	var service map[string]interface{}
 	runA7JSON(t, env, &service, "service", "get", svcID, "-g", gatewayGroup, "-o", "json")
 	assert.Equal(t, svcID, service["id"])
-	assert.Contains(t, fmt.Sprint(service["plugins"]), "proxy-rewrite")
+	plugins := requireJSONObject(t, service["plugins"], "service.plugins")
+	assert.Contains(t, plugins, "proxy-rewrite")
 }
 
 func TestService_RouteWithServiceID(t *testing.T) {

@@ -56,8 +56,13 @@ func TestPluginMetadata_CRUD(t *testing.T) {
 	// Get JSON
 	var metadata map[string]interface{}
 	runA7JSON(t, env, &metadata, "plugin-metadata", "get", pluginName, "-g", gatewayGroup, "-o", "json")
-	assert.Contains(t, fmt.Sprint(metadata), "log_format")
-	assert.Contains(t, fmt.Sprint(metadata), "client_ip")
+	logFormatValue := metadata["log_format"]
+	if logFormatValue == nil {
+		wrapped := requireJSONObject(t, metadata["metadata"], "plugin_metadata.metadata")
+		logFormatValue = wrapped["log_format"]
+	}
+	logFormat := requireJSONObject(t, logFormatValue, "plugin_metadata.log_format")
+	assert.Equal(t, "$remote_addr", logFormat["client_ip"])
 
 	// Delete
 	stdout, stderr, err = runA7WithEnv(env, "plugin-metadata", "delete", pluginName, "--force", "-g", gatewayGroup)

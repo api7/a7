@@ -3,7 +3,6 @@
 package e2e
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -60,7 +59,7 @@ func TestCredential_CRUD(t *testing.T) {
 
 	stdout, stderr, err := runA7WithEnv(env, "credential", "create", credID,
 		"--consumer", username, "-f", tmpFile, "-g", gatewayGroup)
-	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+	require.NoError(t, err, "credential create failed")
 
 	// Get
 	stdout, stderr, err = runA7WithEnv(env, "credential", "get", credID,
@@ -73,7 +72,8 @@ func TestCredential_CRUD(t *testing.T) {
 	runA7JSON(t, env, &credential, "credential", "get", credID,
 		"--consumer", username, "-g", gatewayGroup, "-o", "json")
 	assert.Equal(t, credID, credential["id"])
-	assert.Contains(t, fmt.Sprint(credential["plugins"]), "key-auth")
+	plugins := requireJSONObject(t, credential["plugins"], "credential.plugins")
+	assert.Contains(t, plugins, "key-auth")
 
 	// Update credential and verify readback.
 	updateJSON := `{
@@ -89,12 +89,13 @@ func TestCredential_CRUD(t *testing.T) {
 	require.NoError(t, os.WriteFile(updateFile, []byte(updateJSON), 0644))
 	stdout, stderr, err = runA7WithEnv(env, "credential", "update", credID,
 		"--consumer", username, "-f", updateFile, "-g", gatewayGroup)
-	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+	require.NoError(t, err, "credential update failed")
 
 	runA7JSON(t, env, &credential, "credential", "get", credID,
 		"--consumer", username, "-g", gatewayGroup, "-o", "json")
 	assert.Equal(t, "updated credential", credential["desc"])
-	assert.Contains(t, fmt.Sprint(credential["plugins"]), "key-auth")
+	plugins = requireJSONObject(t, credential["plugins"], "credential.plugins")
+	assert.Contains(t, plugins, "key-auth")
 
 	// Delete credential
 	stdout, stderr, err = runA7WithEnv(env, "credential", "delete", credID,
