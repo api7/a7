@@ -21,9 +21,6 @@ jobs:
       - name: Download Go modules
         run: go mod download
 
-      - name: Validate skills
-        run: make validate-skills
-
       - name: Run E2E tests
         env:
           A7_ADMIN_URL: ${{ secrets.DEMO_WEBSITE }}

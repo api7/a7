@@ -8,7 +8,7 @@ LDFLAGS := -s -w \
 	-X $(MODULE)/internal/version.Commit=$(COMMIT) \
 	-X $(MODULE)/internal/version.Date=$(DATE)
 
-.PHONY: build test test-verbose lint fmt vet check install clean docker-up docker-down validate-skills test-e2e test-e2e-full
+.PHONY: build test test-verbose lint fmt vet check install clean docker-up docker-down validate-skills test-skills test-e2e test-e2e-full
 
 build:
 	go build -ldflags "$(LDFLAGS)" -o bin/$(BINARY) ./cmd/a7
@@ -29,10 +29,13 @@ fmt:
 vet:
 	go vet ./...
 
-check: fmt vet lint test validate-skills
+check: fmt vet lint test validate-skills test-skills
 
 validate-skills:
 	./scripts/validate-skills.sh
+
+test-skills:
+	go test ./test/e2e/skills -tags=e2e -count=1
 
 install: build
 	cp bin/$(BINARY) $(GOPATH)/bin/$(BINARY)

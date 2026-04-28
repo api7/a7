@@ -1,0 +1,23 @@
+name: Skills Validation
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  validate-skills:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.0"
+
+      - name: Validate skills
+        run: make validate-skills
+
+      - name: Test skills
+        run: make test-skills

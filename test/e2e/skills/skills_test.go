@@ -4,6 +4,7 @@ package skills
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -11,26 +12,62 @@ import (
 )
 
 var skillNamePattern = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+var a7Binary string
 
-func repoRoot(t *testing.T) string {
-	t.Helper()
+func locateRepoRoot() (string, error) {
 	dir, err := os.Getwd()
 	if err != nil {
-		t.Fatal(err)
+		return "", err
 	}
 	for {
 		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			return dir
+			return dir, nil
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			t.Fatal("failed to locate repository root")
+			return "", os.ErrNotExist
 		}
 		dir = parent
 	}
 }
 
-func frontmatter(t *testing.T, file string) map[string]string {
+func TestMain(m *testing.M) {
+	root, err := locateRepoRoot()
+	if err != nil {
+		os.Exit(1)
+	}
+	tmpDir, err := os.MkdirTemp("", "a7-skills-test-*")
+	if err != nil {
+		os.Exit(1)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	a7Binary = filepath.Join(tmpDir, "a7")
+	cmd := exec.Command("go", "build", "-o", a7Binary, "./cmd/a7")
+	cmd.Dir = root
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		os.Exit(1)
+	}
+	os.Exit(m.Run())
+}
+
+func repoRoot(t *testing.T) string {
+	t.Helper()
+	root, err := locateRepoRoot()
+	if err != nil {
+		t.Fatal("failed to locate repository root")
+	}
+	return root
+}
+
+type skillMetadata struct {
+	Fields     map[string]string
+	A7Commands []string
+}
+
+func frontmatter(t *testing.T, file string) skillMetadata {
 	t.Helper()
 	data, err := os.ReadFile(file)
 	if err != nil {
@@ -50,19 +87,36 @@ func frontmatter(t *testing.T, file string) map[string]string {
 	if end == -1 {
 		t.Fatalf("%s: missing closing frontmatter delimiter", file)
 	}
-	fields := map[string]string{}
+	metadata := skillMetadata{Fields: map[string]string{}}
+	inA7Commands := false
 	for _, line := range lines[1:end] {
 		key, value, ok := strings.Cut(line, ":")
+		trimmed := strings.TrimSpace(line)
+		if inA7Commands {
+			if strings.HasPrefix(trimmed, "- ") {
+				command := strings.TrimSpace(strings.TrimPrefix(trimmed, "- "))
+				if command != "" {
+					metadata.A7Commands = append(metadata.A7Commands, command)
+				}
+				continue
+			}
+			if trimmed != "" && !strings.HasPrefix(line, "    ") {
+				inA7Commands = false
+			}
+		}
 		if !ok {
 			continue
 		}
 		key = strings.TrimSpace(key)
 		value = strings.Trim(strings.TrimSpace(value), `"`)
 		if key != "" && value != "" {
-			fields[key] = value
+			metadata.Fields[key] = value
+		}
+		if key == "a7_commands" {
+			inA7Commands = true
 		}
 	}
-	return fields
+	return metadata
 }
 
 func TestSkillFrontmatterMatchesDirectories(t *testing.T) {
@@ -81,7 +135,8 @@ func TestSkillFrontmatterMatchesDirectories(t *testing.T) {
 		}
 		name := entry.Name()
 		file := filepath.Join(root, "skills", name, "SKILL.md")
-		fields := frontmatter(t, file)
+		metadata := frontmatter(t, file)
+		fields := metadata.Fields
 		if fields["name"] != name {
 			t.Fatalf("%s: frontmatter name %q must match directory name", file, fields["name"])
 		}
@@ -95,6 +150,47 @@ func TestSkillFrontmatterMatchesDirectories(t *testing.T) {
 			t.Fatalf("duplicate skill name %q", fields["name"])
 		}
 		seen[fields["name"]] = true
+	}
+}
+
+func TestSkillDeclaredA7CommandsExist(t *testing.T) {
+	root := repoRoot(t)
+	matches, err := filepath.Glob(filepath.Join(root, "skills", "*", "SKILL.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range matches {
+		metadata := frontmatter(t, file)
+		for _, command := range metadata.A7Commands {
+			fields := strings.Fields(command)
+			if len(fields) == 0 {
+				continue
+			}
+			if fields[0] != "a7" {
+				t.Fatalf("%s: a7_commands entry %q must start with a7", file, command)
+			}
+			args := append(fields[1:], "--help")
+			cmd := exec.Command(a7Binary, args...)
+			cmd.Dir = root
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				t.Fatalf("%s: command %q is not supported by current a7 CLI: %v\n%s", file, command, err, string(output))
+			}
+		}
+	}
+}
+
+func TestPluginSkillsDeclarePluginName(t *testing.T) {
+	root := repoRoot(t)
+	matches, err := filepath.Glob(filepath.Join(root, "skills", "a7-plugin-*", "SKILL.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range matches {
+		metadata := frontmatter(t, file)
+		if metadata.Fields["plugin_name"] == "" {
+			t.Fatalf("%s: plugin skills must declare metadata.plugin_name", file)
+		}
 	}
 }
 
