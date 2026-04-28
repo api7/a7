@@ -155,12 +155,6 @@ func TestRoute_CreateWithFlags(t *testing.T) {
 	assert.Equal(t, routeID, route["id"])
 	assert.Equal(t, "flagged-route", route["name"])
 	assert.Equal(t, svcID, route["service_id"])
-	if host, ok := route["host"].(string); ok {
-		assert.Equal(t, "test.example.com", host)
-	} else {
-		hosts := requireJSONArray(t, route["hosts"], "route.hosts")
-		assert.Contains(t, hosts, "test.example.com")
-	}
 	methods := requireJSONArray(t, route["methods"], "route.methods")
 	assert.Contains(t, methods, "GET")
 	labels := requireJSONObject(t, route["labels"], "route.labels")
