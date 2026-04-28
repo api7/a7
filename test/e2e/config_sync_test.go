@@ -68,6 +68,7 @@ func trimDumpForRoundtrip(t *testing.T, file string, serviceID, routeID string) 
 		"credentials",
 		"consumer_groups",
 		"plugin_configs",
+		"ssl",
 		"ssls",
 		"global_rules",
 		"stream_routes",
@@ -225,15 +226,15 @@ func TestConfigSync_FullRoundtrip(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(data), routeID)
 
-	stdout, stderr, err := runA7WithEnv(env, "config", "diff", "-f", dumpFile, "-g", gatewayGroup)
-	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
-
 	// CI runs against a shared EE environment. Keep the roundtrip focused on
 	// the service and route this test created so unrelated resources do not
 	// introduce sync failures.
 	trimDumpForRoundtrip(t, dumpFile, svcID, routeID)
 
-	stdout, stderr, err = runA7WithEnv(env, "config", "sync", "-f", dumpFile, "-g", gatewayGroup)
+	stdout, stderr, err := runA7WithEnv(env, "config", "diff", "-f", dumpFile, "-g", gatewayGroup)
+	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+
+	stdout, stderr, err = runA7WithEnv(env, "config", "sync", "-f", dumpFile, "--delete=false", "-g", gatewayGroup)
 	if err != nil && isKnownRoundtripSyncGap(stdout, stderr) {
 		t.Skipf("shared environment cannot roundtrip sync the dumped config reliably: stdout=%s stderr=%s", stdout, stderr)
 	}
