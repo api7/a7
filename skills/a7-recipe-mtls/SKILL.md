@@ -123,7 +123,7 @@ Configure API7 EE to present a client certificate when connecting to backends.
 
 Create the upstream client SSL certificate and CA certificate in API7 EE first, then note their IDs/names. The recommended API7 Enterprise workflow is:
 
-1. Add an SSL Certificate using the certificate API7 EE should present to the upstream.
+1. Add an SSL Certificate using the certificate that API7 EE should present to the upstream.
 2. Add a CA Certificate used to verify the upstream server certificate.
 3. Select both certificates in the published service's upstream connection configuration.
 
