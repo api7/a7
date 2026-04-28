@@ -201,6 +201,7 @@ type Route struct {
 	Host       string                 `json:"host,omitempty"`
 	Hosts      []string               `json:"hosts,omitempty"`
 	ServiceID  string                 `json:"service_id,omitempty"`
+	UpstreamID string                 `json:"upstream_id,omitempty"`
 	Upstream   map[string]interface{} `json:"upstream,omitempty"`
 	Plugins    map[string]interface{} `json:"plugins,omitempty"`
 	Labels     map[string]string      `json:"labels,omitempty"`
@@ -360,17 +361,21 @@ func printTable(io *iostreams.IOStreams, routes []api.Route) error {
 	}
 
 	w := tabwriter.NewWriter(io.Out, 0, 0, 3, ' ', 0)
-	fmt.Fprintln(w, "ID\tNAME\tURIS\tSTATUS\tUPSTREAM_ID")
+	fmt.Fprintln(w, "ID\tNAME\tURIS\tSTATUS\tSERVICE_ID\tUPSTREAM_ID")
 	
 	for _, r := range routes {
 		uris := strings.Join(r.URIs, ",")
 		status := fmt.Sprintf("%d", r.Status)
-		upstream := "N/A"
-		if r.UpstreamID != nil {
-			upstream = *r.UpstreamID
+		service := r.ServiceID
+		if service == "" {
+			service = "N/A"
+		}
+		upstream := r.UpstreamID
+		if upstream == "" {
+			upstream = "N/A"
 		}
 
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", r.ID, r.Name, uris, status, upstream)
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", r.ID, r.Name, uris, status, service, upstream)
 	}
 	return w.Flush()
 }

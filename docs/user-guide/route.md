@@ -149,7 +149,8 @@ Key fields in the route configuration (sent to `/apisix/admin/routes`):
 | `uri` | string | Legacy URI pattern accepted by some APISIX-compatible payloads |
 | `methods` | array | HTTP methods allowed (e.g., ["GET", "POST"]) |
 | `upstream` | object | Inline upstream configuration |
-| `service_id` | string | Reference to the service that owns the upstream configuration |
+| `service_id` | string | Reference to a service that owns the upstream configuration |
+| `upstream_id` | string | Reference to a standalone upstream; distinct from `service_id` and still supported by the CLI/API |
 | `status` | integer | Route status (1 for enabled, 0 for disabled) |
 | `plugins` | object | Plugin configurations for the route |
 | `labels` | object | Key-value pairs for filtering and organization |
