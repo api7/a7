@@ -79,6 +79,9 @@ func actionRun(opts *Options) error {
 		if err != nil {
 			return err
 		}
+		if opts.ID != "" {
+			payload["id"] = opts.ID
+		}
 
 		httpClient, err := opts.Client()
 		if err != nil {

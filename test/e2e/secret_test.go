@@ -65,9 +65,7 @@ func TestSecret_CRUD(t *testing.T) {
 
 	// Create
 	stdout, stderr, err := runA7WithEnv(env, "secret", "create", secretID, "-f", tmpFile, "-g", gatewayGroup)
-	if err != nil {
-		t.Skip("secret create failed (vault may not be configured)")
-	}
+	require.NoError(t, err, "secret create failed: stdout=%s stderr=%s", stdout, stderr)
 
 	// Get
 	stdout, stderr, err = runA7WithEnv(env, "secret", "get", secretID, "-g", gatewayGroup)
