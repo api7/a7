@@ -68,10 +68,10 @@ Optional for live gateway/data-plane coverage:
 - `A7_GATEWAY_GROUP`
 - `A7_E2E_ENABLE_GATEWAY_GROUP_CRUD=1` when you explicitly want to exercise gateway-group create/delete against an environment that supports it
 
-CI provides `A7_ADMIN_URL`, `A7_TOKEN`, and `A7_GATEWAY_GROUP` through repository
-secrets. For local development, you can either point these variables at an
-existing API7 environment or bring up the repository's Docker-based environment
-with:
+CI provides `A7_ADMIN_URL` and `A7_TOKEN` through repository secrets, and sets
+`A7_GATEWAY_GROUP` to the fixed value `default` in the workflow. For local
+development, you can either point these variables at an existing API7
+environment or bring up the repository's Docker-based environment with:
 
 ```bash
 make docker-up

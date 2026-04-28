@@ -12,9 +12,8 @@ metadata:
   category: recipe
   apisix_version: ">=3.0.0"
   a7_commands:
-    - a7 service create
-    - a7 service update
-    - a7 service get
+    - a7 upstream create
+    - a7 upstream get
     - a7 config sync
 ---
 
@@ -192,12 +191,12 @@ a7 upstream create --gateway-group default -f - <<'EOF'
 EOF
 ```
 
-### 4. Verify the referencing route and service
+### 4. Verify the referencing route and upstream
 
 ```bash
 # Current a7 does not expose a standalone upstream-health command.
-# Verify the service/route wiring and use gateway observability for node state.
-a7 service get backend --gateway-group default --output json
+# Verify the upstream/route wiring and use gateway observability for node state.
+a7 upstream get backend --gateway-group default --output json
 a7 route list --gateway-group default --output json
 ```
 

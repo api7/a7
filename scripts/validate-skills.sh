@@ -60,7 +60,36 @@ for skill_dir in "${SKILLS_DIR}"/*; do
     printf '%s\n' "${name}" >>"${seen_names_file}"
   fi
 
-  if ! printf '%s\n' "${frontmatter}" | grep -q '^description:'; then
+  description="$(printf '%s\n' "${frontmatter}" | awk '
+    function ltrim(s) { sub(/^[[:space:]]+/, "", s); return s }
+    function has_text(s) {
+      s = ltrim(s)
+      return s !~ /^[>|]-?$/ && s ~ /[^[:space:]]/
+    }
+    /^[A-Za-z0-9_-]+:/ {
+      if (in_description && $0 !~ /^description:/) {
+        exit
+      }
+    }
+    /^description:[[:space:]]*/ {
+      in_description = 1
+      sub(/^description:[[:space:]]*/, "")
+      if (has_text($0)) {
+        print
+      }
+      next
+    }
+    in_description {
+      if ($0 ~ /^[[:space:]]+/) {
+        if (has_text($0)) {
+          print
+        }
+        next
+      }
+      exit
+    }
+  ')"
+  if [[ -z "${description}" ]]; then
     echo "${skill_name}: missing required frontmatter field: description" >&2
     status=1
   fi

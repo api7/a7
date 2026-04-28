@@ -3,10 +3,13 @@
 package skills
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -40,7 +43,6 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		os.Exit(1)
 	}
-	defer os.RemoveAll(tmpDir)
 
 	a7Binary = filepath.Join(tmpDir, "a7")
 	cmd := exec.Command("go", "build", "-o", a7Binary, "./cmd/a7")
@@ -48,9 +50,16 @@ func TestMain(m *testing.M) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
+		_ = os.RemoveAll(tmpDir)
 		os.Exit(1)
 	}
-	os.Exit(m.Run())
+
+	exitCode := m.Run()
+	if err := os.RemoveAll(tmpDir); err != nil && exitCode == 0 {
+		fmt.Fprintf(os.Stderr, "failed to remove temp dir %s: %v\n", tmpDir, err)
+		exitCode = 1
+	}
+	os.Exit(exitCode)
 }
 
 func repoRoot(t *testing.T) string {
@@ -63,8 +72,9 @@ func repoRoot(t *testing.T) string {
 }
 
 type skillMetadata struct {
-	Fields     map[string]string
-	A7Commands []string
+	Fields             map[string]string
+	A7Commands         []string
+	HasDescriptionText bool
 }
 
 func frontmatter(t *testing.T, file string) skillMetadata {
@@ -89,7 +99,8 @@ func frontmatter(t *testing.T, file string) skillMetadata {
 	}
 	metadata := skillMetadata{Fields: map[string]string{}}
 	inA7Commands := false
-	for _, line := range lines[1:end] {
+	frontmatterLines := lines[1:end]
+	for i, line := range frontmatterLines {
 		key, value, ok := strings.Cut(line, ":")
 		trimmed := strings.TrimSpace(line)
 		if inA7Commands {
@@ -112,11 +123,34 @@ func frontmatter(t *testing.T, file string) skillMetadata {
 		if key != "" && value != "" {
 			metadata.Fields[key] = value
 		}
+		if key == "description" {
+			metadata.HasDescriptionText = hasNonEmptyDescription(frontmatterLines, i, value)
+		}
 		if key == "a7_commands" {
 			inA7Commands = true
 		}
 	}
 	return metadata
+}
+
+func hasNonEmptyDescription(lines []string, startIdx int, value string) bool {
+	value = strings.Trim(strings.TrimSpace(value), `"`)
+	if value != "" && !strings.HasPrefix(value, ">") && !strings.HasPrefix(value, "|") {
+		return true
+	}
+	for _, line := range lines[startIdx+1:] {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		if !strings.HasPrefix(line, " ") && strings.Contains(trimmed, ":") {
+			return false
+		}
+		if trimmed != ">" && trimmed != ">-" && trimmed != "|" && trimmed != "|-" {
+			return true
+		}
+	}
+	return false
 }
 
 func TestSkillFrontmatterMatchesDirectories(t *testing.T) {
@@ -143,7 +177,7 @@ func TestSkillFrontmatterMatchesDirectories(t *testing.T) {
 		if !skillNamePattern.MatchString(fields["name"]) {
 			t.Fatalf("%s: skill name must be kebab-case", file)
 		}
-		if fields["description"] == "" {
+		if !metadata.HasDescriptionText {
 			t.Fatalf("%s: description is required", file)
 		}
 		if seen[fields["name"]] {
@@ -162,15 +196,15 @@ func TestSkillDeclaredA7CommandsExist(t *testing.T) {
 	for _, file := range matches {
 		metadata := frontmatter(t, file)
 		for _, command := range metadata.A7Commands {
-			fields := strings.Fields(command)
-			if len(fields) == 0 {
+			command = strings.TrimSpace(command)
+			if command == "" {
 				continue
 			}
-			if fields[0] != "a7" {
+			if command != "a7" && !strings.HasPrefix(command, "a7 ") {
 				t.Fatalf("%s: a7_commands entry %q must start with a7", file, command)
 			}
-			args := append(fields[1:], "--help")
-			cmd := exec.Command(a7Binary, args...)
+			helpCommand := strconv.Quote(a7Binary) + strings.TrimPrefix(command, "a7") + " --help"
+			cmd := exec.Command("sh", "-c", helpCommand)
 			cmd.Dir = root
 			output, err := cmd.CombinedOutput()
 			if err != nil {
@@ -221,22 +255,44 @@ func TestSkillsDoNotReferenceRemovedA7Commands(t *testing.T) {
 
 func TestSkillsDocumentationReferencesExistingSkills(t *testing.T) {
 	root := repoRoot(t)
+	entries, err := os.ReadDir(filepath.Join(root, "skills"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	existing := map[string]bool{}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			existing[entry.Name()] = true
+		}
+	}
+
 	data, err := os.ReadFile(filepath.Join(root, "docs", "skills.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	doc := string(data)
-	staleSkillNames := []string{
-		"a7-recipe-gateway-group",
-		"a7-persona-platform-eng",
-		"a7-recipe-service-template",
-		"a7-plugin-ai-rag",
-		"a7-plugin-ai-token-limiter",
-		"a7-recipe-service-registry",
+	referencedSkills := regexp.MustCompile(`\ba7-[a-z0-9]+(?:-[a-z0-9]+)*\b`).FindAllString(doc, -1)
+	categoryNames := map[string]bool{
+		"a7-persona": true,
+		"a7-plugin":  true,
+		"a7-recipe":  true,
 	}
-	for _, name := range staleSkillNames {
-		if strings.Contains(doc, name) {
-			t.Fatalf("docs/skills.md references missing skill %q", name)
+	missing := map[string]bool{}
+	for _, name := range referencedSkills {
+		if categoryNames[name] {
+			continue
+		}
+		if !existing[name] {
+			missing[name] = true
 		}
 	}
+	if len(missing) == 0 {
+		return
+	}
+	names := make([]string, 0, len(missing))
+	for name := range missing {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	t.Fatalf("docs/skills.md references missing skills: %s", strings.Join(names, ", "))
 }

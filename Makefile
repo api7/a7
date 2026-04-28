@@ -32,7 +32,7 @@ vet:
 check: fmt vet lint test validate-skills test-skills
 
 validate-skills:
-	./scripts/validate-skills.sh
+	bash ./scripts/validate-skills.sh
 
 test-skills:
 	go test ./test/e2e/skills -tags=e2e -count=1
