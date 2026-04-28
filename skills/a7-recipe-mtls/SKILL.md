@@ -83,9 +83,13 @@ a7 service create --gateway-group default -f - <<'EOF'
   "name": "secure-api-service",
   "upstream": {
     "type": "roundrobin",
-    "nodes": {
-      "backend:8080": 1
-    }
+    "nodes": [
+      {
+        "host": "backend",
+        "port": 8080,
+        "weight": 1
+      }
+    ]
   }
 }
 EOF
@@ -139,9 +143,13 @@ a7 service create --gateway-group default -f - <<'EOF'
   "upstream": {
     "type": "roundrobin",
     "scheme": "https",
-    "nodes": {
-      "secure-backend:443": 1
-    },
+    "nodes": [
+      {
+        "host": "secure-backend",
+        "port": 443,
+        "weight": 1
+      }
+    ],
     "tls": {
       "client_cert_id": "<UPSTREAM_CLIENT_CERTIFICATE_ID>"
     }
@@ -152,7 +160,7 @@ EOF
 
 **Fields**:
 - `upstream.scheme`: Must be `"https"` for TLS connections to upstream.
-- `upstream.nodes`: Backend nodes as `{"host:port": weight}`.
+- `upstream.nodes`: Backend nodes as `[{ "host": "...", "port": 443, "weight": 1 }]`.
 - `upstream.tls.client_cert_id`: Client certificate object API7 EE presents to the upstream.
 - `upstream.pass_host`: Set to `"pass"` (default) or `"rewrite"` if upstream expects a specific Host header.
 
@@ -201,9 +209,13 @@ a7 service create --gateway-group default -f - <<'EOF'
   "upstream": {
     "type": "roundrobin",
     "scheme": "https",
-    "nodes": {
-      "internal-service:443": 1
-    },
+    "nodes": [
+      {
+        "host": "internal-service",
+        "port": 443,
+        "weight": 1
+      }
+    ],
     "tls": {
       "client_cert_id": "<UPSTREAM_CLIENT_CERTIFICATE_ID>"
     }
@@ -300,7 +312,9 @@ services:
       type: roundrobin
       scheme: https
       nodes:
-        "backend:443": 1
+        - host: backend
+          port: 443
+          weight: 1
       tls:
         client_cert_id: upstream-client-cert
 routes:
