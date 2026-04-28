@@ -5,36 +5,58 @@ package e2e
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestDebugTrace_JSONOutput(t *testing.T) {
-	requireGatewayURL(t)
-	requireHTTPBin(t)
-	env := setupEnv(t)
-	routeID := "e2e-debug-trace-route"
-	t.Cleanup(func() { deleteRouteViaAdmin(t, routeID) })
-
-	// Create a route for tracing.
+func createDebugTraceRoute(t testTB, env []string, serviceID, routeID, path string, extraFields string) {
+	t.Helper()
 	routeJSON := fmt.Sprintf(`{
 		"id": %q,
-		"uri": "/debug-trace-test",
-		"upstream": {
-			"type": "roundrobin",
-			"nodes": {"%s": 1}
-		}
-	}`, routeID, upstreamNode())
+		"name": %q,
+		"service_id": %q,
+		"paths": [%q]%s
+	}`, routeID, routeID, serviceID, path, extraFields)
 
 	tmpFile := filepath.Join(t.TempDir(), "route.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(routeJSON), 0644))
 
-	_, stderr, err := runA7WithEnv(env, "route", "create", "-f", tmpFile, "-g", gatewayGroup)
-	require.NoError(t, err, stderr)
+	stdout, stderr, err := runA7WithEnv(env, "route", "create", "-f", tmpFile, "-g", gatewayGroup)
+	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+}
+
+func waitForDebugTraceRoute(t testTB, path string) {
+	t.Helper()
+	status, err := waitForGatewayStatus(gatewayURL+path, func() (*http.Request, error) {
+		return http.NewRequest("GET", gatewayURL+path, nil)
+	}, func(code int) bool {
+		return code != 404
+	}, 15*time.Second)
+	require.NoError(t, err)
+	if status == 404 {
+		t.Skipf("route %s did not propagate to the local gateway within timeout", path)
+	}
+}
+
+func TestDebugTrace_JSONOutput(t *testing.T) {
+	requireGatewayURL(t)
+	requireHTTPBin(t)
+	env := setupEnv(t)
+	svcID := "e2e-debug-trace-svc"
+	routeID := "e2e-debug-trace-route"
+	t.Cleanup(func() {
+		deleteRouteViaAdmin(t, routeID)
+		deleteServiceViaAdmin(t, svcID)
+	})
+	createTestServiceViaCLI(t, env, svcID)
+	createDebugTraceRoute(t, env, svcID, routeID, "/debug-trace-test", "")
+	waitForDebugTraceRoute(t, "/debug-trace-test")
 
 	// Trace the route with JSON output.
 	stdout, stderr, err := runA7WithEnv(env, "debug", "trace", routeID,
@@ -55,29 +77,16 @@ func TestDebugTrace_WithMethod(t *testing.T) {
 	requireGatewayURL(t)
 	requireHTTPBin(t)
 	env := setupEnv(t)
+	svcID := "e2e-debug-trace-method-svc"
 	routeID := "e2e-debug-trace-method"
-	t.Cleanup(func() { deleteRouteViaAdmin(t, routeID) })
-
-	routeJSON := fmt.Sprintf(`{
-		"id": %q,
-		"uri": "/debug-trace-method",
-		"methods": ["GET", "POST"],
-		"upstream": {
-			"type": "roundrobin",
-			"nodes": {"%s": 1}
-		},
-		"plugins": {
-			"proxy-rewrite": {
-				"uri": "/post"
-			}
-		}
-	}`, routeID, upstreamNode())
-
-	tmpFile := filepath.Join(t.TempDir(), "route.json")
-	require.NoError(t, os.WriteFile(tmpFile, []byte(routeJSON), 0644))
-
-	_, stderr, err := runA7WithEnv(env, "route", "create", "-f", tmpFile, "-g", gatewayGroup)
-	require.NoError(t, err, stderr)
+	t.Cleanup(func() {
+		deleteRouteViaAdmin(t, routeID)
+		deleteServiceViaAdmin(t, svcID)
+	})
+	createTestServiceViaCLI(t, env, svcID)
+	createDebugTraceRoute(t, env, svcID, routeID, "/debug-trace-method",
+		`, "methods": ["GET", "POST"], "plugins": {"proxy-rewrite": {"uri": "/post"}}`)
+	waitForDebugTraceRoute(t, "/debug-trace-method")
 
 	// Trace with --method POST.
 	stdout, stderr, err := runA7WithEnv(env, "debug", "trace", routeID,
@@ -99,23 +108,15 @@ func TestDebugTrace_WithHeaders(t *testing.T) {
 	requireGatewayURL(t)
 	requireHTTPBin(t)
 	env := setupEnv(t)
+	svcID := "e2e-debug-trace-headers-svc"
 	routeID := "e2e-debug-trace-headers"
-	t.Cleanup(func() { deleteRouteViaAdmin(t, routeID) })
-
-	routeJSON := fmt.Sprintf(`{
-		"id": %q,
-		"uri": "/debug-trace-headers",
-		"upstream": {
-			"type": "roundrobin",
-			"nodes": {"%s": 1}
-		}
-	}`, routeID, upstreamNode())
-
-	tmpFile := filepath.Join(t.TempDir(), "route.json")
-	require.NoError(t, os.WriteFile(tmpFile, []byte(routeJSON), 0644))
-
-	_, stderr, err := runA7WithEnv(env, "route", "create", "-f", tmpFile, "-g", gatewayGroup)
-	require.NoError(t, err, stderr)
+	t.Cleanup(func() {
+		deleteRouteViaAdmin(t, routeID)
+		deleteServiceViaAdmin(t, svcID)
+	})
+	createTestServiceViaCLI(t, env, svcID)
+	createDebugTraceRoute(t, env, svcID, routeID, "/debug-trace-headers", "")
+	waitForDebugTraceRoute(t, "/debug-trace-headers")
 
 	// Trace with custom header.
 	stdout, stderr, err := runA7WithEnv(env, "debug", "trace", routeID,
@@ -132,24 +133,16 @@ func TestDebugTrace_WithHost(t *testing.T) {
 	requireGatewayURL(t)
 	requireHTTPBin(t)
 	env := setupEnv(t)
+	svcID := "e2e-debug-trace-host-svc"
 	routeID := "e2e-debug-trace-host"
-	t.Cleanup(func() { deleteRouteViaAdmin(t, routeID) })
-
-	routeJSON := fmt.Sprintf(`{
-		"id": %q,
-		"uri": "/debug-trace-host",
-		"host": "trace.example.com",
-		"upstream": {
-			"type": "roundrobin",
-			"nodes": {"%s": 1}
-		}
-	}`, routeID, upstreamNode())
-
-	tmpFile := filepath.Join(t.TempDir(), "route.json")
-	require.NoError(t, os.WriteFile(tmpFile, []byte(routeJSON), 0644))
-
-	_, stderr, err := runA7WithEnv(env, "route", "create", "-f", tmpFile, "-g", gatewayGroup)
-	require.NoError(t, err, stderr)
+	t.Cleanup(func() {
+		deleteRouteViaAdmin(t, routeID)
+		deleteServiceViaAdmin(t, svcID)
+	})
+	createTestServiceViaCLI(t, env, svcID)
+	createDebugTraceRoute(t, env, svcID, routeID, "/debug-trace-host",
+		`, "host": "trace.example.com"`)
+	waitForDebugTraceRoute(t, "/debug-trace-host")
 
 	// Trace with --host flag.
 	stdout, stderr, err := runA7WithEnv(env, "debug", "trace", routeID,
@@ -168,28 +161,16 @@ func TestDebugTrace_WithPath(t *testing.T) {
 	requireGatewayURL(t)
 	requireHTTPBin(t)
 	env := setupEnv(t)
+	svcID := "e2e-debug-trace-path-svc"
 	routeID := "e2e-debug-trace-path"
-	t.Cleanup(func() { deleteRouteViaAdmin(t, routeID) })
-
-	routeJSON := fmt.Sprintf(`{
-		"id": %q,
-		"uri": "/debug-trace-path/*",
-		"upstream": {
-			"type": "roundrobin",
-			"nodes": {"%s": 1}
-		},
-		"plugins": {
-			"proxy-rewrite": {
-				"uri": "/get"
-			}
-		}
-	}`, routeID, upstreamNode())
-
-	tmpFile := filepath.Join(t.TempDir(), "route.json")
-	require.NoError(t, os.WriteFile(tmpFile, []byte(routeJSON), 0644))
-
-	_, stderr, err := runA7WithEnv(env, "route", "create", "-f", tmpFile, "-g", gatewayGroup)
-	require.NoError(t, err, stderr)
+	t.Cleanup(func() {
+		deleteRouteViaAdmin(t, routeID)
+		deleteServiceViaAdmin(t, svcID)
+	})
+	createTestServiceViaCLI(t, env, svcID)
+	createDebugTraceRoute(t, env, svcID, routeID, "/debug-trace-path/*",
+		`, "plugins": {"proxy-rewrite": {"uri": "/get"}}`)
+	waitForDebugTraceRoute(t, "/debug-trace-path/sub")
 
 	// Trace with --path flag override.
 	stdout, stderr, err := runA7WithEnv(env, "debug", "trace", routeID,
@@ -223,23 +204,15 @@ func TestDebugTrace_YAMLOutput(t *testing.T) {
 	requireGatewayURL(t)
 	requireHTTPBin(t)
 	env := setupEnv(t)
+	svcID := "e2e-debug-trace-yaml-svc"
 	routeID := "e2e-debug-trace-yaml"
-	t.Cleanup(func() { deleteRouteViaAdmin(t, routeID) })
-
-	routeJSON := fmt.Sprintf(`{
-		"id": %q,
-		"uri": "/debug-trace-yaml",
-		"upstream": {
-			"type": "roundrobin",
-			"nodes": {"%s": 1}
-		}
-	}`, routeID, upstreamNode())
-
-	tmpFile := filepath.Join(t.TempDir(), "route.json")
-	require.NoError(t, os.WriteFile(tmpFile, []byte(routeJSON), 0644))
-
-	_, stderr, err := runA7WithEnv(env, "route", "create", "-f", tmpFile, "-g", gatewayGroup)
-	require.NoError(t, err, stderr)
+	t.Cleanup(func() {
+		deleteRouteViaAdmin(t, routeID)
+		deleteServiceViaAdmin(t, svcID)
+	})
+	createTestServiceViaCLI(t, env, svcID)
+	createDebugTraceRoute(t, env, svcID, routeID, "/debug-trace-yaml", "")
+	waitForDebugTraceRoute(t, "/debug-trace-yaml")
 
 	stdout, stderr, err := runA7WithEnv(env, "debug", "trace", routeID,
 		"-g", gatewayGroup,

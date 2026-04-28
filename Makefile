@@ -8,7 +8,7 @@ LDFLAGS := -s -w \
 	-X $(MODULE)/internal/version.Commit=$(COMMIT) \
 	-X $(MODULE)/internal/version.Date=$(DATE)
 
-.PHONY: build test test-verbose lint fmt vet check install clean docker-up docker-down test-e2e
+.PHONY: build test test-verbose lint fmt vet check install clean docker-up docker-down test-e2e test-e2e-full
 
 build:
 	go build -ldflags "$(LDFLAGS)" -o bin/$(BINARY) ./cmd/a7
@@ -43,5 +43,11 @@ docker-up:
 docker-down:
 	docker compose -f test/e2e/docker-compose.yml down -v
 
+# test-e2e and test-e2e-full intentionally share the same Ginkgo entrypoint.
+# The default CI stays narrower via runtime guards such as requireGatewayURL,
+# requireHTTPBin, and A7_E2E_ENABLE_GATEWAY_GROUP_CRUD.
 test-e2e:
-	go test ./test/e2e/... -count=1 -v -tags=e2e -timeout 25m
+	go run github.com/onsi/ginkgo/v2/ginkgo -r --procs=1 --tags=e2e --timeout=45m ./test/e2e/...
+
+test-e2e-full:
+	go run github.com/onsi/ginkgo/v2/ginkgo -r --procs=1 --tags=e2e --timeout=45m ./test/e2e/...

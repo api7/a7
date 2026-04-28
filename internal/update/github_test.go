@@ -1,38 +1,48 @@
 package update
 
 import (
+	"io"
 	"net/http"
-	"net/http/httptest"
 	"runtime"
+	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestFetchLatestRelease_OK(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, http.MethodGet, r.Method)
-		require.Equal(t, "/repos/api7/a7/releases/latest", r.URL.Path)
-		assert.Equal(t, "application/vnd.github.v3+json", r.Header.Get("Accept"))
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{
-			"tag_name": "v1.2.3",
-			"name": "v1.2.3",
-			"body": "release notes",
-			"html_url": "https://github.com/api7/a7/releases/tag/v1.2.3",
-			"assets": [{
-				"name": "a7_1.2.3_linux_amd64.tar.gz",
-				"browser_download_url": "https://example.com/a7.tar.gz",
-				"size": 123,
-				"content_type": "application/gzip"
-			}]
-		}`))
-	}))
-	defer srv.Close()
+type roundTripFunc func(*http.Request) (*http.Response, error)
 
-	release, err := fetchLatestRelease(srv.URL, &http.Client{Timeout: 2 * time.Second})
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func TestFetchLatestRelease_OK(t *testing.T) {
+	client := &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			require.Equal(t, http.MethodGet, req.Method)
+			require.Equal(t, "https://example.com/repos/api7/a7/releases/latest", req.URL.String())
+			assert.Equal(t, "application/vnd.github.v3+json", req.Header.Get("Accept"))
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body: io.NopCloser(strings.NewReader(`{
+					"tag_name": "v1.2.3",
+					"name": "v1.2.3",
+					"body": "release notes",
+					"html_url": "https://github.com/api7/a7/releases/tag/v1.2.3",
+					"assets": [{
+						"name": "a7_1.2.3_linux_amd64.tar.gz",
+						"browser_download_url": "https://example.com/a7.tar.gz",
+						"size": 123,
+						"content_type": "application/gzip"
+					}]
+				}`)),
+			}, nil
+		}),
+	}
+
+	release, err := fetchLatestRelease("https://example.com", client)
 	require.NoError(t, err)
 	assert.Equal(t, "v1.2.3", release.TagName)
 	assert.Equal(t, "v1.2.3", release.Name)
@@ -41,23 +51,33 @@ func TestFetchLatestRelease_OK(t *testing.T) {
 }
 
 func TestFetchLatestRelease_404ReturnsEmpty(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-	}))
-	defer srv.Close()
+	client := &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusNotFound,
+				Body:       io.NopCloser(strings.NewReader("")),
+				Header:     make(http.Header),
+			}, nil
+		}),
+	}
 
-	release, err := fetchLatestRelease(srv.URL, &http.Client{Timeout: 2 * time.Second})
+	release, err := fetchLatestRelease("https://example.com", client)
 	require.NoError(t, err)
 	assert.Equal(t, Release{}, release)
 }
 
 func TestFetchLatestRelease_BadStatus(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer srv.Close()
+	client := &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusInternalServerError,
+				Body:       io.NopCloser(strings.NewReader("")),
+				Header:     make(http.Header),
+			}, nil
+		}),
+	}
 
-	_, err := fetchLatestRelease(srv.URL, &http.Client{Timeout: 2 * time.Second})
+	_, err := fetchLatestRelease("https://example.com", client)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "status 500")
 }
@@ -81,7 +101,6 @@ func TestFindAsset_MatchCurrentPlatform(t *testing.T) {
 
 	asset, err := FindAsset(release)
 	require.NoError(t, err)
-
 	assert.Equal(t, current, asset.Name)
 }
 

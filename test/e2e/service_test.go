@@ -4,6 +4,7 @@ package e2e
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,22 +14,30 @@ import (
 )
 
 // deleteServiceViaCLI deletes a service using the a7 CLI.
-func deleteServiceViaCLI(t *testing.T, env []string, id string) {
+func deleteServiceViaCLI(t testTB, env []string, id string) {
 	t.Helper()
 	_, _, _ = runA7WithEnv(env, "service", "delete", id, "--force", "-g", gatewayGroup)
 }
 
 // deleteServiceViaAdmin deletes a service via the Admin API (cleanup).
-func deleteServiceViaAdmin(t *testing.T, id string) {
+func deleteServiceViaAdmin(t testTB, id string) {
 	t.Helper()
 	resp, err := runtimeAdminAPI("DELETE", fmt.Sprintf("/apisix/admin/services/%s", id), nil)
-	if err == nil {
-		resp.Body.Close()
+	if err != nil {
+		t.Fatalf("delete service %s via admin API failed: %v", id, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == 404 {
+		return
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("delete service %s via admin API returned %d: %s", id, resp.StatusCode, string(body))
 	}
 }
 
 // createTestServiceViaCLI creates a service via CLI.
-func createTestServiceViaCLI(t *testing.T, env []string, id string) {
+func createTestServiceViaCLI(t testTB, env []string, id string) {
 	t.Helper()
 	svcJSON := fmt.Sprintf(`{
 		"id": %q,
