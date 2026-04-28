@@ -4,6 +4,7 @@ package e2e
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,11 +14,21 @@ import (
 )
 
 // deleteSecretViaAdmin deletes a secret provider via the Admin API.
-func deleteSecretViaAdmin(t *testing.T, secretManager, id string) {
+func deleteSecretViaAdmin(t testTB, secretManager, id string) {
 	t.Helper()
 	resp, err := runtimeAdminAPI("DELETE", fmt.Sprintf("/apisix/admin/secret_providers/%s/%s", secretManager, id), nil)
-	if err == nil {
-		resp.Body.Close()
+	if resp != nil {
+		defer resp.Body.Close()
+	}
+	if err != nil {
+		t.Fatalf("delete secret provider %s/%s via admin API failed: %v", secretManager, id, err)
+	}
+	if resp.StatusCode == 404 {
+		return
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("delete secret provider %s/%s via admin API returned %d: %s", secretManager, id, resp.StatusCode, string(body))
 	}
 }
 

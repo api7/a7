@@ -6,17 +6,22 @@
 //
 //   - A7_ADMIN_URL: API7 EE Dashboard/control-plane URL (required)
 //   - A7_TOKEN: API7 EE access token (required)
-//   - A7_GATEWAY_GROUP: Gateway group name (default: "default")
-//   - A7_GATEWAY_URL: Gateway data-plane URL (optional — gateway traffic tests skipped if empty)
-//   - HTTPBIN_URL: httpbin URL (optional — traffic forwarding tests skipped if empty)
+//   - A7_GATEWAY_GROUP: Gateway group name (default: "default"; resolved to the
+//     real UUID when unset or set to "default")
+//   - A7_GATEWAY_URL: Gateway data-plane URL (optional — only needed for live
+//     gateway/data-plane coverage)
+//   - HTTPBIN_URL: httpbin URL (optional — only needed for live traffic
+//     forwarding coverage)
 //
 // Run with: go test -v -tags e2e -count=1 -timeout 10m ./test/e2e/...
 package e2e
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -31,12 +36,14 @@ import (
 )
 
 var (
-	binaryPath   string
-	adminURL     string // API7 EE Dashboard/control-plane URL (HTTPS)
-	gatewayURL   string // API7 EE Gateway URL (HTTP)
-	httpbinURL   string
-	adminToken   string // API7 EE access token (a7ee prefix)
-	gatewayGroup = "default"
+	cliCommandTimeout    = 90 * time.Second
+	configCommandTimeout = 4 * time.Minute
+	binaryPath           string
+	adminURL             string // API7 EE Dashboard/control-plane URL (HTTPS)
+	gatewayURL           string // API7 EE Gateway URL (HTTP)
+	httpbinURL           string
+	adminToken           string // API7 EE access token (a7ee prefix)
+	gatewayGroup         = "default"
 
 	// httpClient with TLS skip verify for self-signed certs.
 	insecureClient = &http.Client{
@@ -46,6 +53,27 @@ var (
 		Timeout: 30 * time.Second,
 	}
 )
+
+func commandTimeout(args []string) time.Duration {
+	if len(args) >= 2 && args[0] == "config" {
+		switch args[1] {
+		case "dump", "sync", "diff":
+			return configCommandTimeout
+		}
+	}
+	return cliCommandTimeout
+}
+
+type testTB interface {
+	Helper()
+	TempDir() string
+	Cleanup(func())
+	Errorf(string, ...interface{})
+	FailNow()
+	Fatalf(string, ...interface{})
+	Skip(...interface{})
+	Skipf(string, ...interface{})
+}
 
 func TestMain(m *testing.M) {
 	adminURL = envOrDefault("A7_ADMIN_URL", "")
@@ -120,22 +148,34 @@ func TestMain(m *testing.M) {
 // runA7 executes the a7 binary with the given arguments and returns
 // captured stdout, stderr, and any error.
 func runA7(args ...string) (string, string, error) {
-	cmd := exec.Command(binaryPath, args...)
+	timeout := commandTimeout(args)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, binaryPath, args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err := cmd.Run()
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return stdout.String(), stderr.String(), fmt.Errorf("command timed out after %s: %w", timeout, ctx.Err())
+	}
 	return stdout.String(), stderr.String(), err
 }
 
 // runA7WithEnv executes the a7 binary with custom environment variables.
 func runA7WithEnv(env []string, args ...string) (string, string, error) {
-	cmd := exec.Command(binaryPath, args...)
+	timeout := commandTimeout(args)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, binaryPath, args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	cmd.Env = append(os.Environ(), env...)
 	err := cmd.Run()
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return stdout.String(), stderr.String(), fmt.Errorf("command timed out after %s: %w", timeout, ctx.Err())
+	}
 	return stdout.String(), stderr.String(), err
 }
 
@@ -215,7 +255,9 @@ func waitForHealthy(url string, timeout time.Duration) error {
 
 // setupEnv returns env vars and creates a context pointing at the real API7 EE instance.
 // Each test gets an isolated config directory to avoid context conflicts.
-func setupEnv(t *testing.T) []string {
+// Control-plane tests only need adminURL/adminToken/gatewayGroup; gatewayURL and
+// httpbinURL are optional and only used by live data-plane coverage.
+func setupEnv(t testTB) []string {
 	t.Helper()
 	env := []string{
 		"A7_CONFIG_DIR=" + t.TempDir(),
@@ -254,14 +296,14 @@ func resolveModuleRoot() (string, error) {
 	return filepath.Dir(gomod), nil
 }
 
-func requireGatewayURL(t *testing.T) {
+func requireGatewayURL(t testTB) {
 	t.Helper()
 	if gatewayURL == "" {
 		t.Skip("A7_GATEWAY_URL not set — skipping gateway traffic test")
 	}
 }
 
-func requireHTTPBin(t *testing.T) {
+func requireHTTPBin(t testTB) {
 	t.Helper()
 	if httpbinURL == "" {
 		t.Skip("HTTPBIN_URL not set — skipping httpbin-dependent test")
@@ -303,7 +345,7 @@ func upstreamNodePort() int {
 
 // createTestRouteWithServiceViaCLI creates a route that belongs to an existing service.
 // The service must already exist. This is needed because API7 EE requires service_id for routes.
-func createTestRouteWithServiceViaCLI(t *testing.T, env []string, routeID, serviceID string) {
+func createTestRouteWithServiceViaCLI(t testTB, env []string, routeID, serviceID string) {
 	t.Helper()
 	routeJSON := fmt.Sprintf(`{
 		"id": %q,

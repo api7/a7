@@ -5,6 +5,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -30,43 +31,55 @@ func waitForGatewayStatus(url string, buildRequest func() (*http.Request, error)
 		ctx, cancel := context.WithDeadline(context.Background(), deadline)
 		req = req.WithContext(ctx)
 		resp, err := insecureClient.Do(req)
-		cancel()
 		if err != nil {
+			cancel()
 			lastErr = err
 			time.Sleep(500 * time.Millisecond)
 			continue
 		}
 		lastStatus = resp.StatusCode
+		_, _ = io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
+		cancel()
 		if want(resp.StatusCode) {
 			return resp.StatusCode, nil
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
-	if lastErr != nil {
+	if lastStatus == 0 && lastErr != nil {
 		return lastStatus, lastErr
 	}
 	return lastStatus, nil
 }
 
 // deleteConsumerViaCLI deletes a consumer using the a7 CLI.
-func deleteConsumerViaCLI(t *testing.T, env []string, username string) {
+func deleteConsumerViaCLI(t testTB, env []string, username string) {
 	t.Helper()
 	_, _, _ = runA7WithEnv(env, "consumer", "delete", username, "--force", "-g", gatewayGroup)
 }
 
 // deleteConsumerViaAdmin deletes a consumer via the Admin API (cleanup).
-func deleteConsumerViaAdmin(t *testing.T, username string) {
+func deleteConsumerViaAdmin(t testTB, username string) {
 	t.Helper()
 	resp, err := runtimeAdminAPI("DELETE", fmt.Sprintf("/apisix/admin/consumers/%s", username), nil)
-	if err == nil {
-		resp.Body.Close()
+	if resp != nil {
+		defer resp.Body.Close()
+	}
+	if err != nil {
+		t.Fatalf("delete consumer %s via admin API failed: %v", username, err)
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("delete consumer %s via admin API returned %d: %s", username, resp.StatusCode, string(body))
 	}
 }
 
 // createTestConsumerViaCLI creates a consumer via CLI.
 // API7 EE does not allow auth plugins in the consumer body; use credentials instead.
-func createTestConsumerViaCLI(t *testing.T, env []string, username string) {
+func createTestConsumerViaCLI(t testTB, env []string, username string) {
 	t.Helper()
 	consumerJSON := fmt.Sprintf(`{
 		"username": %q,

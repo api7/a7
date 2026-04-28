@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func createDebugTraceRoute(t *testing.T, env []string, serviceID, routeID, path string, extraFields string) {
+func createDebugTraceRoute(t testTB, env []string, serviceID, routeID, path string, extraFields string) {
 	t.Helper()
 	routeJSON := fmt.Sprintf(`{
 		"id": %q,
@@ -31,7 +31,7 @@ func createDebugTraceRoute(t *testing.T, env []string, serviceID, routeID, path 
 	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
 }
 
-func waitForDebugTraceRoute(t *testing.T, path string) {
+func waitForDebugTraceRoute(t testTB, path string) {
 	t.Helper()
 	status, err := waitForGatewayStatus(gatewayURL+path, func() (*http.Request, error) {
 		return http.NewRequest("GET", gatewayURL+path, nil)

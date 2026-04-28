@@ -5,6 +5,7 @@ package e2e
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -17,17 +18,27 @@ import (
 )
 
 // deleteRouteViaCLI deletes a route using the a7 CLI.
-func deleteRouteViaCLI(t *testing.T, env []string, id string) {
+func deleteRouteViaCLI(t testTB, env []string, id string) {
 	t.Helper()
 	_, _, _ = runA7WithEnv(env, "route", "delete", id, "--force", "-g", gatewayGroup)
 }
 
 // deleteRouteViaAdmin deletes a route via the Admin API (cleanup).
-func deleteRouteViaAdmin(t *testing.T, id string) {
+func deleteRouteViaAdmin(t testTB, id string) {
 	t.Helper()
 	resp, err := runtimeAdminAPI("DELETE", fmt.Sprintf("/apisix/admin/routes/%s", id), nil)
-	if err == nil {
-		resp.Body.Close()
+	if resp != nil {
+		defer resp.Body.Close()
+	}
+	if err != nil {
+		t.Fatalf("delete route %s via admin API failed: %v", id, err)
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("delete route %s via admin API returned %d: %s", id, resp.StatusCode, string(body))
 	}
 }
 

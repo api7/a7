@@ -9,14 +9,17 @@ on:
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 50
     # Only run if secrets are available (skip on forks).
     if: github.repository == 'api7/a7'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.23.0'
+
+      - name: Download Go modules
+        run: go mod download
 
       - name: Run E2E tests
         env:

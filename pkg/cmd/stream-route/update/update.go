@@ -72,16 +72,12 @@ func actionRun(opts *Options) error {
 	if ggID == "" {
 		return fmt.Errorf("gateway group is required; use --gateway-group flag or set a default in context config")
 	}
-	if opts.UpstreamID == "" {
-		return fmt.Errorf("--upstream-id is required")
-	}
-
-	httpClient, err := opts.Client()
-	if err != nil {
-		return err
-	}
 
 	if opts.File != "" {
+		httpClient, err := opts.Client()
+		if err != nil {
+			return err
+		}
 		payload, err := cmdutil.ReadResourceFile(opts.File, opts.IO.In)
 		if err != nil {
 			return err
@@ -96,6 +92,14 @@ func actionRun(opts *Options) error {
 			format = "json"
 		}
 		return cmdutil.NewExporter(format, opts.IO.Out).Write(json.RawMessage(body))
+	}
+	if opts.UpstreamID == "" {
+		return fmt.Errorf("--upstream-id is required")
+	}
+
+	httpClient, err := opts.Client()
+	if err != nil {
+		return err
 	}
 
 	labels := make(map[string]string)
