@@ -75,7 +75,7 @@ func TestCreateSecret_RequiresID(t *testing.T) {
 			return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
 		},
 	})
-	if err == nil || err.Error() != "--id is required" {
+	if err == nil || err.Error() != "secret provider id is required; use a positional arg or --id" {
 		t.Fatalf("expected --id required error, got: %v", err)
 	}
 }
