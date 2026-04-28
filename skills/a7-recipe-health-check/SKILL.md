@@ -1,10 +1,9 @@
 ---
 name: a7-recipe-health-check
 description: >-
-  Recipe skill for configuring upstream health checks using the a7 CLI in API7 Enterprise Edition.
-  Covers active health checks (HTTP probing), passive health checks
-  (response analysis), combining both, configuring healthy/unhealthy
-  thresholds, and monitoring upstream node status.
+  Recipe skill for configuring backend health checks using the a7 CLI in API7 Enterprise Edition.
+  Covers active health checks, passive health checks, combining both,
+  healthy/unhealthy thresholds, and service-backed route wiring.
 version: "1.0.0"
 author: API7.ai Contributors
 license: Apache-2.0
@@ -12,8 +11,10 @@ metadata:
   category: recipe
   apisix_version: ">=3.0.0"
   a7_commands:
-    - a7 upstream create
-    - a7 upstream get
+    - a7 service create
+    - a7 service get
+    - a7 route create
+    - a7 route list
     - a7 config sync
 ---
 
@@ -21,83 +22,70 @@ metadata:
 
 ## Overview
 
-Health checks monitor upstream backend nodes and automatically remove
-unhealthy nodes from the load balancer pool. API7 Enterprise Edition (API7 EE) supports two types:
+Health checks monitor backend nodes and remove unhealthy nodes from load
+balancing. In current API7 EE usage, define the upstream and health check
+configuration on a service, then attach routes to that service with
+`service_id`.
 
-- **Active**: API7 EE periodically probes each node with HTTP/HTTPS/TCP requests.
-- **Passive**: API7 EE analyzes real traffic responses to detect failures.
+API7 EE supports:
 
-Use both together for the most robust setup across your gateway groups.
+- Active checks: gateway probes each node.
+- Passive checks: gateway observes real traffic responses.
 
-## When to Use
-
-- Automatically remove failing backend nodes from rotation.
-- Detect and recover from backend failures without manual intervention.
-- Ensure high availability across multiple backend instances.
-- Monitor backend health status via the a7 CLI.
+Use both for production services that need automatic failure detection and
+recovery.
 
 ## Health Check Configuration Reference
 
 ### Active Health Check
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `checks.active.type` | string | `"http"` | Check type: `"http"`, `"https"`, or `"tcp"` |
-| `checks.active.http_path` | string | `"/"` | HTTP path to probe |
-| `checks.active.host` | string | — | Host header for HTTP probes |
-| `checks.active.port` | integer | — | Override port for probing (default: use node port) |
-| `checks.active.timeout` | number | `1` | Probe timeout in seconds |
-| `checks.active.concurrency` | integer | `10` | Number of concurrent probes |
-| `checks.active.https_verify_certificate` | boolean | `true` | Verify TLS certificate for HTTPS probes |
-| `checks.active.req_headers` | array[string] | — | Additional request headers for probes |
-| `checks.active.healthy.interval` | integer | `1` | Seconds between probes for healthy nodes |
-| `checks.active.healthy.successes` | integer | `2` | Consecutive successes to mark node healthy |
-| `checks.active.healthy.http_statuses` | array[integer] | `[200, 302]` | HTTP codes considered healthy |
-| `checks.active.unhealthy.interval` | integer | `1` | Seconds between probes for unhealthy nodes |
-| `checks.active.unhealthy.http_failures` | integer | `5` | Consecutive HTTP failures to mark unhealthy |
-| `checks.active.unhealthy.tcp_failures` | integer | `2` | Consecutive TCP failures to mark unhealthy |
-| `checks.active.unhealthy.timeouts` | integer | `3` | Consecutive timeouts to mark unhealthy |
-| `checks.active.unhealthy.http_statuses` | array[integer] | `[429, 404, 500, 501, 502, 503, 504, 505]` | HTTP codes considered unhealthy |
+| Field | Description |
+|-------|-------------|
+| `upstream.checks.active.type` | `http`, `https`, or `tcp` |
+| `upstream.checks.active.http_path` | HTTP path to probe |
+| `upstream.checks.active.healthy.successes` | Consecutive successes to mark healthy |
+| `upstream.checks.active.unhealthy.http_failures` | Consecutive HTTP failures to mark unhealthy |
+| `upstream.checks.active.unhealthy.timeouts` | Consecutive timeouts to mark unhealthy |
 
 ### Passive Health Check
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `checks.passive.type` | string | `"http"` | Check type: `"http"`, `"https"`, or `"tcp"` |
-| `checks.passive.healthy.successes` | integer | `5` | Consecutive successes to mark healthy |
-| `checks.passive.healthy.http_statuses` | array[integer] | `[200, 201, 202, ..., 399]` | HTTP codes considered healthy |
-| `checks.passive.unhealthy.http_failures` | integer | `5` | Consecutive failures to mark unhealthy |
-| `checks.passive.unhealthy.tcp_failures` | integer | `2` | Consecutive TCP failures to mark unhealthy |
-| `checks.passive.unhealthy.timeouts` | integer | `7` | Consecutive timeouts to mark unhealthy |
-| `checks.passive.unhealthy.http_statuses` | array[integer] | `[429, 500, 503]` | HTTP codes considered unhealthy |
+| Field | Description |
+|-------|-------------|
+| `upstream.checks.passive.type` | `http`, `https`, or `tcp` |
+| `upstream.checks.passive.unhealthy.http_statuses` | Status codes treated as unhealthy |
+| `upstream.checks.passive.unhealthy.http_failures` | Consecutive failures to mark unhealthy |
+| `upstream.checks.passive.healthy.successes` | Consecutive successes to mark healthy |
 
 ## Step-by-Step: Configure Health Checks
 
-### 1. Active HTTP health check
+### 1. Create a service with active HTTP health checks
 
 ```bash
-a7 upstream create --gateway-group default -f - <<'EOF'
+a7 service create --gateway-group default -f - <<'EOF'
 {
-  "id": "backend",
-  "type": "roundrobin",
-  "nodes": {
-    "backend-1:8080": 1,
-    "backend-2:8080": 1,
-    "backend-3:8080": 1
-  },
-  "checks": {
-    "active": {
-      "type": "http",
-      "http_path": "/health",
-      "healthy": {
-        "interval": 5,
-        "successes": 2,
-        "http_statuses": [200]
-      },
-      "unhealthy": {
-        "interval": 3,
-        "http_failures": 3,
-        "http_statuses": [500, 502, 503]
+  "id": "backend-service",
+  "name": "backend-service",
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": [
+      {"host": "backend-1", "port": 8080, "weight": 1},
+      {"host": "backend-2", "port": 8080, "weight": 1},
+      {"host": "backend-3", "port": 8080, "weight": 1}
+    ],
+    "checks": {
+      "active": {
+        "type": "http",
+        "http_path": "/health",
+        "healthy": {
+          "interval": 5,
+          "successes": 2,
+          "http_statuses": [200]
+        },
+        "unhealthy": {
+          "interval": 3,
+          "http_failures": 3,
+          "http_statuses": [500, 502, 503]
+        }
       }
     }
   }
@@ -105,34 +93,52 @@ a7 upstream create --gateway-group default -f - <<'EOF'
 EOF
 ```
 
-API7 EE probes `/health` on each node:
-- Every 5s for healthy nodes.
-- Every 3s for unhealthy nodes.
-- 3 consecutive failures → node removed from rotation in the `default` group.
-- 2 consecutive successes → node restored.
-
-### 2. Passive health check (analyze real traffic)
+### 2. Create a route that uses the service
 
 ```bash
-a7 upstream create --gateway-group default -f - <<'EOF'
+a7 route create --gateway-group default -f - <<'EOF'
 {
-  "id": "backend-passive",
-  "type": "roundrobin",
-  "nodes": {
-    "backend-1:8080": 1,
-    "backend-2:8080": 1
-  },
-  "checks": {
-    "passive": {
-      "type": "http",
-      "unhealthy": {
-        "http_failures": 3,
-        "http_statuses": [500, 502, 503],
-        "timeouts": 3
-      },
-      "healthy": {
-        "successes": 5,
-        "http_statuses": [200, 201, 202, 203, 204]
+  "id": "api",
+  "name": "api",
+  "paths": ["/api/*"],
+  "service_id": "backend-service"
+}
+EOF
+```
+
+Health checks run for upstream nodes that are reachable through active
+configuration. Verify route wiring with:
+
+```bash
+a7 service get backend-service --gateway-group default --output json
+a7 route list --gateway-group default --service-id backend-service --output json
+```
+
+### 3. Passive health check
+
+```bash
+a7 service create --gateway-group default -f - <<'EOF'
+{
+  "id": "backend-passive-service",
+  "name": "backend-passive-service",
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": [
+      {"host": "backend-1", "port": 8080, "weight": 1},
+      {"host": "backend-2", "port": 8080, "weight": 1}
+    ],
+    "checks": {
+      "passive": {
+        "type": "http",
+        "unhealthy": {
+          "http_failures": 3,
+          "http_statuses": [500, 502, 503],
+          "timeouts": 3
+        },
+        "healthy": {
+          "successes": 5,
+          "http_statuses": [200, 201, 202, 203, 204]
+        }
       }
     }
   }
@@ -140,50 +146,50 @@ a7 upstream create --gateway-group default -f - <<'EOF'
 EOF
 ```
 
-No probing — API7 EE watches real traffic responses. After 3 consecutive 5xx
-errors, the node is removed. After 5 consecutive successes, it's restored.
+Passive-only checks cannot recover a node that receives no traffic. Combine
+passive checks with active checks for full recovery coverage.
 
-**Note**: Passive-only health checks cannot recover a node that receives no
-traffic. Combine with active checks for full coverage.
-
-### 3. Combined active + passive (recommended for production)
+### 4. Combined active + passive checks
 
 ```bash
-a7 upstream create --gateway-group default -f - <<'EOF'
+a7 service create --gateway-group default -f - <<'EOF'
 {
-  "id": "production-backend",
-  "type": "roundrobin",
-  "nodes": {
-    "backend-1:8080": 1,
-    "backend-2:8080": 1,
-    "backend-3:8080": 1
-  },
-  "checks": {
-    "active": {
-      "type": "http",
-      "http_path": "/health",
-      "healthy": {
-        "interval": 5,
-        "successes": 2,
-        "http_statuses": [200]
+  "id": "production-backend-service",
+  "name": "production-backend-service",
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": [
+      {"host": "backend-1", "port": 8080, "weight": 1},
+      {"host": "backend-2", "port": 8080, "weight": 1},
+      {"host": "backend-3", "port": 8080, "weight": 1}
+    ],
+    "checks": {
+      "active": {
+        "type": "http",
+        "http_path": "/health",
+        "healthy": {
+          "interval": 5,
+          "successes": 2,
+          "http_statuses": [200]
+        },
+        "unhealthy": {
+          "interval": 2,
+          "http_failures": 3,
+          "timeouts": 2,
+          "http_statuses": [500, 502, 503, 504]
+        }
       },
-      "unhealthy": {
-        "interval": 2,
-        "http_failures": 3,
-        "timeouts": 2,
-        "http_statuses": [500, 502, 503, 504]
-      }
-    },
-    "passive": {
-      "type": "http",
-      "unhealthy": {
-        "http_failures": 3,
-        "http_statuses": [500, 502, 503],
-        "timeouts": 3
-      },
-      "healthy": {
-        "successes": 3,
-        "http_statuses": [200, 201, 204]
+      "passive": {
+        "type": "http",
+        "unhealthy": {
+          "http_failures": 3,
+          "http_statuses": [500, 502, 503],
+          "timeouts": 3
+        },
+        "healthy": {
+          "successes": 3,
+          "http_statuses": [200, 201, 204]
+        }
       }
     }
   }
@@ -191,137 +197,65 @@ a7 upstream create --gateway-group default -f - <<'EOF'
 EOF
 ```
 
-### 4. Verify the referencing route and upstream
-
-```bash
-# Current a7 does not expose a standalone upstream-health command.
-# Verify the upstream/route wiring and use gateway observability for node state.
-a7 upstream get backend --gateway-group default --output json
-a7 route list --gateway-group default --output json
-```
-
-## Common Patterns
-
-### TCP health check (non-HTTP services)
-
-```json
-{
-  "checks": {
-    "active": {
-      "type": "tcp",
-      "healthy": {
-        "interval": 5,
-        "successes": 2
-      },
-      "unhealthy": {
-        "interval": 2,
-        "tcp_failures": 3,
-        "timeouts": 2
-      }
-    }
-  }
-}
-```
-
-### HTTPS health check with certificate verification
-
-```json
-{
-  "checks": {
-    "active": {
-      "type": "https",
-      "http_path": "/health",
-      "https_verify_certificate": true,
-      "healthy": {
-        "interval": 10,
-        "successes": 2,
-        "http_statuses": [200]
-      },
-      "unhealthy": {
-        "interval": 5,
-        "http_failures": 3
-      }
-    }
-  }
-}
-```
-
-### Custom probe headers (for auth-protected health endpoints)
-
-```json
-{
-  "checks": {
-    "active": {
-      "type": "http",
-      "http_path": "/internal/health",
-      "host": "health.internal",
-      "req_headers": [
-        "Authorization: Bearer health-check-token",
-        "X-Health-Check: true"
-      ],
-      "healthy": {
-        "interval": 10,
-        "successes": 2
-      },
-      "unhealthy": {
-        "interval": 5,
-        "http_failures": 3
-      }
-    }
-  }
-}
-```
-
-## Config Sync Example
+## Config Sync
 
 ```yaml
 version: "1"
 gateway_group: default
-upstreams:
-  - id: production-backend
-    type: roundrobin
-    nodes:
-      "backend-1:8080": 1
-      "backend-2:8080": 1
-      "backend-3:8080": 1
-    checks:
-      active:
-        type: http
-        http_path: /health
-        healthy:
-          interval: 5
-          successes: 2
-          http_statuses: [200]
-        unhealthy:
-          interval: 2
-          http_failures: 3
-          timeouts: 2
-          http_statuses: [500, 502, 503, 504]
-      passive:
-        type: http
-        unhealthy:
-          http_failures: 3
-          http_statuses: [500, 502, 503]
-          timeouts: 3
-        healthy:
-          successes: 3
-          http_statuses: [200, 201, 204]
+services:
+  - id: production-backend-service
+    name: production-backend-service
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: backend-1
+          port: 8080
+          weight: 1
+        - host: backend-2
+          port: 8080
+          weight: 1
+        - host: backend-3
+          port: 8080
+          weight: 1
+      checks:
+        active:
+          type: http
+          http_path: /health
+          healthy:
+            interval: 5
+            successes: 2
+            http_statuses: [200]
+          unhealthy:
+            interval: 2
+            http_failures: 3
+            timeouts: 2
+            http_statuses: [500, 502, 503, 504]
+        passive:
+          type: http
+          unhealthy:
+            http_failures: 3
+            http_statuses: [500, 502, 503]
+            timeouts: 3
+          healthy:
+            successes: 3
+            http_statuses: [200, 201, 204]
 routes:
   - id: api
-    uri: /api/*
-    upstream_id: production-backend
+    name: api
+    paths:
+      - /api/*
+    service_id: production-backend-service
 ```
 
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| Health checks not running | No route references the upstream | Health checks only run for upstreams attached to at least one route |
-| All nodes marked unhealthy | Health endpoint returns wrong status code | Verify `http_statuses` includes your health endpoint's response code |
-| Node not recovering | Passive-only: no traffic reaches unhealthy node | Add active health checks for recovery |
-| Probe hitting wrong endpoint | Default `http_path` is `/` | Set `http_path` to your actual health endpoint |
+| Health checks not running | Route does not reference the service | Verify `service_id` with `a7 route get` |
+| All nodes marked unhealthy | Health endpoint returns unexpected status | Verify `http_statuses` includes the response code |
+| Node not recovering | Passive-only checks have no traffic to observe | Add active health checks |
+| Probe hits wrong endpoint | Default `http_path` is `/` | Set `http_path` to the real health endpoint |
 | TLS probe fails | Certificate verification fails | Set `https_verify_certificate: false` or fix certificates |
-| Health checks too aggressive | Low thresholds with flaky endpoints | Increase `failures` threshold and `interval` |
-| No standalone health command | Current a7 does not expose upstream health status | Verify service/route config with `a7 service get` and use gateway observability |
+| No standalone health command | Current a7 does not expose upstream health status | Verify config with `a7 service get` and use gateway observability |
 | Command failed with 401 | Invalid token | Refresh your token using `a7 context create` |
-| Upstream not found | Different gateway group | Ensure `--gateway-group` matches the group where upstream was created |
+| Service not found | Different gateway group | Ensure `--gateway-group` matches where the service was created |
