@@ -67,7 +67,7 @@ func actionRun(opts *Options) error {
 	client := api.NewClient(httpClient, cfg.BaseURL())
 	body, err := client.Get("/apisix/admin/ssls/"+opts.ID, map[string]string{"gateway_group_id": ggID})
 	if err != nil {
-		return fmt.Errorf(cmdutil.FormatAPIError(err))
+		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
 	}
 
 	var item api.SSL

@@ -45,7 +45,7 @@ func TestUpdateConsumerGroup_JSONOutput(t *testing.T) {
 	}
 
 	var item api.ConsumerGroup
-	if err := json.Unmarshal([]byte(out.String()), &item); err != nil {
+	if err := json.Unmarshal(out.Bytes(), &item); err != nil {
 		t.Fatalf("failed to parse output: %v", err)
 	}
 	if item.ID != "cg1" || item.Desc != "updated" {

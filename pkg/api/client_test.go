@@ -9,6 +9,13 @@ import (
 	"testing"
 )
 
+func writeResponse(t *testing.T, w http.ResponseWriter, body []byte) {
+	t.Helper()
+	if _, err := w.Write(body); err != nil {
+		t.Errorf("failed to write response: %v", err)
+	}
+}
+
 // TestClient_Get tests the Get method with a successful response.
 func TestClient_Get(t *testing.T) {
 	expectedBody := `{"id": 1, "name": "test"}`
@@ -21,9 +28,7 @@ func TestClient_Get(t *testing.T) {
 			t.Errorf("expected path /routes, got %s", r.URL.Path)
 		}
 		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte(expectedBody)); err != nil {
-			t.Errorf("failed to write response: %v", err)
-		}
+		writeResponse(t, w, []byte(expectedBody))
 	}))
 	defer server.Close()
 
@@ -65,9 +70,7 @@ func TestClient_Post(t *testing.T) {
 		}
 
 		w.WriteHeader(http.StatusCreated)
-		if _, err := w.Write([]byte(expectedBody)); err != nil {
-			t.Errorf("failed to write response: %v", err)
-		}
+		writeResponse(t, w, []byte(expectedBody))
 	}))
 	defer server.Close()
 
@@ -101,9 +104,7 @@ func TestClient_Put(t *testing.T) {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte(expectedBody)); err != nil {
-			t.Errorf("failed to write response: %v", err)
-		}
+		writeResponse(t, w, []byte(expectedBody))
 	}))
 	defer server.Close()
 
@@ -161,7 +162,7 @@ func TestClient_GetWithQuery(t *testing.T) {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"list": []}`))
+		writeResponse(t, w, []byte(`{"list": []}`))
 	}))
 	defer server.Close()
 
@@ -185,7 +186,7 @@ func TestClient_APIError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"error_msg":"bad request"}`))
+		writeResponse(t, w, []byte(`{"error_msg":"bad request"}`))
 	}))
 	defer server.Close()
 
@@ -219,7 +220,7 @@ func TestClient_APIError_401(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"error_msg":"invalid api key"}`))
+		writeResponse(t, w, []byte(`{"error_msg":"invalid api key"}`))
 	}))
 	defer server.Close()
 
@@ -294,7 +295,7 @@ func TestApiKeyTransport(t *testing.T) {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status": "ok"}`))
+		writeResponse(t, w, []byte(`{"status": "ok"}`))
 	}))
 	defer server.Close()
 
@@ -341,7 +342,7 @@ func TestClient_Patch(t *testing.T) {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(expectedBody))
+		writeResponse(t, w, []byte(expectedBody))
 	}))
 	defer server.Close()
 
@@ -465,7 +466,7 @@ func TestApiKeyTransport_MultipleRequests(t *testing.T) {
 			t.Errorf("request %d: expected X-API-KEY header %q, got %q", requestCount, testAPIKey, apiKey)
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{}`))
+		writeResponse(t, w, []byte(`{}`))
 	}))
 	defer server.Close()
 
@@ -492,7 +493,7 @@ func TestClient_EmptyQuery(t *testing.T) {
 			t.Errorf("expected empty query string, got %s", r.URL.RawQuery)
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{}`))
+		writeResponse(t, w, []byte(`{}`))
 	}))
 	defer server.Close()
 
@@ -522,7 +523,7 @@ func TestClient_MultipleQueryParams(t *testing.T) {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"list": []}`))
+		writeResponse(t, w, []byte(`{"list": []}`))
 	}))
 	defer server.Close()
 
@@ -552,7 +553,7 @@ func TestClient_JSONResponseParsing(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write(respJSON)
+		writeResponse(t, w, respJSON)
 	}))
 	defer server.Close()
 
@@ -584,7 +585,7 @@ func TestClient_LargeResponseBody(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write(largeData)
+		writeResponse(t, w, largeData)
 	}))
 	defer server.Close()
 
@@ -611,7 +612,7 @@ func TestClient_SpecialCharactersInQuery(t *testing.T) {
 			t.Errorf("expected query param 'foo=bar&baz=qux', got %q", actual)
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{}`))
+		writeResponse(t, w, []byte(`{}`))
 	}))
 	defer server.Close()
 
@@ -634,7 +635,7 @@ func TestClient_NonJSONErrorResponse(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Header().Set("Content-Type", "text/plain")
-		w.Write([]byte(plainTextError))
+		writeResponse(t, w, []byte(plainTextError))
 	}))
 	defer server.Close()
 
@@ -700,7 +701,7 @@ func TestClient_Get_URLEncodingPreservation(t *testing.T) {
 			t.Errorf("expected path /routes/test, got %s", r.URL.Path)
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{}`))
+		writeResponse(t, w, []byte(`{}`))
 	}))
 	defer server.Close()
 
@@ -720,7 +721,7 @@ func TestClient_PostWithNilBody(t *testing.T) {
 			t.Errorf("expected Content-Type application/json, got %s", ct)
 		}
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte(`{"status": "created"}`))
+		writeResponse(t, w, []byte(`{"status": "created"}`))
 	}))
 	defer server.Close()
 
@@ -744,7 +745,7 @@ func TestClient_ErrorResponse_WithPartialJSON(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(partialJSON))
+		writeResponse(t, w, []byte(partialJSON))
 	}))
 	defer server.Close()
 
@@ -811,7 +812,7 @@ func TestClient_QueryMapWithEmptyValues(t *testing.T) {
 			t.Errorf("expected empty filter value, got %q", actual)
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{}`))
+		writeResponse(t, w, []byte(`{}`))
 	}))
 	defer server.Close()
 
@@ -830,7 +831,7 @@ func TestClient_QueryMapWithEmptyValues(t *testing.T) {
 func TestClient_StatusCode_200(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"success": true}`))
+		writeResponse(t, w, []byte(`{"success": true}`))
 	}))
 	defer server.Close()
 
@@ -850,7 +851,7 @@ func TestClient_StatusCode_200(t *testing.T) {
 func TestClient_StatusCode_201(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte(`{"id": 1}`))
+		writeResponse(t, w, []byte(`{"id": 1}`))
 	}))
 	defer server.Close()
 
@@ -890,7 +891,7 @@ func TestClient_StatusCode_204(t *testing.T) {
 func TestClient_StatusCode_400(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`{"error_msg": "bad request"}`))
+		writeResponse(t, w, []byte(`{"error_msg": "bad request"}`))
 	}))
 	defer server.Close()
 
@@ -910,7 +911,7 @@ func TestClient_StatusCode_400(t *testing.T) {
 func TestClient_StatusCode_403(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
-		w.Write([]byte(`{"error_msg": "forbidden"}`))
+		writeResponse(t, w, []byte(`{"error_msg": "forbidden"}`))
 	}))
 	defer server.Close()
 
@@ -939,7 +940,7 @@ func TestClient_StatusCode_403(t *testing.T) {
 func TestClient_StatusCode_404(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(`{"error_msg": "not found"}`))
+		writeResponse(t, w, []byte(`{"error_msg": "not found"}`))
 	}))
 	defer server.Close()
 
@@ -968,7 +969,7 @@ func TestClient_StatusCode_404(t *testing.T) {
 func TestClient_StatusCode_500(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(`{"error_msg": "internal error"}`))
+		writeResponse(t, w, []byte(`{"error_msg": "internal error"}`))
 	}))
 	defer server.Close()
 
@@ -997,7 +998,7 @@ func TestClient_StatusCode_500(t *testing.T) {
 func TestClient_StatusCode_502(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadGateway)
-		w.Write([]byte(`{"error_msg": "bad gateway"}`))
+		writeResponse(t, w, []byte(`{"error_msg": "bad gateway"}`))
 	}))
 	defer server.Close()
 
@@ -1025,7 +1026,7 @@ func TestClient_BaseURLWithTrailingSlash(t *testing.T) {
 			t.Errorf("expected path /api/routes, got %s", r.URL.Path)
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{}`))
+		writeResponse(t, w, []byte(`{}`))
 	}))
 	defer server.Close()
 
