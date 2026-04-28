@@ -251,7 +251,7 @@ routes:
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| Health checks not running | Route does not reference the service | Verify `service_id` with `a7 route get` |
+| Health checks not running | Route does not reference the service | Verify with `a7 route list --service-id <service>` |
 | All nodes marked unhealthy | Health endpoint returns unexpected status | Verify `http_statuses` includes the response code |
 | Node not recovering | Passive-only checks have no traffic to observe | Add active health checks |
 | Probe hits wrong endpoint | Default `http_path` is `/` | Set `http_path` to the real health endpoint |
