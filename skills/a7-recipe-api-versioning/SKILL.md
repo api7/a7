@@ -145,6 +145,9 @@ a7 route update route-v1 -g production -f - <<'EOF'
 {
   "service_id": "service-v1",
   "plugins": {
+    "proxy-rewrite": {
+      "regex_uri": ["^/v1/(.*)", "/$1"]
+    },
     "traffic-split": {
       "rules": [
         {
