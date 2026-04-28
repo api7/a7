@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -64,9 +63,10 @@ func TestGlobalRule_CRUD(t *testing.T) {
 	assert.Contains(t, stdout, grID)
 
 	// Get JSON
-	stdout, stderr, err = runA7WithEnv(env, "global-rule", "get", grID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, "prometheus")
+	var globalRule map[string]interface{}
+	runA7JSON(t, env, &globalRule, "global-rule", "get", grID, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, grID, globalRule["id"])
+	assert.Contains(t, fmt.Sprint(globalRule["plugins"]), "prometheus")
 
 	// Update — API7 EE requires exactly one plugin per global rule.
 	updateJSON := fmt.Sprintf(`{
@@ -82,13 +82,14 @@ func TestGlobalRule_CRUD(t *testing.T) {
 	require.NoError(t, err, stderr)
 
 	// Export (use get -o json; export is batch-only with cobra.NoArgs)
-	stdout, stderr, err = runA7WithEnv(env, "global-rule", "get", grID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, "prometheus")
+	runA7JSON(t, env, &globalRule, "global-rule", "get", grID, "-g", gatewayGroup, "-o", "json")
+	assert.Contains(t, fmt.Sprint(globalRule["plugins"]), "prefer_name")
 
 	// Delete
 	stdout, stderr, err = runA7WithEnv(env, "global-rule", "delete", grID, "--force", "-g", gatewayGroup)
 	require.NoError(t, err, stderr)
+	_, _, err = runA7WithEnv(env, "global-rule", "get", grID, "-g", gatewayGroup)
+	assert.Error(t, err)
 }
 
 func TestGlobalRule_DeleteNonexistent(t *testing.T) {
@@ -122,8 +123,9 @@ func TestGlobalRule_SkillExample(t *testing.T) {
 	require.NoError(t, err, stderr)
 
 	// Verify
-	stdout, stderr, err := runA7WithEnv(env, "global-rule", "get", grID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, "ip-restriction")
-	_ = strings.Contains(stdout, "whitelist") // ensure plugin config persisted
+	var globalRule map[string]interface{}
+	runA7JSON(t, env, &globalRule, "global-rule", "get", grID, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, grID, globalRule["id"])
+	assert.Contains(t, fmt.Sprint(globalRule["plugins"]), "ip-restriction")
+	assert.Contains(t, fmt.Sprint(globalRule["plugins"]), "whitelist")
 }

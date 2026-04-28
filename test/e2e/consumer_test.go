@@ -123,9 +123,10 @@ func TestConsumer_CRUD(t *testing.T) {
 	assert.Contains(t, stdout, username)
 
 	// Get JSON
-	stdout, stderr, err = runA7WithEnv(env, "consumer", "get", username, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, username)
+	var consumer map[string]interface{}
+	runA7JSON(t, env, &consumer, "consumer", "get", username, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, username, consumer["username"])
+	assert.Equal(t, "e2e test consumer", consumer["desc"])
 
 	// Update
 	updateJSON := fmt.Sprintf(`{
@@ -137,10 +138,14 @@ func TestConsumer_CRUD(t *testing.T) {
 
 	stdout, stderr, err = runA7WithEnv(env, "consumer", "update", username, "-f", tmpFile, "-g", gatewayGroup)
 	require.NoError(t, err, stderr)
+	runA7JSON(t, env, &consumer, "consumer", "get", username, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, "updated consumer", consumer["desc"])
 
 	// Delete
 	stdout, stderr, err = runA7WithEnv(env, "consumer", "delete", username, "--force", "-g", gatewayGroup)
 	require.NoError(t, err, stderr)
+	_, _, err = runA7WithEnv(env, "consumer", "get", username, "-g", gatewayGroup)
+	assert.Error(t, err)
 }
 
 func TestConsumer_Export(t *testing.T) {
@@ -151,9 +156,9 @@ func TestConsumer_Export(t *testing.T) {
 	createTestConsumerViaCLI(t, env, username)
 
 	// Use get -o json (export is batch-only, cobra.NoArgs).
-	stdout, stderr, err := runA7WithEnv(env, "consumer", "get", username, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, username)
+	var consumer map[string]interface{}
+	runA7JSON(t, env, &consumer, "consumer", "get", username, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, username, consumer["username"])
 }
 
 func TestConsumer_WithKeyAuth(t *testing.T) {

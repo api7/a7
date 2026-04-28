@@ -61,18 +61,20 @@ func TestProto_CRUD(t *testing.T) {
 	assert.Contains(t, stdout, protoID)
 
 	// Get JSON
-	stdout, stderr, err = runA7WithEnv(env, "proto", "get", protoID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, "helloworld")
+	var proto map[string]interface{}
+	runA7JSON(t, env, &proto, "proto", "get", protoID, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, protoID, proto["id"])
+	assert.Contains(t, fmt.Sprint(proto["content"]), "helloworld")
 
 	// Export (use get -o json; export is batch-only with cobra.NoArgs)
-	stdout, stderr, err = runA7WithEnv(env, "proto", "get", protoID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, "helloworld")
+	runA7JSON(t, env, &proto, "proto", "get", protoID, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, "e2e test proto", proto["desc"])
 
 	// Delete
 	stdout, stderr, err = runA7WithEnv(env, "proto", "delete", protoID, "--force", "-g", gatewayGroup)
 	require.NoError(t, err, stderr)
+	_, _, err = runA7WithEnv(env, "proto", "get", protoID, "-g", gatewayGroup)
+	assert.Error(t, err)
 }
 
 func TestProto_DeleteNonexistent(t *testing.T) {

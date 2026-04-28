@@ -85,9 +85,10 @@ func TestService_CRUD(t *testing.T) {
 	assert.Contains(t, stdout, svcID)
 
 	// Get JSON
-	stdout, stderr, err = runA7WithEnv(env, "service", "get", svcID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, svcID)
+	var service map[string]interface{}
+	runA7JSON(t, env, &service, "service", "get", svcID, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, svcID, service["id"])
+	assert.Equal(t, "e2e-svc-"+svcID, service["name"])
 
 	// Update
 	updateJSON := fmt.Sprintf(`{
@@ -105,13 +106,14 @@ func TestService_CRUD(t *testing.T) {
 	require.NoError(t, err, stderr)
 
 	// Verify update
-	stdout, stderr, err = runA7WithEnv(env, "service", "get", svcID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, "e2e-svc-updated")
+	runA7JSON(t, env, &service, "service", "get", svcID, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, "e2e-svc-updated", service["name"])
 
 	// Delete
 	stdout, stderr, err = runA7WithEnv(env, "service", "delete", svcID, "--force", "-g", gatewayGroup)
 	require.NoError(t, err, stderr)
+	_, _, err = runA7WithEnv(env, "service", "get", svcID, "-g", gatewayGroup)
+	assert.Error(t, err)
 }
 
 func TestService_Export(t *testing.T) {
@@ -122,9 +124,9 @@ func TestService_Export(t *testing.T) {
 	createTestServiceViaCLI(t, env, svcID)
 
 	// export is batch-only (cobra.NoArgs); use "get -o json" for single-resource export.
-	stdout, stderr, err := runA7WithEnv(env, "service", "get", svcID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, svcID)
+	var service map[string]interface{}
+	runA7JSON(t, env, &service, "service", "get", svcID, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, svcID, service["id"])
 }
 
 func TestService_WithPlugins(t *testing.T) {
@@ -152,9 +154,10 @@ func TestService_WithPlugins(t *testing.T) {
 	_, stderr, err := runA7WithEnv(env, "service", "create", "-f", tmpFile, "-g", gatewayGroup)
 	require.NoError(t, err, stderr)
 
-	stdout, stderr, err := runA7WithEnv(env, "service", "get", svcID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, "proxy-rewrite")
+	var service map[string]interface{}
+	runA7JSON(t, env, &service, "service", "get", svcID, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, svcID, service["id"])
+	assert.Contains(t, fmt.Sprint(service["plugins"]), "proxy-rewrite")
 }
 
 func TestService_RouteWithServiceID(t *testing.T) {
@@ -180,7 +183,8 @@ func TestService_RouteWithServiceID(t *testing.T) {
 	_, stderr, err := runA7WithEnv(env, "route", "create", "-f", tmpFile, "-g", gatewayGroup)
 	require.NoError(t, err, stderr)
 
-	stdout, stderr, err := runA7WithEnv(env, "route", "get", routeID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, svcID)
+	var route map[string]interface{}
+	runA7JSON(t, env, &route, "route", "get", routeID, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, routeID, route["id"])
+	assert.Equal(t, svcID, route["service_id"])
 }

@@ -3,7 +3,6 @@
 package e2e
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -91,9 +90,11 @@ func TestRoute_CRUD(t *testing.T) {
 	assert.Contains(t, stdout, routeID)
 
 	// Get JSON
-	stdout, stderr, err = runA7WithEnv(env, "route", "get", routeID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, routeID)
+	var route map[string]interface{}
+	runA7JSON(t, env, &route, "route", "get", routeID, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, routeID, route["id"])
+	assert.Equal(t, "e2e-route-crud", route["name"])
+	assert.Equal(t, svcID, route["service_id"])
 
 	// Update via file
 	updateJSON := fmt.Sprintf(`{
@@ -109,13 +110,16 @@ func TestRoute_CRUD(t *testing.T) {
 	require.NoError(t, err, stderr)
 
 	// Verify update
-	stdout, stderr, err = runA7WithEnv(env, "route", "get", routeID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, "/test-updated")
+	runA7JSON(t, env, &route, "route", "get", routeID, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, "e2e-route-crud-updated", route["name"])
+	assert.Equal(t, svcID, route["service_id"])
+	assert.Contains(t, fmt.Sprint(route["paths"]), "/test-updated")
 
 	// Delete
 	stdout, stderr, err = runA7WithEnv(env, "route", "delete", routeID, "--force", "-g", gatewayGroup)
 	require.NoError(t, err, stderr)
+	_, _, err = runA7WithEnv(env, "route", "get", routeID, "-g", gatewayGroup)
+	assert.Error(t, err)
 }
 
 func TestRoute_CreateWithFlags(t *testing.T) {
@@ -145,9 +149,15 @@ func TestRoute_CreateWithFlags(t *testing.T) {
 	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
 
 	// Verify
-	stdout, stderr, err = runA7WithEnv(env, "route", "get", routeID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, "flagged-route")
+	var route map[string]interface{}
+	runA7JSON(t, env, &route, "route", "get", routeID, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, routeID, route["id"])
+	assert.Equal(t, "flagged-route", route["name"])
+	assert.Equal(t, svcID, route["service_id"])
+	assert.Equal(t, "test.example.com", route["host"])
+	assert.Contains(t, fmt.Sprint(route["methods"]), "GET")
+	assert.Contains(t, fmt.Sprint(route["labels"]), "env")
+	assert.Contains(t, fmt.Sprint(route["labels"]), "team")
 }
 
 func TestRoute_CreateWithPlugins(t *testing.T) {
@@ -179,9 +189,11 @@ func TestRoute_CreateWithPlugins(t *testing.T) {
 	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
 
 	// Verify plugin
-	stdout, stderr, err = runA7WithEnv(env, "route", "get", routeID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, "proxy-rewrite")
+	var route map[string]interface{}
+	runA7JSON(t, env, &route, "route", "get", routeID, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, routeID, route["id"])
+	assert.Equal(t, svcID, route["service_id"])
+	assert.Contains(t, fmt.Sprint(route["plugins"]), "proxy-rewrite")
 }
 
 func TestRoute_Export(t *testing.T) {
@@ -207,11 +219,9 @@ func TestRoute_Export(t *testing.T) {
 	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
 
 	// Use 'get -o json' to export a single route (export is batch, no positional ID).
-	stdout, stderr, err = runA7WithEnv(env, "route", "get", routeID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
-
 	var exported map[string]interface{}
-	require.NoError(t, json.Unmarshal([]byte(stdout), &exported), "should be valid JSON")
+	runA7JSON(t, env, &exported, "route", "get", routeID, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, routeID, exported["id"])
 }
 
 func TestRoute_ExportYAML(t *testing.T) {

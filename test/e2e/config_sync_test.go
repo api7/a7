@@ -3,7 +3,6 @@
 package e2e
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -172,13 +171,19 @@ routes:
 	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
 	assert.Contains(t, stdout, "Sync completed")
 
-	stdout, stderr, err = runA7WithEnv(env, "route", "get", routeID, "-g", gatewayGroup, "-o", "json")
-	require.NoError(t, err, stderr)
 	var route map[string]interface{}
-	require.NoError(t, json.Unmarshal([]byte(stdout), &route))
+	runA7JSON(t, env, &route, "route", "get", routeID, "-g", gatewayGroup, "-o", "json")
 	assert.Equal(t, routeID, route["id"])
 	assert.Equal(t, routeID, route["name"])
 	assert.Equal(t, svcID, route["service_id"])
+
+	dumpFile := filepath.Join(t.TempDir(), "sync-create-dump.yaml")
+	_, stderr, err = runA7WithEnv(env, "config", "dump", "-g", gatewayGroup, "-f", dumpFile)
+	require.NoError(t, err, stderr)
+	dumped, err := os.ReadFile(dumpFile)
+	require.NoError(t, err)
+	assert.Contains(t, string(dumped), routeID)
+	assert.Contains(t, string(dumped), svcID)
 }
 
 func TestConfigSync_DeleteFalse(t *testing.T) {

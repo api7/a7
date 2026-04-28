@@ -117,9 +117,10 @@ func TestServiceTemplate_CRUD(t *testing.T) {
 	assert.Contains(t, stdout, stName)
 
 	// Get JSON
-	stdout, stderr, err = runA7WithEnv(env, "service-template", "get", stID, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, stName)
+	var template map[string]interface{}
+	runA7JSON(t, env, &template, "service-template", "get", stID, "-o", "json")
+	assert.Equal(t, stID, fmt.Sprint(template["id"]))
+	assert.Equal(t, stName, template["name"])
 
 	// Update via file
 	updateJSON := `{
@@ -139,13 +140,15 @@ func TestServiceTemplate_CRUD(t *testing.T) {
 	require.NoError(t, err, stderr)
 
 	// Verify update
-	stdout, stderr, err = runA7WithEnv(env, "service-template", "get", stID, "-o", "json")
-	require.NoError(t, err, stderr)
-	assert.Contains(t, stdout, "e2e-template-updated")
+	runA7JSON(t, env, &template, "service-template", "get", stID, "-o", "json")
+	assert.Equal(t, "e2e-template-updated", template["name"])
+	assert.Equal(t, "Updated by e2e tests", template["description"])
 
 	// Delete
 	stdout, stderr, err = runA7WithEnv(env, "service-template", "delete", stID, "--force")
 	require.NoError(t, err, stderr)
+	_, _, err = runA7WithEnv(env, "service-template", "get", stID)
+	assert.Error(t, err)
 }
 
 func TestServiceTemplate_CreateWithName(t *testing.T) {

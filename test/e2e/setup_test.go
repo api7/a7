@@ -179,6 +179,16 @@ func runA7WithEnv(env []string, args ...string) (string, string, error) {
 	return stdout.String(), stderr.String(), err
 }
 
+// runA7JSON executes a7 and decodes stdout as JSON. Callers should pass
+// command arguments that already request JSON output, usually with "-o json".
+func runA7JSON(t testTB, env []string, out interface{}, args ...string) string {
+	t.Helper()
+	stdout, stderr, err := runA7WithEnv(env, args...)
+	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+	require.NoError(t, json.Unmarshal([]byte(stdout), out), "stdout=%s", stdout)
+	return stdout
+}
+
 // adminAPI sends an HTTP request to the API7 EE Dashboard API.
 // Used for test setup and cleanup — not for testing the CLI itself.
 // Uses insecureClient because API7 EE typically uses self-signed certs.
