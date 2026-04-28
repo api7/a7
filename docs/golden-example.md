@@ -191,21 +191,21 @@ Matching the API7 EE Runtime Admin API route schema.
 package api
 
 type Route struct {
-	ID         string                 `json:"id"` // IDs are string in API7 EE
-	Name       string                 `json:"name"`
-	Desc       *string                `json:"desc,omitempty"`
+	ID         string                 `json:"id,omitempty"`
+	Name       string                 `json:"name,omitempty"`
+	Desc       string                 `json:"desc,omitempty"`
+	URI        string                 `json:"uri,omitempty"`
 	URIs       []string               `json:"uris,omitempty"`
+	Paths      []string               `json:"paths,omitempty"`
 	Methods    []string               `json:"methods,omitempty"`
-	Host       *string                `json:"host,omitempty"`
+	Host       string                 `json:"host,omitempty"`
 	Hosts      []string               `json:"hosts,omitempty"`
-	Priority   int                    `json:"priority"`
-	Status     int                    `json:"status"`
+	ServiceID  string                 `json:"service_id,omitempty"`
+	Upstream   map[string]interface{} `json:"upstream,omitempty"`
 	Plugins    map[string]interface{} `json:"plugins,omitempty"`
-	UpstreamID *string                `json:"upstream_id,omitempty"`
-	ServiceID  *string                `json:"service_id,omitempty"`
 	Labels     map[string]string      `json:"labels,omitempty"`
-	CreateTime int64                  `json:"create_time"`
-	UpdateTime int64                  `json:"update_time"`
+	Status     int                    `json:"status,omitempty"`
+	Priority   int                    `json:"priority,omitempty"`
 }
 ```
 
@@ -511,10 +511,10 @@ func JSONResponse(path string) Response {
     {
       "id": "1",
       "name": "users-api",
-      "uris": ["/api/v1/users"],
+      "paths": ["/api/v1/users"],
       "methods": ["GET", "POST"],
       "status": 1,
-      "upstream_id": "u1"
+      "service_id": "svc-users"
     }
   ]
 }

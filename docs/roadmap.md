@@ -74,9 +74,9 @@ This document defines the per-PR development plan for the a7 CLI (API7 Enterpris
 - **Commands**: `a7 token create|list`, `a7 user/role/policy`
 - **Focus**: Managing CLI access tokens and platform permissions.
 
-### PR-36: Portal & Custom Plugins
-- **Commands**: `a7 portal`, `a7 custom-plugin`
-- **Focus**: Developer portal configuration and custom Lua plugin management.
+### PR-36: Custom Plugin Extensions
+- **Commands**: `a7 custom-plugin` (future)
+- **Focus**: Custom Lua plugin management when exposed by supported API7 EE APIs.
 
 ---
 
@@ -92,6 +92,6 @@ This document defines the per-PR development plan for the a7 CLI (API7 Enterpris
 | 8 | PR-33 | E2E Test Infra | Smoke tests |
 | 8 | PR-34 | Resource CRUD E2E | Lifecycle validation |
 | 9 | PR-35 | Token & RBAC | Multi-user E2E |
-| 9 | PR-36 | Portal & Extensions | Feature-specific E2E |
+| 9 | PR-36 | Custom Plugin Extensions | Feature-specific E2E |
 
 **Total**: 9 PRs to reach production readiness.

@@ -66,30 +66,53 @@ a7 gateway-group list
 
 If the connection is successful, you will see a list of gateway groups.
 
-## Your First Route
+## Your First Service and Route
 
-Once you have a working context, you can start managing routes within a gateway group.
+Once you have a working context, create a service for the backend and then
+create a route that references that service.
 
-### 1. Create a Route Configuration
+### 1. Create a Service Configuration
 
-Create a file named `route.json` with the following content:
+Create a file named `service.json` with the following content:
+
+```json
+{
+  "id": "getting-started-service",
+  "name": "getting-started-service",
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": [
+      {
+        "host": "httpbin.org",
+        "port": 80,
+        "weight": 1
+      }
+    ]
+  }
+}
+```
+
+### 2. Apply the Service
+
+```bash
+a7 service create -g default -f service.json
+```
+
+### 3. Create a Route Configuration
+
+Create a file named `route.json`:
 
 ```json
 {
   "id": "getting-started",
   "name": "getting-started-route",
-  "uri": "/get",
+  "paths": ["/get"],
   "methods": ["GET"],
-  "upstream": {
-    "type": "roundrobin",
-    "nodes": {
-      "httpbin.org:80": 1
-    }
-  }
+  "service_id": "getting-started-service"
 }
 ```
 
-### 2. Apply the Route
+### 4. Apply the Route
 
 Use the `route create` command to send this configuration to API7 EE. Note that `--gateway-group` (or `-g`) is required for runtime resource commands if not set in the current context.
 
@@ -97,12 +120,12 @@ Use the `route create` command to send this configuration to API7 EE. Note that 
 a7 route create -g default -f route.json
 ```
 
-### 3. Verify the Route
+### 5. Verify the Route
 
 List your routes to see the new entry:
 
 ```bash
-a7 route list -g default
+a7 route list -g default --service-id getting-started-service
 ```
 
 You can also get the full details of the route you just created:
@@ -111,7 +134,7 @@ You can also get the full details of the route you just created:
 a7 route get getting-started -g default
 ```
 
-### 4. Test the Route
+### 6. Test the Route
 
 Assuming your API7 gateway is running and listening for data plane traffic (default port 9443), you can test the route with `curl`:
 
@@ -119,12 +142,13 @@ Assuming your API7 gateway is running and listening for data plane traffic (defa
 curl -ik https://localhost:9443/get
 ```
 
-### 5. Clean Up
+### 7. Clean Up
 
-When you are done, you can delete the route:
+When you are done, delete the route and service:
 
 ```bash
 a7 route delete getting-started -g default --force
+a7 service delete getting-started-service -g default --force
 ```
 
 ## Interactive Mode
@@ -195,8 +219,8 @@ You can delete or export multiple resources with one command.
 # Delete all routes in the current gateway group
 a7 route delete --all --force -g default
 
-# Export upstreams by label as JSON
-a7 upstream export --label team=platform --output json -g default
+# Export services by label as JSON
+a7 service export --label team=platform --output json -g default
 ```
 
 ## What's Next

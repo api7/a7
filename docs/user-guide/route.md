@@ -8,28 +8,27 @@ The `a7 route` command allows you to manage API7 Enterprise Edition (API7 EE) ro
 
 ### `a7 route list`
 
-Lists all routes in the specified gateway group.
+Lists routes in the specified gateway group. In current API7 EE environments,
+routes are scoped by service, so prefer passing `--service-id` when listing
+routes for a known service.
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--gateway-group` | `-g` | | Target gateway group name (required) |
-| `--page` | | `1` | Page number for pagination |
-| `--page-size` | | `20` | Number of items per page |
-| `--name` | | | Filter routes by name |
 | `--label` | | | Filter routes by label |
-| `--uri` | | | Filter routes by URI |
+| `--service-id` | | | Filter routes by service ID |
 | `--output` | `-o` | `table` | Output format (table, json, yaml) |
 
 **Examples:**
 
-List all routes in the "default" gateway group:
+List routes for a service in the "default" gateway group:
 ```bash
-a7 route list -g default
+a7 route list -g default --service-id example-service
 ```
 
-Filter routes by label:
+Filter routes by label within a service:
 ```bash
-a7 route list -g default --label env=prod
+a7 route list -g default --service-id example-service --label env=prod
 ```
 
 ### `a7 route get <id>`
@@ -60,6 +59,11 @@ Creates a new route from a JSON or YAML file.
 
 **Examples:**
 
+Create a service first:
+```bash
+a7 service create -g default -f service.json
+```
+
 Create a route from a JSON file:
 ```bash
 a7 route create -g default -f route.json
@@ -70,14 +74,9 @@ a7 route create -g default -f route.json
 {
   "id": "getting-started",
   "name": "example-route",
-  "uri": "/get",
+  "paths": ["/get"],
   "methods": ["GET"],
-  "upstream": {
-    "type": "roundrobin",
-    "nodes": {
-      "httpbin.org:80": 1
-    }
-  }
+  "service_id": "example-service"
 }
 ```
 
@@ -146,10 +145,11 @@ Key fields in the route configuration (sent to `/apisix/admin/routes`):
 |-------|------|-------------|
 | `id` | string | Unique identifier for the route |
 | `name` | string | Human-readable name for the route |
-| `uri` | string | The URI pattern to match |
+| `paths` | array | Path patterns to match |
+| `uri` | string | Legacy URI pattern accepted by some APISIX-compatible payloads |
 | `methods` | array | HTTP methods allowed (e.g., ["GET", "POST"]) |
 | `upstream` | object | Inline upstream configuration |
-| `upstream_id` | string | Reference to an existing upstream ID |
+| `service_id` | string | Reference to the service that owns the upstream configuration |
 | `status` | integer | Route status (1 for enabled, 0 for disabled) |
 | `plugins` | object | Plugin configurations for the route |
 | `labels` | object | Key-value pairs for filtering and organization |
@@ -160,18 +160,13 @@ Key fields in the route configuration (sent to `/apisix/admin/routes`):
 
 ```json
 {
-  "uri": "/api/v1/*",
+  "paths": ["/api/v1/*"],
   "name": "api-v1-route",
+  "service_id": "billing-service",
   "methods": ["GET", "POST"],
   "labels": {
     "env": "production",
     "team": "billing"
-  },
-  "upstream": {
-    "type": "roundrobin",
-    "nodes": {
-      "billing.internal:8080": 1
-    }
   }
 }
 ```
