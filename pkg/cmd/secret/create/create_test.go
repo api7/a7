@@ -102,6 +102,31 @@ func TestCreateSecret_FileUsesPositionalID(t *testing.T) {
 	registry.Verify(t)
 }
 
+func TestCreateSecret_FileRequiresID(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	registry := &httpmock.Registry{}
+
+	file := filepath.Join(t.TempDir(), "secret.json")
+	if err := os.WriteFile(file, []byte(`{"uri":"http://vault","prefix":"kv","token":"tok"}`), 0644); err != nil {
+		t.Fatalf("failed to write temp file: %v", err)
+	}
+
+	err := actionRun(&Options{
+		IO:     ios,
+		Client: func() (*http.Client, error) { return registry.GetClient(), nil },
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
+		},
+		GatewayGroup: "gg1",
+		File:         file,
+	})
+	if err == nil || err.Error() != "secret provider id is required; use a positional arg or --id" {
+		t.Fatalf("expected --id required error, got: %v", err)
+	}
+
+	registry.Verify(t)
+}
+
 func TestCreateSecret_RequiresID(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
 	registry := &httpmock.Registry{}

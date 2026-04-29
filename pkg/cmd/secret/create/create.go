@@ -81,6 +81,8 @@ func actionRun(opts *Options) error {
 		}
 		if opts.ID != "" {
 			payload["id"] = opts.ID
+		} else if id, ok := payload["id"]; !ok || id == nil || fmt.Sprint(id) == "" {
+			return fmt.Errorf("secret provider id is required; use a positional arg or --id")
 		}
 
 		httpClient, err := opts.Client()
