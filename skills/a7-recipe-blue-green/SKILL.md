@@ -172,7 +172,6 @@ EOF
 
 ```yaml
 version: "1"
-gateway_group: default
 services:
   - id: blue-service
     name: blue-service
@@ -244,7 +243,7 @@ fi
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | 502 after switch | New environment not ready | Test health endpoint before switching; roll back if needed |
-| Traffic still going to old env | Route update has not propagated yet | Verify with `a7 route get api -o json` and retry after propagation |
+| Traffic still going to old env | Route update has not propagated yet | Verify with `a7 route get api --gateway-group "$GROUP" -o json` and retry after propagation |
 | Cannot roll back | Previous service ID was not recorded | Record `service_id` before switching |
 | Command failed with 401 | Invalid token | Refresh your token using `a7 context create` |
 | Service not found | Different gateway group | Ensure `--gateway-group` matches where services and routes were created |

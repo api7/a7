@@ -261,7 +261,6 @@ done
 
 ```yaml
 version: "1"
-gateway_group: default
 services:
   - id: stable-service
     name: stable-service
@@ -302,8 +301,8 @@ routes:
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | Traffic ratio is not exact | Weighted routing is probabilistic | Measure over enough requests |
-| Canary not receiving traffic | Match condition never true | Check header/cookie name and `a7 route get` output |
-| Rollback not instant | Config has not propagated yet | Verify with `a7 route get` and retry after propagation |
+| Canary not receiving traffic | Match condition never true | Check header/cookie name and `a7 route get api --gateway-group default` output |
+| Rollback not instant | Config has not propagated yet | Verify with `a7 route get api --gateway-group default` and retry after propagation |
 | 502 from canary | Canary backend is unhealthy | Check canary service health before increasing weight |
-| Weight changes have no effect | Editing wrong route | Verify route ID with `a7 route list --service-id stable-service` |
+| Weight changes have no effect | Editing wrong route | Verify route ID with `a7 route list --gateway-group default --service-id stable-service` |
 | Command failed with 403 | RBAC permission issue | Ensure your token can modify routes in the gateway group |

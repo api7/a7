@@ -194,7 +194,6 @@ EOF
 
 ```yaml
 version: "1"
-gateway_group: production
 services:
   - id: service-v1
     name: Service V1
