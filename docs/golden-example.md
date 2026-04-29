@@ -361,10 +361,16 @@ func printTable(io *iostreams.IOStreams, routes []api.Route) error {
 	}
 
 	w := tabwriter.NewWriter(io.Out, 0, 0, 3, ' ', 0)
-	fmt.Fprintln(w, "ID\tNAME\tURIS\tSTATUS\tSERVICE_ID\tUPSTREAM_ID")
-	
+	fmt.Fprintln(w, "ID\tNAME\tPATHS\tSTATUS\tSERVICE_ID\tUPSTREAM_ID")
+
 	for _, r := range routes {
-		uris := strings.Join(r.URIs, ",")
+		paths := strings.Join(r.Paths, ",")
+		if paths == "" {
+			paths = r.URI
+		}
+		if paths == "" {
+			paths = strings.Join(r.URIs, ",")
+		}
 		status := fmt.Sprintf("%d", r.Status)
 		service := r.ServiceID
 		if service == "" {
@@ -375,7 +381,7 @@ func printTable(io *iostreams.IOStreams, routes []api.Route) error {
 			upstream = "N/A"
 		}
 
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", r.ID, r.Name, uris, status, service, upstream)
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", r.ID, r.Name, paths, status, service, upstream)
 	}
 	return w.Flush()
 }

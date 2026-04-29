@@ -8,9 +8,9 @@ The `a7 route` command allows you to manage API7 Enterprise Edition (API7 EE) ro
 
 ### `a7 route list`
 
-Lists routes in the specified gateway group. In current API7 EE environments,
-routes are scoped by service, so prefer passing `--service-id` when listing
-routes for a known service.
+Lists routes in the specified gateway group. API7 EE may require
+`--service-id` to list routes; omit it only if your environment supports
+unscoped route listing.
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
