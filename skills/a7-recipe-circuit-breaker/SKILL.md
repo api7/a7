@@ -101,6 +101,9 @@ after enough healthy responses.
 ```bash
 a7 route update protected-api --gateway-group default -f - <<'EOF'
 {
+  "id": "protected-api",
+  "name": "protected-api",
+  "paths": ["/api/*"],
   "service_id": "backend-service",
   "plugins": {
     "api-breaker": {
@@ -181,7 +184,6 @@ EOF
 
 ```yaml
 version: "1"
-gateway_group: default
 services:
   - id: backend-service
     name: backend-service

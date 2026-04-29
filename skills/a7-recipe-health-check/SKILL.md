@@ -106,8 +106,8 @@ a7 route create --gateway-group default -f - <<'EOF'
 EOF
 ```
 
-Health checks run for upstream nodes that are reachable through active
-configuration. Verify route wiring with:
+Health checks run only for services that are referenced by at least one route.
+Verify route wiring with:
 
 ```bash
 a7 service get backend-service --gateway-group default --output json
@@ -142,6 +142,19 @@ a7 service create --gateway-group default -f - <<'EOF'
       }
     }
   }
+}
+EOF
+```
+
+Attach the passive-check service to a route before sending traffic through it:
+
+```bash
+a7 route create --gateway-group default -f - <<'EOF'
+{
+  "id": "api-passive",
+  "name": "api-passive",
+  "paths": ["/api-passive/*"],
+  "service_id": "backend-passive-service"
 }
 EOF
 ```
@@ -197,11 +210,23 @@ a7 service create --gateway-group default -f - <<'EOF'
 EOF
 ```
 
+Attach or update a route to reference the combined-check service:
+
+```bash
+a7 route create --gateway-group default -f - <<'EOF'
+{
+  "id": "api-production",
+  "name": "api-production",
+  "paths": ["/api-production/*"],
+  "service_id": "production-backend-service"
+}
+EOF
+```
+
 ## Config Sync
 
 ```yaml
 version: "1"
-gateway_group: default
 services:
   - id: production-backend-service
     name: production-backend-service
@@ -251,11 +276,11 @@ routes:
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| Health checks not running | Route does not reference the service | Verify with `a7 route list --service-id <service>` |
+| Health checks not running | Route does not reference the service | Verify with `a7 route list --gateway-group default --service-id <service>` |
 | All nodes marked unhealthy | Health endpoint returns unexpected status | Verify `http_statuses` includes the response code |
 | Node not recovering | Passive-only checks have no traffic to observe | Add active health checks |
 | Probe hits wrong endpoint | Default `http_path` is `/` | Set `http_path` to the real health endpoint |
 | TLS probe fails | Certificate verification fails | Set `https_verify_certificate: false` or fix certificates |
-| No standalone health command | Current a7 does not expose upstream health status | Verify config with `a7 service get` and use gateway observability |
+| No standalone health command | Current a7 does not expose upstream health status | Verify config with `a7 service get --gateway-group default` and use gateway observability |
 | Command failed with 401 | Invalid token | Refresh your token using `a7 context create` |
 | Service not found | Different gateway group | Ensure `--gateway-group` matches where the service was created |
