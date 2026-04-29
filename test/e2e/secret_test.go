@@ -75,7 +75,7 @@ func TestSecret_CRUD(t *testing.T) {
 	// Get JSON
 	var secret map[string]interface{}
 	runA7JSON(t, env, &secret, "secret", "get", secretID, "-g", gatewayGroup, "-o", "json")
-	assert.Equal(t, secretID, secret["id"])
+	assert.Equal(t, "e2e-secret-crud", secret["id"])
 	assert.Equal(t, "https://vault.example.com", secret["uri"])
 	assert.Equal(t, "kv/apisix", secret["prefix"])
 
