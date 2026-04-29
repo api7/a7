@@ -116,14 +116,15 @@ func isConfigDiffResult(stdout, stderr string) bool {
 func TestConfigSync_DryRun(t *testing.T) {
 	env := setupEnv(t)
 
-	svcID := "e2e-sync-dryrun-svc"
+	svcID := uniqueResourceID("e2e-sync-dryrun-svc")
+	routeID := uniqueResourceID("e2e-sync-dryrun-route")
 	createTestServiceViaCLI(t, env, svcID)
 	t.Cleanup(func() { deleteServiceViaAdmin(t, svcID) })
 
 	syncYAML := fmt.Sprintf(`version: "1"
 routes:
-  - id: e2e-sync-dryrun-route
-    name: e2e-sync-dryrun-route
+  - id: %s
+    name: %s
     service_id: %s
     paths:
       - /sync-dryrun
@@ -133,21 +134,21 @@ routes:
         - host: "127.0.0.1"
           port: 8080
           weight: 1
-`, svcID)
+`, routeID, routeID, svcID)
 	tmpFile := filepath.Join(t.TempDir(), "sync-dryrun.yaml")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(syncYAML), 0644))
 
 	stdout, stderr, err := runA7WithEnv(env, "config", "sync", "-f", tmpFile, "--dry-run", "-g", gatewayGroup)
 	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
 
-	_, _, getErr := runA7WithEnv(env, "route", "get", "e2e-sync-dryrun-route", "-g", gatewayGroup)
+	_, _, getErr := runA7WithEnv(env, "route", "get", routeID, "-g", gatewayGroup)
 	assert.Error(t, getErr, "dry-run should not create resources")
 }
 
 func TestConfigSync_CreateAndCleanup(t *testing.T) {
 	env := setupEnv(t)
-	svcID := "e2e-sync-create-svc"
-	routeID := "e2e-sync-create-route"
+	svcID := uniqueResourceID("e2e-sync-create-svc")
+	routeID := uniqueResourceID("e2e-sync-create-route")
 	createTestServiceViaCLI(t, env, svcID)
 	t.Cleanup(func() {
 		deleteRouteViaAdmin(t, routeID)
@@ -197,8 +198,8 @@ routes:
 
 func TestConfigSync_DeleteFalse(t *testing.T) {
 	env := setupEnv(t)
-	svcID := "e2e-sync-nodelete-svc"
-	routeID := "e2e-sync-nodelete-route"
+	svcID := uniqueResourceID("e2e-sync-nodelete-svc")
+	routeID := uniqueResourceID("e2e-sync-nodelete-route")
 	createTestServiceViaCLI(t, env, svcID)
 	t.Cleanup(func() {
 		deleteRouteViaAdmin(t, routeID)
@@ -222,8 +223,8 @@ func TestConfigSync_DeleteFalse(t *testing.T) {
 
 func TestConfigSync_FullRoundtrip(t *testing.T) {
 	env := setupEnv(t)
-	svcID := "e2e-sync-roundtrip-svc"
-	routeID := "e2e-sync-roundtrip-route"
+	svcID := uniqueResourceID("e2e-sync-roundtrip-svc")
+	routeID := uniqueResourceID("e2e-sync-roundtrip-route")
 	createTestServiceViaCLI(t, env, svcID)
 	t.Cleanup(func() {
 		deleteRouteViaAdmin(t, routeID)
