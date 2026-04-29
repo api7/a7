@@ -18,6 +18,7 @@ metadata:
     - a7 route get
     - a7 consumer create
     - a7 credential create
+    - a7 config sync
 ---
 
 # a7-recipe-graphql-proxy

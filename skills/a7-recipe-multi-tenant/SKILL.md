@@ -12,14 +12,17 @@ metadata:
   apisix_version: ">=3.0.0"
   a7_commands:
     - a7 gateway-group create
+    - a7 global-rule create
     - a7 consumer-group create
+    - a7 consumer-group list
     - a7 consumer create
+    - a7 consumer list
     - a7 credential create
     - a7 service create
+    - a7 service get
     - a7 route create
     - a7 route get
     - a7 config sync
-    - a7 config dump
 ---
 
 # a7-recipe-multi-tenant
@@ -52,6 +55,7 @@ Gateway groups are the primary isolation boundary.
 ```bash
 a7 gateway-group create premium-tier --desc "High-performance tier for paid customers"
 a7 gateway-group create standard-tier --desc "Standard tier for free and trial users"
+a7 gateway-group create platform --desc "Shared platform gateway group for tenant consumers and routes"
 ```
 
 Each group can have its own global policies:
