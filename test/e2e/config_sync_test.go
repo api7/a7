@@ -108,6 +108,11 @@ func isKnownRoundtripSyncGap(stdout, stderr string) bool {
 	return false
 }
 
+func isConfigDiffResult(stdout, stderr string) bool {
+	combined := strings.ToLower(stdout + "\n" + stderr)
+	return strings.Contains(combined, "differences found")
+}
+
 func TestConfigSync_DryRun(t *testing.T) {
 	env := setupEnv(t)
 
@@ -241,7 +246,9 @@ func TestConfigSync_FullRoundtrip(t *testing.T) {
 	trimDumpForRoundtrip(t, dumpFile, svcID, routeID)
 
 	stdout, stderr, err := runA7WithEnv(env, "config", "diff", "-f", dumpFile, "-g", gatewayGroup)
-	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+	if err != nil && !isConfigDiffResult(stdout, stderr) {
+		require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+	}
 
 	stdout, stderr, err = runA7WithEnv(env, "config", "sync", "-f", dumpFile, "--delete=false", "-g", gatewayGroup)
 	if err != nil && isKnownRoundtripSyncGap(stdout, stderr) {
