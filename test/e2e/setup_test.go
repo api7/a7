@@ -30,6 +30,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -53,6 +54,8 @@ var (
 		},
 		Timeout: 30 * time.Second,
 	}
+
+	e2eResourceCounter uint64
 )
 
 func commandTimeout(args []string) time.Duration {
@@ -292,16 +295,21 @@ func setupEnv(t testTB) []string {
 	env := []string{
 		"A7_CONFIG_DIR=" + t.TempDir(),
 	}
-	_, _, err := runA7WithEnv(env, "context", "create", "test",
+	stdout, stderr, err := runA7WithEnv(env, "context", "create", "test",
 		"--server", adminURL,
 		"--token", adminToken,
 		"--gateway-group", gatewayGroup,
 		"--tls-skip-verify",
+		"--skip-validation",
 	)
 	if err != nil {
-		t.Fatalf("failed to create test context: %v", err)
+		t.Fatalf("failed to create test context: %v stdout=%s stderr=%s", err, stdout, stderr)
 	}
 	return env
+}
+
+func uniqueResourceID(prefix string) string {
+	return fmt.Sprintf("%s-%x-%x-%x", prefix, time.Now().UnixNano(), os.Getpid(), atomic.AddUint64(&e2eResourceCounter, 1))
 }
 
 // envOrDefault returns the value of the environment variable named by key,
