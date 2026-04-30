@@ -79,6 +79,23 @@ func actionRun(opts *Options) error {
 		if err != nil {
 			return err
 		}
+		if opts.ID != "" {
+			id := strings.TrimSpace(opts.ID)
+			if id == "" {
+				return fmt.Errorf("secret provider id is required; use a positional arg or --id")
+			}
+			payload["id"] = id
+		} else {
+			id, ok := payload["id"]
+			if !ok || id == nil {
+				return fmt.Errorf("secret provider id is required; use a positional arg or --id")
+			}
+			trimmedID := strings.TrimSpace(fmt.Sprint(id))
+			if trimmedID == "" {
+				return fmt.Errorf("secret provider id is required; use a positional arg or --id")
+			}
+			payload["id"] = trimmedID
+		}
 
 		httpClient, err := opts.Client()
 		if err != nil {

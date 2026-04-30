@@ -3,6 +3,8 @@ package create
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/api7/a7/internal/config"
@@ -59,6 +61,92 @@ func TestCreateSecret_JSON(t *testing.T) {
 	}
 	if item.ID != "vault/s1" || item.URI != "http://vault" {
 		t.Fatalf("unexpected item: %+v", item)
+	}
+
+	registry.Verify(t)
+}
+
+func TestCreateSecret_FileUsesPositionalID(t *testing.T) {
+	ios, _, out, _ := iostreams.Test()
+	registry := &httpmock.Registry{}
+	registry.Register(http.MethodPut, "/apisix/admin/secret_providers/vault/s1", httpmock.JSONResponse(`{"id":"vault/s1","uri":"http://vault","prefix":"kv"}`))
+
+	file := filepath.Join(t.TempDir(), "secret.json")
+	if err := os.WriteFile(file, []byte(`{"uri":"http://vault","prefix":"kv","token":"tok"}`), 0644); err != nil {
+		t.Fatalf("failed to write temp file: %v", err)
+	}
+
+	opts := &Options{
+		IO:     ios,
+		Client: func() (*http.Client, error) { return registry.GetClient(), nil },
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
+		},
+		GatewayGroup: "gg1",
+		ID:           "vault/s1",
+		File:         file,
+	}
+
+	if err := actionRun(opts); err != nil {
+		t.Fatalf("actionRun failed: %v", err)
+	}
+
+	var item api.Secret
+	if err := json.Unmarshal(out.Bytes(), &item); err != nil {
+		t.Fatalf("failed to parse output: %v", err)
+	}
+	if item.ID != "vault/s1" {
+		t.Fatalf("expected positional id in output, got: %+v", item)
+	}
+
+	registry.Verify(t)
+}
+
+func TestCreateSecret_FileRequiresID(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	registry := &httpmock.Registry{}
+
+	file := filepath.Join(t.TempDir(), "secret.json")
+	if err := os.WriteFile(file, []byte(`{"uri":"http://vault","prefix":"kv","token":"tok"}`), 0644); err != nil {
+		t.Fatalf("failed to write temp file: %v", err)
+	}
+
+	err := actionRun(&Options{
+		IO:     ios,
+		Client: func() (*http.Client, error) { return registry.GetClient(), nil },
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
+		},
+		GatewayGroup: "gg1",
+		File:         file,
+	})
+	if err == nil || err.Error() != "secret provider id is required; use a positional arg or --id" {
+		t.Fatalf("expected --id required error, got: %v", err)
+	}
+
+	registry.Verify(t)
+}
+
+func TestCreateSecret_FileRejectsWhitespaceID(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	registry := &httpmock.Registry{}
+
+	file := filepath.Join(t.TempDir(), "secret.json")
+	if err := os.WriteFile(file, []byte(`{"id":"   ","uri":"http://vault","prefix":"kv","token":"tok"}`), 0644); err != nil {
+		t.Fatalf("failed to write temp file: %v", err)
+	}
+
+	err := actionRun(&Options{
+		IO:     ios,
+		Client: func() (*http.Client, error) { return registry.GetClient(), nil },
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
+		},
+		GatewayGroup: "gg1",
+		File:         file,
+	})
+	if err == nil || err.Error() != "secret provider id is required; use a positional arg or --id" {
+		t.Fatalf("expected --id required error, got: %v", err)
 	}
 
 	registry.Verify(t)
