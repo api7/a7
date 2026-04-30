@@ -2,9 +2,8 @@
 name: a7-recipe-blue-green
 description: >-
   Recipe skill for implementing blue-green deployments using the a7 CLI in API7 Enterprise Edition.
-  Covers creating two upstream environments, switching traffic instantly
-  via route updates or traffic-split plugin, rollback procedures, and
-  config sync workflows with gateway group scoping.
+  Covers creating two service-backed environments, switching traffic via route service_id updates,
+  rollback procedures, and config sync workflows with gateway group scoping.
 version: "1.0.0"
 author: API7.ai Contributors
 license: Apache-2.0
@@ -12,9 +11,10 @@ metadata:
   category: recipe
   apisix_version: ">=3.0.0"
   a7_commands:
-    - a7 upstream create
+    - a7 service create
     - a7 route create
     - a7 route update
+    - a7 route get
     - a7 config sync
     - a7 config diff
 ---
@@ -23,211 +23,216 @@ metadata:
 
 ## Overview
 
-Blue-green deployment runs two identical production environments (blue and
-green). At any time, only one serves live traffic. Deploy the new version to
-the idle environment, test it, then switch traffic instantly. If anything
-goes wrong, switch back.
+Blue-green deployment runs two identical production environments. Only one
+environment serves live traffic at a time. Deploy the new version to the idle
+environment, test it, then switch the route to the new service. If anything
+goes wrong, switch the route back.
 
-This recipe implements blue-green deployment using API7 Enterprise Edition (API7 EE) routes and upstreams
-managed by the a7 CLI.
+This recipe uses the current API7 EE service-backed route model:
 
-## When to Use
-
-- Zero-downtime deployments with instant rollback.
-- You have two identical environments that can be swapped.
-- You want to test the new version with internal traffic before switching.
-- You need an auditable, scriptable deployment process.
+1. Create one service for blue.
+2. Create one service for green.
+3. Point the route to the active service with `service_id`.
+4. Switch or roll back by updating the route's `service_id`.
 
 ## Prerequisites
 
 - API7 EE Control Plane and at least one Gateway Group.
 - a7 CLI configured with a valid token and server address.
+- Two deployable backend environments, such as blue and green.
 
-## Approach A: Upstream Swap (Simplest)
+## Approach A: Service Swap
 
-Switch traffic by updating the route's `upstream_id` to point at the other
-environment.
-
-### 1. Create both upstreams
+### 1. Create both services
 
 ```bash
-a7 upstream create --gateway-group default -f - <<'EOF'
+a7 service create --gateway-group default -f - <<'EOF'
 {
-  "id": "blue",
-  "type": "roundrobin",
-  "nodes": {
-    "blue-backend-1:8080": 1,
-    "blue-backend-2:8080": 1
+  "id": "blue-service",
+  "name": "blue-service",
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": [
+      {"host": "blue-backend-1", "port": 8080, "weight": 1},
+      {"host": "blue-backend-2", "port": 8080, "weight": 1}
+    ]
   }
 }
 EOF
 
-a7 upstream create --gateway-group default -f - <<'EOF'
+a7 service create --gateway-group default -f - <<'EOF'
 {
-  "id": "green",
-  "type": "roundrobin",
-  "nodes": {
-    "green-backend-1:8080": 1,
-    "green-backend-2:8080": 1
+  "id": "green-service",
+  "name": "green-service",
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": [
+      {"host": "green-backend-1", "port": 8080, "weight": 1},
+      {"host": "green-backend-2", "port": 8080, "weight": 1}
+    ]
   }
 }
 EOF
 ```
 
-### 2. Create route pointing to blue
+### 2. Create the route pointing to blue
 
 ```bash
 a7 route create --gateway-group default -f - <<'EOF'
 {
   "id": "api",
-  "uri": "/api/*",
-  "upstream_id": "blue"
+  "name": "api",
+  "paths": ["/api/*"],
+  "service_id": "blue-service"
 }
 EOF
 ```
 
-### 3. Deploy new version to green, test it
+### 3. Deploy and test green
 
-Deploy your new version to the green environment. Test internally using its direct IP/hostname.
+Deploy the new version to the green environment, then test it directly through
+its internal hostname or a temporary test route before switching production
+traffic.
 
 ### 4. Switch to green
 
 ```bash
 a7 route update api --gateway-group default -f - <<'EOF'
 {
-  "upstream_id": "green"
+  "service_id": "green-service"
 }
 EOF
 ```
 
-Traffic switches instantly across all gateways in the `default` gateway group. No downtime.
+Traffic switches across all gateways in the `default` gateway group after the
+configuration propagates.
 
-### 5. Rollback to blue (if needed)
+### 5. Roll back to blue
 
 ```bash
 a7 route update api --gateway-group default -f - <<'EOF'
 {
-  "upstream_id": "blue"
+  "service_id": "blue-service"
 }
 EOF
 ```
 
-## Approach B: Traffic-Split Plugin (Header-Based Testing)
+## Approach B: Header-Based Green Testing
 
-Use the `traffic-split` plugin to test the green environment with specific
-headers before full switch.
-
-### 1. Create route with traffic-split
+Use `traffic-split` for targeted green testing while the route defaults to blue.
+The route still uses `service_id` for the default backend; the plugin contains
+an inline upstream only for matched green requests.
 
 ```bash
-a7 route create --gateway-group default -f - <<'EOF'
+a7 route update api --gateway-group default -f - <<'EOF'
 {
-  "id": "api",
-  "uri": "/api/*",
+  "service_id": "blue-service",
   "plugins": {
     "traffic-split": {
       "rules": [
         {
           "match": [
-            {
-              "vars": [["http_x-env", "==", "green"]]
-            }
+            {"vars": [["http_x_env", "==", "green"]]}
           ],
           "weighted_upstreams": [
             {
-              "upstream_id": "green",
+              "upstream": {
+                "type": "roundrobin",
+                "nodes": {"green-backend-1:8080": 1}
+              },
               "weight": 1
             }
           ]
         }
       ]
     }
-  },
-  "upstream_id": "blue"
+  }
 }
 EOF
 ```
 
-### 2. Test green internally
+Test green with:
 
 ```bash
 curl -H "x-env: green" http://gateway:9080/api/health
 ```
 
-### 3. Full switch — remove traffic-split, swap upstream
+When ready, remove the plugin and switch the route to `green-service`:
 
 ```bash
 a7 route update api --gateway-group default -f - <<'EOF'
 {
   "plugins": {},
-  "upstream_id": "green"
+  "service_id": "green-service"
 }
 EOF
 ```
 
-## Approach C: Config Sync (Declarative)
-
-### config.yaml — Blue active
+## Config Sync
 
 ```yaml
 version: "1"
-gateway_group: default
-upstreams:
-  - id: blue
-    type: roundrobin
-    nodes:
-      "blue-backend-1:8080": 1
-      "blue-backend-2:8080": 1
-  - id: green
-    type: roundrobin
-    nodes:
-      "green-backend-1:8080": 1
-      "green-backend-2:8080": 1
+services:
+  - id: blue-service
+    name: blue-service
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: blue-backend-1
+          port: 8080
+          weight: 1
+        - host: blue-backend-2
+          port: 8080
+          weight: 1
+  - id: green-service
+    name: green-service
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: green-backend-1
+          port: 8080
+          weight: 1
+        - host: green-backend-2
+          port: 8080
+          weight: 1
 routes:
   - id: api
-    uri: /api/*
-    upstream_id: blue  # ← change to "green" to switch
+    name: api
+    paths:
+      - /api/*
+    service_id: blue-service # change to green-service to switch
 ```
 
-### Preview changes before switching
+Preview and apply:
 
 ```bash
-# Edit config.yaml: change upstream_id to "green"
 a7 config diff -f config.yaml
-```
-
-### Apply the switch
-
-```bash
 a7 config sync -f config.yaml
 ```
 
-## Deployment Script Example
+## Deployment Script
 
 ```bash
 #!/bin/bash
 set -euo pipefail
 
 GROUP="default"
-CURRENT=$(a7 route get api --gateway-group $GROUP -o json | jq -r '.upstream_id')
-TARGET=$([ "$CURRENT" = "blue" ] && echo "green" || echo "blue")
+ROUTE_ID="api"
+CURRENT=$(a7 route get "$ROUTE_ID" --gateway-group "$GROUP" -o json | jq -r '.service_id')
+TARGET=$([ "$CURRENT" = "blue-service" ] && echo "green-service" || echo "blue-service")
 
-echo "Current: $CURRENT → Switching to: $TARGET in group: $GROUP"
+echo "Current: $CURRENT; switching to: $TARGET"
 
-# Switch
-a7 route update api --gateway-group $GROUP -f - <<EOF
-{"upstream_id": "$TARGET"}
+a7 route update "$ROUTE_ID" --gateway-group "$GROUP" -f - <<EOF
+{"service_id": "$TARGET"}
 EOF
 
-echo "Switched to $TARGET. Verifying..."
-
-# Health check (assuming gateway IP is accessible)
 if curl -sf http://gateway:9080/api/health > /dev/null; then
-  echo "✅ $TARGET is healthy"
+  echo "$TARGET is healthy"
 else
-  echo "❌ $TARGET unhealthy, rolling back to $CURRENT"
-  a7 route update api --gateway-group $GROUP -f - <<EOF
-{"upstream_id": "$CURRENT"}
+  echo "$TARGET unhealthy; rolling back to $CURRENT"
+  a7 route update "$ROUTE_ID" --gateway-group "$GROUP" -f - <<EOF
+{"service_id": "$CURRENT"}
 EOF
   exit 1
 fi
@@ -237,9 +242,8 @@ fi
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| 502 after switch | New environment not ready | Test health endpoint before switching; rollback if needed |
-| Traffic still going to old env | Route cache or DNS | API7 EE routes update instantly — verify with `a7 route get` |
-| Can't rollback | Lost track of previous upstream | Always record current state before switching |
-| Connections drop during switch | Long-running requests on old upstream | API7 EE handles in-flight requests gracefully; existing connections complete |
+| 502 after switch | New environment not ready | Test health endpoint before switching; roll back if needed |
+| Traffic still going to old env | Route update has not propagated yet | Verify with `a7 route get api --gateway-group "$GROUP" -o json` and retry after propagation |
+| Cannot roll back | Previous service ID was not recorded | Record `service_id` before switching |
 | Command failed with 401 | Invalid token | Refresh your token using `a7 context create` |
-| Upstream not found | Different gateway group | Ensure `--gateway-group` matches the group where upstreams were created |
+| Service not found | Different gateway group | Ensure `--gateway-group` matches where services and routes were created |
