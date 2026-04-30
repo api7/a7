@@ -65,9 +65,7 @@ func TestSecret_CRUD(t *testing.T) {
 
 	// Create
 	stdout, stderr, err := runA7WithEnv(env, "secret", "create", secretID, "-f", tmpFile, "-g", gatewayGroup)
-	if err != nil {
-		t.Skip("secret create failed (vault may not be configured)")
-	}
+	require.NoError(t, err, "secret create failed: stdout=%s stderr=%s", stdout, stderr)
 
 	// Get
 	stdout, stderr, err = runA7WithEnv(env, "secret", "get", secretID, "-g", gatewayGroup)
@@ -77,7 +75,9 @@ func TestSecret_CRUD(t *testing.T) {
 	// Get JSON
 	var secret map[string]interface{}
 	runA7JSON(t, env, &secret, "secret", "get", secretID, "-g", gatewayGroup, "-o", "json")
-	assert.Equal(t, secretID, secret["id"])
+	// The runtime secret provider API returns the provider-local ID; the CLI
+	// still uses the compound ID for addressing resources.
+	assert.Equal(t, "e2e-secret-crud", secret["id"])
 	assert.Equal(t, "https://vault.example.com", secret["uri"])
 	assert.Equal(t, "kv/apisix", secret["prefix"])
 
