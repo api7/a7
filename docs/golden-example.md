@@ -191,21 +191,22 @@ Matching the API7 EE Runtime Admin API route schema.
 package api
 
 type Route struct {
-	ID         string                 `json:"id"` // IDs are string in API7 EE
-	Name       string                 `json:"name"`
-	Desc       *string                `json:"desc,omitempty"`
+	ID         string                 `json:"id,omitempty"`
+	Name       string                 `json:"name,omitempty"`
+	Desc       string                 `json:"desc,omitempty"`
+	URI        string                 `json:"uri,omitempty"`
 	URIs       []string               `json:"uris,omitempty"`
+	Paths      []string               `json:"paths,omitempty"`
 	Methods    []string               `json:"methods,omitempty"`
-	Host       *string                `json:"host,omitempty"`
+	Host       string                 `json:"host,omitempty"`
 	Hosts      []string               `json:"hosts,omitempty"`
-	Priority   int                    `json:"priority"`
-	Status     int                    `json:"status"`
+	ServiceID  string                 `json:"service_id,omitempty"`
+	UpstreamID string                 `json:"upstream_id,omitempty"`
+	Upstream   map[string]interface{} `json:"upstream,omitempty"`
 	Plugins    map[string]interface{} `json:"plugins,omitempty"`
-	UpstreamID *string                `json:"upstream_id,omitempty"`
-	ServiceID  *string                `json:"service_id,omitempty"`
 	Labels     map[string]string      `json:"labels,omitempty"`
-	CreateTime int64                  `json:"create_time"`
-	UpdateTime int64                  `json:"update_time"`
+	Status     int                    `json:"status,omitempty"`
+	Priority   int                    `json:"priority,omitempty"`
 }
 ```
 
@@ -360,17 +361,27 @@ func printTable(io *iostreams.IOStreams, routes []api.Route) error {
 	}
 
 	w := tabwriter.NewWriter(io.Out, 0, 0, 3, ' ', 0)
-	fmt.Fprintln(w, "ID\tNAME\tURIS\tSTATUS\tUPSTREAM_ID")
-	
+	fmt.Fprintln(w, "ID\tNAME\tPATHS\tSTATUS\tSERVICE_ID\tUPSTREAM_ID")
+
 	for _, r := range routes {
-		uris := strings.Join(r.URIs, ",")
+		paths := strings.Join(r.Paths, ",")
+		if paths == "" {
+			paths = r.URI
+		}
+		if paths == "" {
+			paths = strings.Join(r.URIs, ",")
+		}
 		status := fmt.Sprintf("%d", r.Status)
-		upstream := "N/A"
-		if r.UpstreamID != nil {
-			upstream = *r.UpstreamID
+		service := r.ServiceID
+		if service == "" {
+			service = "N/A"
+		}
+		upstream := r.UpstreamID
+		if upstream == "" {
+			upstream = "N/A"
 		}
 
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", r.ID, r.Name, uris, status, upstream)
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", r.ID, r.Name, paths, status, service, upstream)
 	}
 	return w.Flush()
 }
@@ -511,10 +522,10 @@ func JSONResponse(path string) Response {
     {
       "id": "1",
       "name": "users-api",
-      "uris": ["/api/v1/users"],
+      "paths": ["/api/v1/users"],
       "methods": ["GET", "POST"],
       "status": 1,
-      "upstream_id": "u1"
+      "service_id": "svc-users"
     }
   ]
 }
