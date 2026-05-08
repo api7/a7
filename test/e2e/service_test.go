@@ -116,6 +116,30 @@ func TestService_CRUD(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestService_UpdateFlagsPreservesName(t *testing.T) {
+	env := setupEnv(t)
+	svcID := "e2e-service-update-flags"
+	t.Cleanup(func() { deleteServiceViaAdmin(t, svcID) })
+	createTestServiceViaCLI(t, env, svcID)
+
+	stdout, stderr, err := runA7WithEnv(env, "service", "update", svcID,
+		"--desc", "updated by flag mode",
+		"--host", "flag-service.example.com",
+		"--labels", "mode=flag",
+		"-g", gatewayGroup)
+	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+
+	var service map[string]interface{}
+	runA7JSON(t, env, &service, "service", "get", svcID, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, svcID, service["id"])
+	assert.Equal(t, "e2e-svc-"+svcID, service["name"])
+	assert.Equal(t, "updated by flag mode", service["desc"])
+	hosts := requireJSONArray(t, service["hosts"], "service.hosts")
+	assert.Contains(t, hosts, "flag-service.example.com")
+	labels := requireJSONObject(t, service["labels"], "service.labels")
+	assert.Equal(t, "flag", labels["mode"])
+}
+
 func TestService_Export(t *testing.T) {
 	env := setupEnv(t)
 	svcID := "e2e-service-export"

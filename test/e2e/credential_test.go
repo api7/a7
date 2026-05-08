@@ -84,6 +84,33 @@ func TestCredential_CRUD(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestCredential_CreateWithPositionalID(t *testing.T) {
+	env := setupEnv(t)
+	username := "e2e-cred-positional-consumer"
+	credID := "e2e-cred-positional"
+	t.Cleanup(func() { deleteConsumerViaAdmin(t, username) })
+
+	createTestConsumerViaCLI(t, env, username)
+
+	stdout, stderr, err := runA7WithEnv(env, "credential", "create", credID,
+		"--consumer", username,
+		"--plugins-json", `{"key-auth":{"key":"e2e-positional-key-12345"}}`,
+		"-g", gatewayGroup)
+	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+
+	var credential map[string]interface{}
+	runA7JSON(t, env, &credential, "credential", "get", credID,
+		"--consumer", username, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, credID, credential["id"])
+	assert.Equal(t, credID, credential["name"])
+	plugins := requireJSONObject(t, credential["plugins"], "credential.plugins")
+	assert.Contains(t, plugins, "key-auth")
+
+	stdout, stderr, err = runA7WithEnv(env, "credential", "delete", credID,
+		"--consumer", username, "--force", "-g", gatewayGroup)
+	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+}
+
 func TestCredential_RequiresConsumerFlag(t *testing.T) {
 	env := setupEnv(t)
 

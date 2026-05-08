@@ -173,6 +173,33 @@ func TestRoute_CreateWithFlags(t *testing.T) {
 	assert.Equal(t, "e2e", labels["team"])
 }
 
+func TestRoute_UpdateFlagsMapsURIToPaths(t *testing.T) {
+	env := setupEnv(t)
+	svcID := "e2e-service-route-update-flags"
+	routeID := "e2e-route-update-flags"
+	t.Cleanup(func() {
+		deleteRouteViaAdmin(t, routeID)
+		deleteServiceViaAdmin(t, svcID)
+	})
+	createTestServiceViaCLI(t, env, svcID)
+	createTestRouteWithServiceViaCLI(t, env, routeID, svcID)
+
+	stdout, stderr, err := runA7WithEnv(env, "route", "update", routeID,
+		"--uri", "/test-update-flags-new",
+		"--labels", "mode=flag",
+		"-g", gatewayGroup)
+	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+
+	var route map[string]interface{}
+	runA7JSON(t, env, &route, "route", "get", routeID, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, routeID, route["id"])
+	assert.Equal(t, svcID, route["service_id"])
+	paths := requireJSONArray(t, route["paths"], "route.paths")
+	assert.Contains(t, paths, "/test-update-flags-new")
+	labels := requireJSONObject(t, route["labels"], "route.labels")
+	assert.Equal(t, "flag", labels["mode"])
+}
+
 func TestRoute_CreateWithPlugins(t *testing.T) {
 	env := setupEnv(t)
 	svcID := "e2e-service-route-plugins"
@@ -232,10 +259,17 @@ func TestRoute_Export(t *testing.T) {
 	stdout, stderr, err := runA7WithEnv(env, "route", "create", "-f", tmpFile, "-g", gatewayGroup)
 	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
 
-	// Use 'get -o json' to export a single route (export is batch, no positional ID).
-	var exported map[string]interface{}
-	runA7JSON(t, env, &exported, "route", "get", routeID, "-g", gatewayGroup, "-o", "json")
-	assert.Equal(t, routeID, exported["id"])
+	var exported []map[string]interface{}
+	runA7JSON(t, env, &exported, "route", "export", "-g", gatewayGroup, "--service-id", svcID, "-o", "json")
+	assert.NotEmpty(t, exported)
+	found := false
+	for _, item := range exported {
+		if item["id"] == routeID {
+			found = true
+			assert.Equal(t, svcID, item["service_id"])
+		}
+	}
+	assert.True(t, found, "expected exported routes to contain %s", routeID)
 }
 
 func TestRoute_ExportYAML(t *testing.T) {

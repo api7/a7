@@ -95,6 +95,44 @@ func TestSSL_CRUD(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestSSL_UpdateFlagsWithCertificatePathsAndSNIs(t *testing.T) {
+	env := setupEnv(t)
+	sslID := "e2e-ssl-update-flags"
+	t.Cleanup(func() { deleteSSLViaAdmin(t, sslID) })
+
+	cert, key := readTestCert(t)
+	sslJSON := fmt.Sprintf(`{
+		"id": %q,
+		"cert": %q,
+		"key": %q,
+		"snis": ["old-flags.example.com"]
+	}`, sslID, cert, key)
+	tmpFile := filepath.Join(t.TempDir(), "ssl.json")
+	require.NoError(t, os.WriteFile(tmpFile, []byte(sslJSON), 0644))
+
+	stdout, stderr, err := runA7WithEnv(env, "ssl", "create", "-f", tmpFile, "-g", gatewayGroup)
+	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+
+	stdout, stderr, err = runA7WithEnv(env, "ssl", "update", sslID,
+		"--cert", "testdata/test.crt",
+		"--key", "testdata/test.key",
+		"--sni", "new-flags.example.com",
+		"--sni", "new-flags-alt.example.com",
+		"--status", "0",
+		"-g", gatewayGroup)
+	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+
+	var ssl map[string]interface{}
+	runA7JSON(t, env, &ssl, "ssl", "get", sslID, "-g", gatewayGroup, "-o", "json")
+	snis := requireJSONArray(t, ssl["snis"], "ssl.snis")
+	assert.Contains(t, snis, "new-flags.example.com")
+	assert.Contains(t, snis, "new-flags-alt.example.com")
+	assert.Equal(t, float64(0), ssl["status"])
+
+	stdout, stderr, err = runA7WithEnv(env, "ssl", "delete", sslID, "--force", "-g", gatewayGroup)
+	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+}
+
 func TestSSL_DeleteNonexistent(t *testing.T) {
 	env := setupEnv(t)
 

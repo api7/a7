@@ -116,6 +116,17 @@ func TestStreamRoute_CRUD(t *testing.T) {
 	assert.Equal(t, float64(19091), streamRoute["server_port"])
 	assert.Equal(t, "stream route e2e updated", streamRoute["desc"])
 
+	var exported []map[string]interface{}
+	runA7JSON(t, env, &exported, "stream-route", "export", "-g", gatewayGroup, "--service-id", svcID, "-o", "json")
+	found := false
+	for _, item := range exported {
+		if item["id"] == srID {
+			found = true
+			assert.Equal(t, svcID, item["service_id"])
+		}
+	}
+	assert.True(t, found, "expected exported stream routes to contain %s", srID)
+
 	// Delete
 	stdout, stderr, err = runA7WithEnv(env, "stream-route", "delete", srID, "--force", "-g", gatewayGroup)
 	require.NoError(t, err, stderr)
