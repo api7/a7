@@ -3,6 +3,7 @@
 package e2e
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -82,6 +83,39 @@ func TestCredential_CRUD(t *testing.T) {
 	_, _, err = runA7WithEnv(env, "credential", "get", credID,
 		"--consumer", username, "-g", gatewayGroup)
 	assert.Error(t, err)
+}
+
+func TestCredential_CreateWithPositionalID(t *testing.T) {
+	env := setupEnv(t)
+	username := "e2e-cred-positional-consumer"
+	credID := "e2e-cred-positional"
+	t.Cleanup(func() { deleteConsumerViaAdmin(t, username) })
+
+	createTestConsumerViaCLI(t, env, username)
+
+	stdout, stderr, err := runA7WithEnv(env, "credential", "create", credID,
+		"--consumer", username,
+		"--plugins-json", `{"key-auth":{"key":"e2e-positional-key-12345"}}`,
+		"-g", gatewayGroup)
+	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+
+	var created map[string]interface{}
+	require.NoError(t, json.Unmarshal([]byte(stdout), &created), "credential create should return JSON")
+	actualID, ok := created["id"].(string)
+	require.True(t, ok && actualID != "", "credential create response should contain generated id: %v", created)
+	assert.Equal(t, credID, created["name"])
+
+	var credential map[string]interface{}
+	runA7JSON(t, env, &credential, "credential", "get", actualID,
+		"--consumer", username, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, actualID, credential["id"])
+	assert.Equal(t, credID, credential["name"])
+	plugins := requireJSONObject(t, credential["plugins"], "credential.plugins")
+	assert.Contains(t, plugins, "key-auth")
+
+	stdout, stderr, err = runA7WithEnv(env, "credential", "delete", actualID,
+		"--consumer", username, "--force", "-g", gatewayGroup)
+	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
 }
 
 func TestCredential_RequiresConsumerFlag(t *testing.T) {

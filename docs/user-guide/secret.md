@@ -54,11 +54,15 @@ a7 secret get vault/prod-vault -g default
 ### `a7 secret create`
 
 Creates a new secret manager from a JSON or YAML file using a compound ID.
+Flag mode is also supported for Vault-style provider configuration. Use
+`--provider-token` for the secret backend token; the global `--token` flag is
+reserved for the API7 EE API token.
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--gateway-group` | `-g` | | Target gateway group name (required) |
-| `--file` | `-f` | | Path to the secret configuration file (required) |
+| `--file` | `-f` | | Path to the secret configuration file (required unless using flag mode) |
+| `--provider-token` | | | Secret provider token for flag mode |
 | `--output` | `-o` | `yaml` | Output format (json, yaml) |
 
 **Examples:**
@@ -68,14 +72,24 @@ Create an AWS secret manager:
 a7 secret create aws/my-aws -g default -f aws-config.yaml
 ```
 
+Create a Vault secret manager with flags:
+```bash
+a7 secret create vault/my-vault -g default \
+  --uri https://vault.example.com \
+  --prefix apisix/prod \
+  --provider-token hvs.CAES...
+```
+
 ### `a7 secret update`
 
-Updates an existing secret manager by compound ID.
+Updates an existing secret manager by compound ID. As with create, use
+`--provider-token` for the secret backend token in flag mode.
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--gateway-group` | `-g` | | Target gateway group name (required) |
-| `--file` | `-f` | | Path to the secret configuration file (required) |
+| `--file` | `-f` | | Path to the secret configuration file (required unless using flag mode) |
+| `--provider-token` | | | Secret provider token for flag mode |
 | `--output` | `-o` | `yaml` | Output format (json, yaml) |
 
 **Examples:**

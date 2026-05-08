@@ -103,6 +103,37 @@ func TestSecret_CRUD(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestSecret_FlagModeProviderToken(t *testing.T) {
+	env := setupEnv(t)
+	secretID := "vault/e2e-secret-flags"
+	t.Cleanup(func() { deleteSecretViaAdmin(t, "vault", "e2e-secret-flags") })
+
+	stdout, stderr, err := runA7WithEnv(env, "secret", "create", secretID,
+		"--uri", "https://vault-flags.example.com",
+		"--prefix", "kv/flags",
+		"--provider-token", "flag-vault-token",
+		"-g", gatewayGroup)
+	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+
+	var secret map[string]interface{}
+	runA7JSON(t, env, &secret, "secret", "get", secretID, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, "e2e-secret-flags", secret["id"])
+	assert.Equal(t, "https://vault-flags.example.com", secret["uri"])
+	assert.Equal(t, "kv/flags", secret["prefix"])
+
+	stdout, stderr, err = runA7WithEnv(env, "secret", "update", secretID,
+		"--uri", "https://vault-flags-updated.example.com",
+		"-g", gatewayGroup)
+	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+
+	runA7JSON(t, env, &secret, "secret", "get", secretID, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, "https://vault-flags-updated.example.com", secret["uri"])
+	assert.Equal(t, "kv/flags", secret["prefix"])
+
+	stdout, stderr, err = runA7WithEnv(env, "secret", "delete", secretID, "--force", "-g", gatewayGroup)
+	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+}
+
 func TestSecret_DeleteNonexistent(t *testing.T) {
 	env := setupEnv(t)
 

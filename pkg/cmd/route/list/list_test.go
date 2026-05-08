@@ -67,6 +67,7 @@ func TestListRoutes_Table(t *testing.T) {
 		},
 		Output:       "",
 		GatewayGroup: "gg1",
+		ServiceID:    "svc1",
 	}
 
 	err := actionRun(opts)
@@ -149,6 +150,7 @@ func TestListRoutes_JSON(t *testing.T) {
 		},
 		Output:       "json",
 		GatewayGroup: "gg1",
+		ServiceID:    "svc1",
 	}
 
 	err := actionRun(opts)
@@ -208,6 +210,25 @@ func TestListRoutes_MissingGatewayGroup(t *testing.T) {
 	}
 }
 
+func TestListRoutes_MissingServiceID(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	registry := &httpmock.Registry{}
+
+	opts := &Options{
+		IO:     ios,
+		Client: func() (*http.Client, error) { return registry.GetClient(), nil },
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
+		},
+		GatewayGroup: "gg1",
+	}
+
+	err := actionRun(opts)
+	if err == nil || !strings.Contains(err.Error(), "--service-id is required by API7 EE") {
+		t.Fatalf("expected service-id error, got: %v", err)
+	}
+}
+
 // TestListRoutes_GatewayGroupFromConfig tests that GatewayGroup falls back to config when opts is empty
 func TestListRoutes_GatewayGroupFromConfig(t *testing.T) {
 	ios, _, out, _ := iostreams.Test()
@@ -235,6 +256,7 @@ func TestListRoutes_GatewayGroupFromConfig(t *testing.T) {
 		},
 		Output:       "",
 		GatewayGroup: "", // Empty - should use config value
+		ServiceID:    "svc1",
 	}
 
 	err := actionRun(opts)
@@ -279,7 +301,8 @@ func TestListRoutes_GatewayGroupFromFlag(t *testing.T) {
 			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg-from-config"}, nil
 		},
 		Output:       "",
-		GatewayGroup: "gg-from-flag", // Flag value - should take precedence
+		GatewayGroup: "gg-from-flag",
+		ServiceID:    "svc1",
 	}
 
 	err := actionRun(opts)

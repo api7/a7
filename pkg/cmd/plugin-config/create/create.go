@@ -81,7 +81,7 @@ func actionRun(opts *Options) error {
 			body, err = client.Post("/apisix/admin/plugin_configs?gateway_group_id="+ggID, payload)
 		}
 		if err != nil {
-			return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
+			return fmt.Errorf("%s", cmdutil.FormatAPISIXCompatibilityResourceError(err, "plugin-config"))
 		}
 
 		format := opts.Output
@@ -124,7 +124,7 @@ func actionRun(opts *Options) error {
 	client := api.NewClient(httpClient, cfg.BaseURL())
 	body, err := client.Post("/apisix/admin/plugin_configs?gateway_group_id="+ggID, bodyReq)
 	if err != nil {
-		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
+		return fmt.Errorf("%s", cmdutil.FormatAPISIXCompatibilityResourceError(err, "plugin-config"))
 	}
 
 	var created api.PluginConfig

@@ -22,6 +22,7 @@ type Options struct {
 	Output       string
 	GatewayGroup string
 	Label        string
+	ServiceID    string
 }
 
 func NewCmd(f *cmd.Factory) *cobra.Command {
@@ -35,10 +36,12 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 			opts.Output, _ = c.Flags().GetString("output")
 			opts.GatewayGroup, _ = c.Flags().GetString("gateway-group")
 			opts.Label, _ = c.Flags().GetString("label")
+			opts.ServiceID, _ = c.Flags().GetString("service-id")
 			return actionRun(opts)
 		},
 	}
 	c.Flags().StringVar(&opts.Label, "label", "", "Filter by label (key=value)")
+	c.Flags().StringVar(&opts.ServiceID, "service-id", "", "Service ID (required by API7 EE)")
 
 	return c
 }
@@ -63,7 +66,11 @@ func actionRun(opts *Options) error {
 	}
 
 	client := api.NewClient(httpClient, cfg.BaseURL())
+	if opts.ServiceID == "" {
+		return fmt.Errorf("--service-id is required by API7 EE")
+	}
 	query := map[string]string{"gateway_group_id": ggID}
+	query["service_id"] = opts.ServiceID
 	labelKey, labelValue := cmdutil.ParseLabel(opts.Label)
 	if labelKey != "" {
 		query["label"] = labelKey

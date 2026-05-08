@@ -122,19 +122,22 @@ a7 route delete 12345 -g default --force
 ### `a7 route export`
 
 Exports routes from a gateway group to a file or stdout.
+API7 EE requires `--service-id` for route export because routes are scoped by
+service.
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--gateway-group` | `-g` | | Target gateway group name (required) |
+| `--service-id` | | | Service ID whose routes should be exported (required by API7 EE) |
 | `--label` | | | Filter routes to export by label |
 | `--output` | `-o` | `yaml` | Output format (json, yaml) |
 | `--file` | `-f` | | Path to save the exported configuration |
 
 **Examples:**
 
-Export all routes to a YAML file:
+Export routes for a service to a YAML file:
 ```bash
-a7 route export -g default -f all-routes.yaml
+a7 route export -g default --service-id example-service -f routes.yaml
 ```
 
 ## Configuration Reference

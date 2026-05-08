@@ -80,7 +80,18 @@ func actionRun(opts *Options) error {
 		}
 
 		if opts.ID != "" {
-			payload["id"] = opts.ID
+			payload["name"] = opts.ID
+			delete(payload, "id")
+		} else if _, ok := payload["name"]; ok {
+			delete(payload, "id")
+		} else if id, ok := payload["id"]; ok {
+			payload["name"] = id
+			delete(payload, "id")
+		}
+
+		name, hasName, err := credentialNameFromPayload(payload)
+		if err != nil {
+			return err
 		}
 
 		httpClient, err := opts.Client()
@@ -91,8 +102,8 @@ func actionRun(opts *Options) error {
 		path := "/apisix/admin/consumers/" + opts.Consumer + "/credentials?gateway_group_id=" + ggID
 		client := api.NewClient(httpClient, cfg.BaseURL())
 		var body []byte
-		if id, ok := payload["id"]; ok {
-			body, err = client.Put(fmt.Sprintf("/apisix/admin/consumers/%s/credentials/%v?gateway_group_id=%s", opts.Consumer, id, ggID), payload)
+		if hasName {
+			body, err = client.Put(fmt.Sprintf("/apisix/admin/consumers/%s/credentials/%s?gateway_group_id=%s", opts.Consumer, name, ggID), payload)
 		} else {
 			body, err = client.Post(path, payload)
 		}
@@ -128,7 +139,7 @@ func actionRun(opts *Options) error {
 		labels[parts[0]] = parts[1]
 	}
 
-	bodyReq := api.Credential{Desc: opts.Desc}
+	bodyReq := api.Credential{Name: opts.ID, Desc: opts.Desc}
 	if len(pl) > 0 {
 		bodyReq.Plugins = pl
 	}
@@ -153,4 +164,16 @@ func actionRun(opts *Options) error {
 		format = "json"
 	}
 	return cmdutil.NewExporter(format, opts.IO.Out).Write(created)
+}
+
+func credentialNameFromPayload(payload map[string]interface{}) (string, bool, error) {
+	rawName, ok := payload["name"]
+	if !ok {
+		return "", false, nil
+	}
+	name, ok := rawName.(string)
+	if !ok || strings.TrimSpace(name) == "" {
+		return "", false, fmt.Errorf("credential name must be a non-empty string")
+	}
+	return name, true, nil
 }

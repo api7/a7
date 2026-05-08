@@ -3,6 +3,7 @@ package update
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -25,13 +26,15 @@ type Options struct {
 	File         string
 	GatewayGroup string
 
-	ID     string
-	Cert   string
-	Key    string
-	SNIs   []string
-	Type   string
-	Labels []string
-	Status int
+	ID        string
+	Cert      string
+	Key       string
+	SNIs      []string
+	Type      string
+	Labels    []string
+	Status    int
+	TypeSet   bool
+	StatusSet bool
 }
 
 func NewCmd(f *cmd.Factory) *cobra.Command {
@@ -51,6 +54,8 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 			opts.ID = args[0]
 			opts.Output, _ = c.Flags().GetString("output")
 			opts.GatewayGroup, _ = c.Flags().GetString("gateway-group")
+			opts.TypeSet = c.Flags().Changed("type")
+			opts.StatusSet = c.Flags().Changed("status")
 			return actionRun(opts)
 		},
 	}
@@ -99,7 +104,7 @@ func actionRun(opts *Options) error {
 		if format == "" {
 			format = "json"
 		}
-		return cmdutil.NewExporter(format, opts.IO.Out).Write(json.RawMessage(body))
+		return writeSSLResponse(format, opts.IO.Out, body)
 	}
 
 	cert, err := maybeReadFile(opts.Cert)
@@ -111,20 +116,46 @@ func actionRun(opts *Options) error {
 		return err
 	}
 
-	body := api.SSL{
-		ID:     opts.ID,
-		Cert:   cert,
-		Key:    key,
-		SNIs:   opts.SNIs,
-		Labels: parseLabels(opts.Labels),
-		Type:   opts.Type,
-		Status: opts.Status,
-	}
-
 	client := api.NewClient(httpClient, cfg.BaseURL())
-	_, err = client.Put("/apisix/admin/ssls/"+opts.ID+"?gateway_group_id="+ggID, body)
+	currentBody, err := client.Get("/apisix/admin/ssls/"+opts.ID, map[string]string{"gateway_group_id": ggID})
 	if err != nil {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
+	}
+	var body api.SSL
+	if err := json.Unmarshal(currentBody, &body); err != nil {
+		return fmt.Errorf("failed to decode current ssl: %w", err)
+	}
+
+	if cert != "" {
+		body.Cert = cert
+	}
+	if key != "" {
+		body.Key = key
+	}
+	if len(opts.SNIs) > 0 {
+		body.SNIs = opts.SNIs
+	}
+	if len(opts.Labels) > 0 {
+		body.Labels = parseLabels(opts.Labels)
+	}
+	if opts.TypeSet {
+		body.Type = opts.Type
+	}
+	if opts.StatusSet {
+		body.Status = opts.Status
+	}
+
+	payload, err := sslPayload(body)
+	if err != nil {
+		return err
+	}
+	updatedBody, err := client.Put("/apisix/admin/ssls/"+opts.ID+"?gateway_group_id="+ggID, payload)
+	if err != nil {
+		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
+	}
+	var updated api.SSL
+	if err := json.Unmarshal(updatedBody, &updated); err != nil {
+		return fmt.Errorf("failed to decode response: %w", err)
 	}
 
 	output := opts.Output
@@ -132,7 +163,32 @@ func actionRun(opts *Options) error {
 		output = "json"
 	}
 
-	return cmdutil.NewExporter(output, opts.IO.Out).Write(body)
+	return cmdutil.NewExporter(output, opts.IO.Out).Write(api.RedactSSL(updated))
+}
+
+func writeSSLResponse(format string, out io.Writer, body []byte) error {
+	var item api.SSL
+	if err := json.Unmarshal(body, &item); err != nil {
+		return cmdutil.NewExporter(format, out).Write(json.RawMessage(body))
+	}
+	return cmdutil.NewExporter(format, out).Write(api.RedactSSL(item))
+}
+
+func sslPayload(ssl api.SSL) (interface{}, error) {
+	if ssl.Status != 0 {
+		return ssl, nil
+	}
+
+	b, err := json.Marshal(ssl)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode ssl payload: %w", err)
+	}
+	var payload map[string]interface{}
+	if err := json.Unmarshal(b, &payload); err != nil {
+		return nil, fmt.Errorf("failed to prepare ssl payload: %w", err)
+	}
+	payload["status"] = 0
+	return payload, nil
 }
 
 func maybeReadFile(input string) (string, error) {
@@ -158,7 +214,17 @@ func maybeReadFile(input string) (string, error) {
 }
 
 func looksLikePath(v string) bool {
-	return strings.HasPrefix(v, "/") || strings.HasPrefix(v, "./") || strings.HasPrefix(v, "~/")
+	if strings.Contains(v, "-----BEGIN ") || strings.Contains(v, "\n") {
+		return false
+	}
+	if strings.HasPrefix(v, "/") || strings.HasPrefix(v, "./") || strings.HasPrefix(v, "~/") {
+		return true
+	}
+	info, err := os.Stat(v)
+	if err != nil {
+		return true
+	}
+	return !info.IsDir()
 }
 
 func parseLabels(raw []string) map[string]string {

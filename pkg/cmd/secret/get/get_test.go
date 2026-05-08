@@ -54,7 +54,7 @@ func TestGetSecret_Table(t *testing.T) {
 	if !strings.Contains(output, "FIELD") || !strings.Contains(output, "VALUE") {
 		t.Fatalf("expected table headers in output: %s", output)
 	}
-	if !strings.Contains(output, "vault/s1") || !strings.Contains(output, "http://vault") || !strings.Contains(output, "kv") || !strings.Contains(output, "tok") {
+	if !strings.Contains(output, "vault/s1") || !strings.Contains(output, "http://vault") || !strings.Contains(output, "kv") || !strings.Contains(output, api.RedactedSecretToken) || strings.Contains(output, " tok") {
 		t.Fatalf("expected secret fields in output: %s", output)
 	}
 
@@ -85,7 +85,7 @@ func TestGetSecret_JSON(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &item); err != nil {
 		t.Fatalf("failed to parse output: %v", err)
 	}
-	if item.ID != "vault/s1" || item.Prefix != "kv" {
+	if item.ID != "vault/s1" || item.Prefix != "kv" || item.Token != api.RedactedSecretToken {
 		t.Fatalf("unexpected item: %+v", item)
 	}
 

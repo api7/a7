@@ -66,10 +66,11 @@ func actionRun(opts *Options) error {
 	}
 
 	client := api.NewClient(httpClient, cfg.BaseURL())
-	query := map[string]string{"gateway_group_id": ggID}
-	if opts.ServiceID != "" {
-		query["service_id"] = opts.ServiceID
+	if opts.ServiceID == "" {
+		return fmt.Errorf("--service-id is required by API7 EE")
 	}
+	query := map[string]string{"gateway_group_id": ggID}
+	query["service_id"] = opts.ServiceID
 	labelKey, labelValue := cmdutil.ParseLabel(opts.Label)
 	if labelKey != "" {
 		query["label"] = labelKey

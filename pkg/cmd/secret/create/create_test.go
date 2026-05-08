@@ -9,6 +9,7 @@ import (
 
 	"github.com/api7/a7/internal/config"
 	"github.com/api7/a7/pkg/api"
+	cmd "github.com/api7/a7/pkg/cmd"
 	"github.com/api7/a7/pkg/httpmock"
 	"github.com/api7/a7/pkg/iostreams"
 )
@@ -35,7 +36,7 @@ func (m *mockConfig) Save() error                                     { return n
 func TestCreateSecret_JSON(t *testing.T) {
 	ios, _, out, _ := iostreams.Test()
 	registry := &httpmock.Registry{}
-	registry.Register(http.MethodPost, "/apisix/admin/secret_providers", httpmock.JSONResponse(`{"id":"vault/s1","uri":"http://vault","prefix":"kv","token":"tok"}`))
+	registry.Register(http.MethodPut, "/apisix/admin/secret_providers/vault/s1", httpmock.JSONResponse(`{"id":"vault/s1","uri":"http://vault","prefix":"kv","token":"tok"}`))
 
 	opts := &Options{
 		IO:     ios,
@@ -59,11 +60,23 @@ func TestCreateSecret_JSON(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &item); err != nil {
 		t.Fatalf("failed to parse output: %v", err)
 	}
-	if item.ID != "vault/s1" || item.URI != "http://vault" {
+	if item.ID != "vault/s1" || item.URI != "http://vault" || item.Token != api.RedactedSecretToken {
 		t.Fatalf("unexpected item: %+v", item)
 	}
 
 	registry.Verify(t)
+}
+
+func TestCreateCommandUsesProviderTokenFlag(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	c := NewCmd(&cmd.Factory{IOStreams: ios})
+
+	if c.Flags().Lookup("provider-token") == nil {
+		t.Fatal("expected provider-token flag")
+	}
+	if c.Flags().Lookup("token") != nil {
+		t.Fatal("secret create must not define a local token flag that shadows the global API token")
+	}
 }
 
 func TestCreateSecret_FileUsesPositionalID(t *testing.T) {

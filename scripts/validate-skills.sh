@@ -100,7 +100,7 @@ for skill_dir in "${SKILLS_DIR}"/*; do
   else
     body_start=$((end_line + 1))
   fi
-  if ! tail -n +"${body_start}" "${skill_file}" | grep -q '[^[:space:]]'; then
+  if ! awk -v body_start="${body_start}" 'NR >= body_start && /[^[:space:]]/ { found = 1; exit } END { exit !found }' "${skill_file}"; then
     echo "${skill_name}: SKILL.md body must not be empty" >&2
     status=1
   fi

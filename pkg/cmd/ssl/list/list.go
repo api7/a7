@@ -96,7 +96,7 @@ func actionRun(opts *Options) error {
 	}
 
 	if opts.Output != "" {
-		return cmdutil.NewExporter(opts.Output, opts.IO.Out).Write(resp.List)
+		return cmdutil.NewExporter(opts.Output, opts.IO.Out).Write(api.RedactSSLs(resp.List))
 	}
 
 	tp := tableprinter.New(opts.IO.Out)

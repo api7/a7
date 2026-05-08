@@ -2,7 +2,9 @@ package create
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 
@@ -53,6 +55,99 @@ func TestCreateCredential_JSONOutput(t *testing.T) {
 	}
 
 	registry.Verify(t)
+}
+
+func TestCreateCredential_PositionalIDSetsName(t *testing.T) {
+	ios, _, out, _ := iostreams.Test()
+	registry := &httpmock.Registry{}
+	registry.RegisterResponder(http.MethodPost, "/apisix/admin/consumers/alice/credentials", func(req *http.Request) (httpmock.Response, error) {
+		var payload map[string]interface{}
+		if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+			return httpmock.Response{}, fmt.Errorf("decode request body: %w", err)
+		}
+		if payload["name"] != "cred1" {
+			return httpmock.Response{}, fmt.Errorf("expected positional id to map to name, got payload: %#v", payload)
+		}
+		if _, ok := payload["id"]; ok {
+			return httpmock.Response{}, fmt.Errorf("expected positional id to be normalized to name only, got payload: %#v", payload)
+		}
+		return httpmock.JSONResponse(`{"id":"generated","name":"cred1"}`), nil
+	})
+
+	opts := &Options{IO: ios, Client: func() (*http.Client, error) { return registry.GetClient(), nil }, Config: func() (config.Config, error) {
+		return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
+	}, Consumer: "alice", GatewayGroup: "gg1", ID: "cred1", PluginsJSON: `{"key-auth":{"key":"k"}}`}
+
+	if err := actionRun(opts); err != nil {
+		t.Fatalf("actionRun failed: %v", err)
+	}
+	var item api.Credential
+	if err := json.Unmarshal(out.Bytes(), &item); err != nil {
+		t.Fatalf("failed to parse output: %v", err)
+	}
+	if item.Name != "cred1" {
+		t.Fatalf("expected credential name in output, got %+v", item)
+	}
+	registry.Verify(t)
+}
+
+func TestCreateCredential_FileNormalizesLegacyID(t *testing.T) {
+	ios, _, out, _ := iostreams.Test()
+	tmpFile := t.TempDir() + "/credential.json"
+	if err := os.WriteFile(tmpFile, []byte(`{"id":"cred-file","plugins":{"key-auth":{"key":"k"}}}`), 0o644); err != nil {
+		t.Fatalf("write credential file: %v", err)
+	}
+
+	registry := &httpmock.Registry{}
+	registry.RegisterResponder(http.MethodPut, "/apisix/admin/consumers/alice/credentials/cred-file", func(req *http.Request) (httpmock.Response, error) {
+		var payload map[string]interface{}
+		if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+			return httpmock.Response{}, fmt.Errorf("decode request body: %w", err)
+		}
+		if payload["name"] != "cred-file" {
+			return httpmock.Response{}, fmt.Errorf("expected legacy id to map to name, got payload: %#v", payload)
+		}
+		if _, ok := payload["id"]; ok {
+			return httpmock.Response{}, fmt.Errorf("expected legacy id to be removed, got payload: %#v", payload)
+		}
+		return httpmock.JSONResponse(`{"id":"generated","name":"cred-file"}`), nil
+	})
+
+	opts := &Options{IO: ios, Client: func() (*http.Client, error) { return registry.GetClient(), nil }, Config: func() (config.Config, error) {
+		return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
+	}, Consumer: "alice", GatewayGroup: "gg1", File: tmpFile}
+
+	if err := actionRun(opts); err != nil {
+		t.Fatalf("actionRun failed: %v", err)
+	}
+	var item api.Credential
+	if err := json.Unmarshal(out.Bytes(), &item); err != nil {
+		t.Fatalf("failed to parse output: %v", err)
+	}
+	if item.Name != "cred-file" {
+		t.Fatalf("expected credential name in output, got %+v", item)
+	}
+	registry.Verify(t)
+}
+
+func TestCreateCredential_FileRejectsInvalidName(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	tmpFile := t.TempDir() + "/credential.json"
+	if err := os.WriteFile(tmpFile, []byte(`{"name":123,"plugins":{"key-auth":{"key":"k"}}}`), 0o644); err != nil {
+		t.Fatalf("write credential file: %v", err)
+	}
+
+	opts := &Options{IO: ios, Client: func() (*http.Client, error) {
+		t.Fatal("unexpected HTTP client call")
+		return nil, nil
+	}, Config: func() (config.Config, error) {
+		return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
+	}, Consumer: "alice", GatewayGroup: "gg1", File: tmpFile}
+
+	err := actionRun(opts)
+	if err == nil || !strings.Contains(err.Error(), "credential name must be a non-empty string") {
+		t.Fatalf("expected invalid credential name error, got: %v", err)
+	}
 }
 
 func TestCreateCredential_MissingGatewayGroup(t *testing.T) {

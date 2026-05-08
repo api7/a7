@@ -10,3 +10,22 @@ type Secret struct {
 	Token  string            `json:"token,omitempty" yaml:"token,omitempty"`
 	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 }
+
+const RedactedSecretToken = "<redacted>"
+
+// RedactSecret returns a copy safe for CLI output.
+func RedactSecret(secret Secret) Secret {
+	if secret.Token != "" {
+		secret.Token = RedactedSecretToken
+	}
+	return secret
+}
+
+// RedactSecrets returns copies safe for CLI output.
+func RedactSecrets(secrets []Secret) []Secret {
+	redacted := make([]Secret, len(secrets))
+	for i, secret := range secrets {
+		redacted[i] = RedactSecret(secret)
+	}
+	return redacted
+}

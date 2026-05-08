@@ -62,6 +62,15 @@ func FormatAPIError(err error) string {
 	return err.Error()
 }
 
+// FormatAPISIXCompatibilityResourceError adds context for APISIX-compatible
+// resources that are intentionally not exposed by the API7 EE Admin API.
+func FormatAPISIXCompatibilityResourceError(err error, resource string) string {
+	if IsNotFound(err) {
+		return fmt.Sprintf("%s is not exposed by the API7 EE Admin API; this command is kept for APISIX compatibility. Original error: %s", resource, FormatAPIError(err))
+	}
+	return FormatAPIError(err)
+}
+
 // IsNotFound returns true if the error is a 404 API error.
 func IsNotFound(err error) bool {
 	var apiErr *api.APIError

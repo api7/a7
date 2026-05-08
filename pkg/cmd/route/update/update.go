@@ -24,15 +24,17 @@ type Options struct {
 	GatewayGroup string
 	ID           string
 
-	Name       string
-	URI        string
-	Methods    []string
-	Host       string
-	ServiceID  string
-	UpstreamID string
-	Labels     []string
-	Status     int
-	Priority   int
+	Name        string
+	URI         string
+	Methods     []string
+	Host        string
+	ServiceID   string
+	UpstreamID  string
+	Labels      []string
+	Status      int
+	Priority    int
+	StatusSet   bool
+	PrioritySet bool
 }
 
 func NewCmd(f *cmd.Factory) *cobra.Command {
@@ -45,6 +47,8 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 			opts.ID = args[0]
 			opts.Output, _ = c.Flags().GetString("output")
 			opts.GatewayGroup, _ = c.Flags().GetString("gateway-group")
+			opts.StatusSet = c.Flags().Changed("status")
+			opts.PrioritySet = c.Flags().Changed("priority")
 			return actionRun(opts)
 		},
 	}
@@ -108,22 +112,51 @@ func actionRun(opts *Options) error {
 		labels[parts[0]] = parts[1]
 	}
 
-	bodyReq := api.Route{
-		Name:       opts.Name,
-		URI:        opts.URI,
-		Methods:    opts.Methods,
-		Host:       opts.Host,
-		ServiceID:  opts.ServiceID,
-		UpstreamID: opts.UpstreamID,
-		Status:     opts.Status,
-		Priority:   opts.Priority,
+	client := api.NewClient(httpClient, cfg.BaseURL())
+	currentBody, err := client.Get("/apisix/admin/routes/"+opts.ID, map[string]string{"gateway_group_id": ggID})
+	if err != nil {
+		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
+	}
+	var bodyReq api.Route
+	if err := json.Unmarshal(currentBody, &bodyReq); err != nil {
+		return fmt.Errorf("failed to decode current route: %w", err)
+	}
+
+	if opts.Name != "" {
+		bodyReq.Name = opts.Name
+	}
+	if opts.URI != "" {
+		bodyReq.URI = ""
+		bodyReq.URIs = nil
+		bodyReq.Paths = []string{opts.URI}
+	}
+	if len(opts.Methods) > 0 {
+		bodyReq.Methods = opts.Methods
+	}
+	if opts.Host != "" {
+		bodyReq.Host = opts.Host
+	}
+	if opts.ServiceID != "" {
+		bodyReq.ServiceID = opts.ServiceID
+	}
+	if opts.UpstreamID != "" {
+		bodyReq.UpstreamID = opts.UpstreamID
+	}
+	if opts.StatusSet {
+		bodyReq.Status = opts.Status
+	}
+	if opts.PrioritySet {
+		bodyReq.Priority = opts.Priority
 	}
 	if len(labels) > 0 {
 		bodyReq.Labels = labels
 	}
 
-	client := api.NewClient(httpClient, cfg.BaseURL())
-	body, err := client.Put("/apisix/admin/routes/"+opts.ID+"?gateway_group_id="+ggID, bodyReq)
+	payload, err := routePayload(bodyReq, opts)
+	if err != nil {
+		return err
+	}
+	body, err := client.Put("/apisix/admin/routes/"+opts.ID+"?gateway_group_id="+ggID, payload)
 	if err != nil {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
 	}
@@ -139,4 +172,26 @@ func actionRun(opts *Options) error {
 	}
 	exporter := cmdutil.NewExporter(format, opts.IO.Out)
 	return exporter.Write(updated)
+}
+
+func routePayload(route api.Route, opts *Options) (interface{}, error) {
+	if !opts.StatusSet && !opts.PrioritySet {
+		return route, nil
+	}
+
+	b, err := json.Marshal(route)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode route payload: %w", err)
+	}
+	var payload map[string]interface{}
+	if err := json.Unmarshal(b, &payload); err != nil {
+		return nil, fmt.Errorf("failed to prepare route payload: %w", err)
+	}
+	if opts.StatusSet {
+		payload["status"] = opts.Status
+	}
+	if opts.PrioritySet {
+		payload["priority"] = opts.Priority
+	}
+	return payload, nil
 }

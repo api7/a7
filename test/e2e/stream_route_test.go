@@ -34,8 +34,11 @@ func deleteStreamRouteViaAdmin(t testTB, id string) {
 
 func TestStreamRoute_List(t *testing.T) {
 	env := setupEnv(t)
+	svcID := "e2e-stream-route-list-svc"
+	t.Cleanup(func() { deleteServiceViaAdmin(t, svcID) })
+	createTestServiceViaCLI(t, env, svcID)
 
-	stdout, stderr, err := runA7WithEnv(env, "stream-route", "list", "-g", gatewayGroup)
+	stdout, stderr, err := runA7WithEnv(env, "stream-route", "list", "-g", gatewayGroup, "--service-id", svcID)
 	if err != nil {
 		t.Skipf("stream-route list failed (may not be enabled): stderr=%s", stderr)
 	}
@@ -44,8 +47,11 @@ func TestStreamRoute_List(t *testing.T) {
 
 func TestStreamRoute_ListJSON(t *testing.T) {
 	env := setupEnv(t)
+	svcID := "e2e-stream-route-list-json-svc"
+	t.Cleanup(func() { deleteServiceViaAdmin(t, svcID) })
+	createTestServiceViaCLI(t, env, svcID)
 
-	stdout, stderr, err := runA7WithEnv(env, "stream-route", "list", "-g", gatewayGroup, "-o", "json")
+	stdout, stderr, err := runA7WithEnv(env, "stream-route", "list", "-g", gatewayGroup, "--service-id", svcID, "-o", "json")
 	if err != nil {
 		t.Skipf("stream-route list JSON failed (may not be enabled): stderr=%s", stderr)
 	}
@@ -109,6 +115,17 @@ func TestStreamRoute_CRUD(t *testing.T) {
 	runA7JSON(t, env, &streamRoute, "stream-route", "get", srID, "-g", gatewayGroup, "-o", "json")
 	assert.Equal(t, float64(19091), streamRoute["server_port"])
 	assert.Equal(t, "stream route e2e updated", streamRoute["desc"])
+
+	var exported []map[string]interface{}
+	runA7JSON(t, env, &exported, "stream-route", "export", "-g", gatewayGroup, "--service-id", svcID, "-o", "json")
+	found := false
+	for _, item := range exported {
+		if item["id"] == srID {
+			found = true
+			assert.Equal(t, svcID, item["service_id"])
+		}
+	}
+	assert.True(t, found, "expected exported stream routes to contain %s", srID)
 
 	// Delete
 	stdout, stderr, err = runA7WithEnv(env, "stream-route", "delete", srID, "--force", "-g", gatewayGroup)

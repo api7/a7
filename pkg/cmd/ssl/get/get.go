@@ -80,5 +80,5 @@ func actionRun(opts *Options) error {
 		output = "json"
 	}
 
-	return cmdutil.NewExporter(output, opts.IO.Out).Write(item)
+	return cmdutil.NewExporter(output, opts.IO.Out).Write(api.RedactSSL(item))
 }

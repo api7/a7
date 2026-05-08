@@ -1,6 +1,8 @@
 package update
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -34,6 +36,7 @@ func (m *mockConfig) Save() error                                     { return n
 func TestUpdateRoute_Success(t *testing.T) {
 	ios, _, out, _ := iostreams.Test()
 	registry := &httpmock.Registry{}
+	registry.Register(http.MethodGet, "/apisix/admin/routes/r1", httpmock.JSONResponse(`{"id":"r1","name":"old-name","paths":["/old"],"service_id":"svc1"}`))
 	registry.Register(http.MethodPut, "/apisix/admin/routes/r1", httpmock.JSONResponse(`{"id":"r1","name":"new-name"}`))
 	opts := &Options{IO: ios, Client: func() (*http.Client, error) { return registry.GetClient(), nil }, Config: func() (config.Config, error) {
 		return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
@@ -42,6 +45,46 @@ func TestUpdateRoute_Success(t *testing.T) {
 		t.Fatalf("actionRun failed: %v", err)
 	}
 	if !strings.Contains(out.String(), "new-name") {
+		t.Fatalf("expected updated route output: %s", out.String())
+	}
+	registry.Verify(t)
+}
+
+func TestUpdateRoute_URIMapsToPathsAndPreservesCurrentRoute(t *testing.T) {
+	ios, _, out, _ := iostreams.Test()
+	registry := &httpmock.Registry{}
+	registry.Register(http.MethodGet, "/apisix/admin/routes/r1", httpmock.JSONResponse(`{"id":"r1","name":"old-name","uris":["/old"],"service_id":"svc1","status":1}`))
+	registry.RegisterResponder(http.MethodPut, "/apisix/admin/routes/r1", func(req *http.Request) (httpmock.Response, error) {
+		var payload map[string]interface{}
+		if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+			return httpmock.Response{}, fmt.Errorf("decode request body: %w", err)
+		}
+		if _, ok := payload["uri"]; ok {
+			return httpmock.Response{}, fmt.Errorf("route update should not send uri to API7 EE: %#v", payload)
+		}
+		if _, ok := payload["uris"]; ok {
+			return httpmock.Response{}, fmt.Errorf("route update should not preserve uris when --uri maps to paths: %#v", payload)
+		}
+		paths, ok := payload["paths"].([]interface{})
+		if !ok || len(paths) != 1 || paths[0] != "/new" {
+			return httpmock.Response{}, fmt.Errorf("expected uri to map to paths, got payload: %#v", payload)
+		}
+		if payload["name"] != "old-name" || payload["service_id"] != "svc1" {
+			return httpmock.Response{}, fmt.Errorf("expected current route fields to be preserved, got payload: %#v", payload)
+		}
+		if payload["status"] != float64(0) {
+			return httpmock.Response{}, fmt.Errorf("expected explicit status 0 to be sent, got payload: %#v", payload)
+		}
+		return httpmock.JSONResponse(`{"id":"r1","name":"old-name","paths":["/new"],"service_id":"svc1","status":0}`), nil
+	})
+
+	opts := &Options{IO: ios, Client: func() (*http.Client, error) { return registry.GetClient(), nil }, Config: func() (config.Config, error) {
+		return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
+	}, ID: "r1", URI: "/new", Status: 0, StatusSet: true, GatewayGroup: "gg1"}
+	if err := actionRun(opts); err != nil {
+		t.Fatalf("actionRun failed: %v", err)
+	}
+	if !strings.Contains(out.String(), "/new") {
 		t.Fatalf("expected updated route output: %s", out.String())
 	}
 	registry.Verify(t)

@@ -41,6 +41,7 @@ func TestExport_Success(t *testing.T) {
 			return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
 		},
 		GatewayGroup: "gg1",
+		ServiceID:    "svc1",
 		Output:       "json",
 	}
 
@@ -66,6 +67,7 @@ func TestExport_Empty(t *testing.T) {
 			return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
 		},
 		GatewayGroup: "gg1",
+		ServiceID:    "svc1",
 		Output:       "json",
 	}
 
@@ -74,5 +76,24 @@ func TestExport_Empty(t *testing.T) {
 	}
 	if !strings.Contains(errBuf.String(), "No stream routes found") {
 		t.Fatalf("expected no stream routes message, got: %s", errBuf.String())
+	}
+}
+
+func TestExport_MissingServiceID(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	registry := &httpmock.Registry{}
+	opts := &Options{
+		IO:     ios,
+		Client: func() (*http.Client, error) { return registry.GetClient(), nil },
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
+		},
+		GatewayGroup: "gg1",
+		Output:       "json",
+	}
+
+	err := actionRun(opts)
+	if err == nil || !strings.Contains(err.Error(), "--service-id is required by API7 EE") {
+		t.Fatalf("expected service-id error, got: %v", err)
 	}
 }

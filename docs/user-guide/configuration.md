@@ -77,6 +77,10 @@ Create a new context profile.
 | `--tls-skip-verify` | Skip TLS certificate verification |
 | `--ca-cert` | Path to CA certificate file |
 
+If `--token` is omitted and `A7_TOKEN` is set, `context create` uses that
+environment token for validation and persists it into the new context. It does
+not copy the token from the previously active context.
+
 The first context you create is automatically set as the current context.
 
 ```bash

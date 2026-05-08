@@ -90,7 +90,7 @@ func actionRun(opts *Options) error {
 
 	if opts.Output != "" {
 		exporter := cmdutil.NewExporter(opts.Output, opts.IO.Out)
-		return exporter.Write(resp.List)
+		return exporter.Write(api.RedactSecrets(resp.List))
 	}
 
 	tp := tableprinter.New(opts.IO.Out)

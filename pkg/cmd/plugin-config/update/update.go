@@ -64,9 +64,6 @@ func actionRun(opts *Options) error {
 	if ggID == "" {
 		return fmt.Errorf("gateway group is required; use --gateway-group flag or set a default in context config")
 	}
-	if opts.PluginsJSON == "" {
-		return fmt.Errorf("--plugins-json is required")
-	}
 
 	httpClient, err := opts.Client()
 	if err != nil {
@@ -81,13 +78,16 @@ func actionRun(opts *Options) error {
 		client := api.NewClient(httpClient, cfg.BaseURL())
 		body, err := client.Put("/apisix/admin/plugin_configs/"+opts.ID+"?gateway_group_id="+ggID, payload)
 		if err != nil {
-			return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
+			return fmt.Errorf("%s", cmdutil.FormatAPISIXCompatibilityResourceError(err, "plugin-config"))
 		}
 		format := opts.Output
 		if format == "" {
 			format = "json"
 		}
 		return cmdutil.NewExporter(format, opts.IO.Out).Write(json.RawMessage(body))
+	}
+	if opts.PluginsJSON == "" {
+		return fmt.Errorf("--plugins-json is required")
 	}
 
 	plugins := map[string]interface{}{}
@@ -115,7 +115,7 @@ func actionRun(opts *Options) error {
 	client := api.NewClient(httpClient, cfg.BaseURL())
 	body, err := client.Put("/apisix/admin/plugin_configs/"+opts.ID+"?gateway_group_id="+ggID, bodyReq)
 	if err != nil {
-		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
+		return fmt.Errorf("%s", cmdutil.FormatAPISIXCompatibilityResourceError(err, "plugin-config"))
 	}
 
 	var updated api.PluginConfig
