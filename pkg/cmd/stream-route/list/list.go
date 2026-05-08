@@ -41,7 +41,7 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 		},
 	}
 	c.Flags().StringVar(&opts.Label, "label", "", "Filter by label (key=value)")
-	c.Flags().StringVar(&opts.ServiceID, "service-id", "", "Filter by service ID (required by API7 EE)")
+	c.Flags().StringVar(&opts.ServiceID, "service-id", "", "Service ID (required by API7 EE)")
 
 	return c
 }

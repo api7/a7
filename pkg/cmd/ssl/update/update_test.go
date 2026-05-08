@@ -151,3 +151,34 @@ func TestUpdateSSL_SendsExplicitStatusZero(t *testing.T) {
 	}
 	registry.Verify(t)
 }
+
+func TestUpdateSSL_PreservesExistingStatusZero(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	registry := &httpmock.Registry{}
+	registry.Register(http.MethodGet, "/apisix/admin/ssls/ssl1", httpmock.JSONResponse(`{"value":{"id":"ssl1","cert":"old-cert","key":"old-key","snis":["old.example.com"],"type":"server","status":0}}`))
+	registry.RegisterResponder(http.MethodPut, "/apisix/admin/ssls/ssl1", func(req *http.Request) (httpmock.Response, error) {
+		var payload map[string]interface{}
+		if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+			return httpmock.Response{}, fmt.Errorf("decode request: %w", err)
+		}
+		if payload["status"] != float64(0) {
+			return httpmock.Response{}, fmt.Errorf("expected existing status 0 to be preserved, got payload %#v", payload)
+		}
+		return httpmock.JSONResponse(`{"value":{"id":"ssl1","cert":"old-cert","key":"old-key","snis":["new.example.com"],"type":"server","status":0}}`), nil
+	})
+
+	err := actionRun(&Options{
+		IO:           ios,
+		Client:       func() (*http.Client, error) { return registry.GetClient(), nil },
+		GatewayGroup: "gg1",
+		ID:           "ssl1",
+		SNIs:         []string{"new.example.com"},
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("actionRun failed: %v", err)
+	}
+	registry.Verify(t)
+}

@@ -199,7 +199,10 @@ func looksLikePath(v string) bool {
 		return true
 	}
 	info, err := os.Stat(v)
-	return (err == nil && !info.IsDir()) || os.IsNotExist(err)
+	if err != nil {
+		return true
+	}
+	return !info.IsDir()
 }
 
 func parseLabels(raw []string) map[string]string {

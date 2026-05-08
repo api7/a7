@@ -89,6 +89,11 @@ func actionRun(opts *Options) error {
 			delete(payload, "id")
 		}
 
+		name, hasName, err := credentialNameFromPayload(payload)
+		if err != nil {
+			return err
+		}
+
 		httpClient, err := opts.Client()
 		if err != nil {
 			return err
@@ -97,8 +102,8 @@ func actionRun(opts *Options) error {
 		path := "/apisix/admin/consumers/" + opts.Consumer + "/credentials?gateway_group_id=" + ggID
 		client := api.NewClient(httpClient, cfg.BaseURL())
 		var body []byte
-		if name, ok := payload["name"]; ok {
-			body, err = client.Put(fmt.Sprintf("/apisix/admin/consumers/%s/credentials/%v?gateway_group_id=%s", opts.Consumer, name, ggID), payload)
+		if hasName {
+			body, err = client.Put(fmt.Sprintf("/apisix/admin/consumers/%s/credentials/%s?gateway_group_id=%s", opts.Consumer, name, ggID), payload)
 		} else {
 			body, err = client.Post(path, payload)
 		}
@@ -159,4 +164,16 @@ func actionRun(opts *Options) error {
 		format = "json"
 	}
 	return cmdutil.NewExporter(format, opts.IO.Out).Write(created)
+}
+
+func credentialNameFromPayload(payload map[string]interface{}) (string, bool, error) {
+	rawName, ok := payload["name"]
+	if !ok {
+		return "", false, nil
+	}
+	name, ok := rawName.(string)
+	if !ok || strings.TrimSpace(name) == "" {
+		return "", false, fmt.Errorf("credential name must be a non-empty string")
+	}
+	return name, true, nil
 }

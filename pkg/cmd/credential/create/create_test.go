@@ -130,6 +130,26 @@ func TestCreateCredential_FileNormalizesLegacyID(t *testing.T) {
 	registry.Verify(t)
 }
 
+func TestCreateCredential_FileRejectsInvalidName(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	tmpFile := t.TempDir() + "/credential.json"
+	if err := os.WriteFile(tmpFile, []byte(`{"name":123,"plugins":{"key-auth":{"key":"k"}}}`), 0o644); err != nil {
+		t.Fatalf("write credential file: %v", err)
+	}
+
+	opts := &Options{IO: ios, Client: func() (*http.Client, error) {
+		t.Fatal("unexpected HTTP client call")
+		return nil, nil
+	}, Config: func() (config.Config, error) {
+		return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
+	}, Consumer: "alice", GatewayGroup: "gg1", File: tmpFile}
+
+	err := actionRun(opts)
+	if err == nil || !strings.Contains(err.Error(), "credential name must be a non-empty string") {
+		t.Fatalf("expected invalid credential name error, got: %v", err)
+	}
+}
+
 func TestCreateCredential_MissingGatewayGroup(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
 	opts := &Options{IO: ios, Client: func() (*http.Client, error) { return (&httpmock.Registry{}).GetClient(), nil }, Config: func() (config.Config, error) {

@@ -145,7 +145,7 @@ func actionRun(opts *Options) error {
 		body.Status = opts.Status
 	}
 
-	payload, err := sslPayload(body, opts)
+	payload, err := sslPayload(body)
 	if err != nil {
 		return err
 	}
@@ -174,8 +174,8 @@ func writeSSLResponse(format string, out io.Writer, body []byte) error {
 	return cmdutil.NewExporter(format, out).Write(api.RedactSSL(item))
 }
 
-func sslPayload(ssl api.SSL, opts *Options) (interface{}, error) {
-	if !opts.StatusSet || opts.Status != 0 {
+func sslPayload(ssl api.SSL) (interface{}, error) {
+	if ssl.Status != 0 {
 		return ssl, nil
 	}
 
@@ -187,7 +187,7 @@ func sslPayload(ssl api.SSL, opts *Options) (interface{}, error) {
 	if err := json.Unmarshal(b, &payload); err != nil {
 		return nil, fmt.Errorf("failed to prepare ssl payload: %w", err)
 	}
-	payload["status"] = opts.Status
+	payload["status"] = 0
 	return payload, nil
 }
 
@@ -221,7 +221,10 @@ func looksLikePath(v string) bool {
 		return true
 	}
 	info, err := os.Stat(v)
-	return (err == nil && !info.IsDir()) || os.IsNotExist(err)
+	if err != nil {
+		return true
+	}
+	return !info.IsDir()
 }
 
 func parseLabels(raw []string) map[string]string {
