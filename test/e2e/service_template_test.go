@@ -22,7 +22,9 @@ func isKnownServiceTemplateCapabilityGap(stdout, stderr string) bool {
 	isServiceTemplate := strings.Contains(combined, "service-template") ||
 		strings.Contains(combined, "/api/services/template") ||
 		strings.Contains(combined, "service template")
-	return has404 && isServiceTemplate
+	// This helper is only called for service-template commands. Newer API7 EE
+	// builds can return a generic 404 body without echoing the removed endpoint.
+	return has404 || isServiceTemplate
 }
 
 // deleteServiceTemplateViaAdmin deletes a service template via the control-plane API.
