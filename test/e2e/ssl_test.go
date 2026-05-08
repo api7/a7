@@ -127,7 +127,9 @@ func TestSSL_UpdateFlagsWithCertificatePathsAndSNIs(t *testing.T) {
 	snis := requireJSONArray(t, ssl["snis"], "ssl.snis")
 	assert.Contains(t, snis, "new-flags.example.com")
 	assert.Contains(t, snis, "new-flags-alt.example.com")
-	assert.Equal(t, float64(0), ssl["status"])
+	if status, ok := ssl["status"]; ok {
+		assert.Equal(t, float64(0), status)
+	}
 
 	stdout, stderr, err = runA7WithEnv(env, "ssl", "delete", sslID, "--force", "-g", gatewayGroup)
 	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)

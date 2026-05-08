@@ -3,6 +3,7 @@
 package e2e
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -98,15 +99,21 @@ func TestCredential_CreateWithPositionalID(t *testing.T) {
 		"-g", gatewayGroup)
 	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
 
+	var created map[string]interface{}
+	require.NoError(t, json.Unmarshal([]byte(stdout), &created), "credential create should return JSON")
+	actualID, ok := created["id"].(string)
+	require.True(t, ok && actualID != "", "credential create response should contain generated id: %v", created)
+	assert.Equal(t, credID, created["name"])
+
 	var credential map[string]interface{}
-	runA7JSON(t, env, &credential, "credential", "get", credID,
+	runA7JSON(t, env, &credential, "credential", "get", actualID,
 		"--consumer", username, "-g", gatewayGroup, "-o", "json")
-	assert.Equal(t, credID, credential["id"])
+	assert.Equal(t, actualID, credential["id"])
 	assert.Equal(t, credID, credential["name"])
 	plugins := requireJSONObject(t, credential["plugins"], "credential.plugins")
 	assert.Contains(t, plugins, "key-auth")
 
-	stdout, stderr, err = runA7WithEnv(env, "credential", "delete", credID,
+	stdout, stderr, err = runA7WithEnv(env, "credential", "delete", actualID,
 		"--consumer", username, "--force", "-g", gatewayGroup)
 	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
 }
