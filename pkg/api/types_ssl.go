@@ -10,3 +10,22 @@ type SSL struct {
 	Status int               `json:"status,omitempty" yaml:"status,omitempty"`
 	Type   string            `json:"type,omitempty" yaml:"type,omitempty"`
 }
+
+const RedactedSSLKey = "<redacted>"
+
+// RedactSSL returns a copy safe for CLI output.
+func RedactSSL(ssl SSL) SSL {
+	if ssl.Key != "" {
+		ssl.Key = RedactedSSLKey
+	}
+	return ssl
+}
+
+// RedactSSLs returns copies safe for CLI output.
+func RedactSSLs(ssls []SSL) []SSL {
+	redacted := make([]SSL, len(ssls))
+	for i, ssl := range ssls {
+		redacted[i] = RedactSSL(ssl)
+	}
+	return redacted
+}

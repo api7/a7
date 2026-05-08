@@ -3,6 +3,7 @@ package create
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -103,7 +104,7 @@ func actionRun(opts *Options) error {
 		if output == "" {
 			output = "json"
 		}
-		return cmdutil.NewExporter(output, opts.IO.Out).Write(json.RawMessage(body))
+		return writeSSLResponse(output, opts.IO.Out, body)
 	}
 	if opts.Cert == "" {
 		return fmt.Errorf("--cert is required")
@@ -139,7 +140,7 @@ func actionRun(opts *Options) error {
 	}
 
 	client := api.NewClient(httpClient, cfg.BaseURL())
-	_, err = client.Post("/apisix/admin/ssls?gateway_group_id="+ggID, body)
+	createdBody, err := client.Post("/apisix/admin/ssls?gateway_group_id="+ggID, body)
 	if err != nil {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
 	}
@@ -149,7 +150,26 @@ func actionRun(opts *Options) error {
 		output = "json"
 	}
 
-	return cmdutil.NewExporter(output, opts.IO.Out).Write(body)
+	return writeSSLResponseOrFallback(output, opts.IO.Out, createdBody, body)
+}
+
+func writeSSLResponse(format string, out io.Writer, body []byte) error {
+	var item api.SSL
+	if err := json.Unmarshal(body, &item); err != nil {
+		return cmdutil.NewExporter(format, out).Write(json.RawMessage(body))
+	}
+	return cmdutil.NewExporter(format, out).Write(api.RedactSSL(item))
+}
+
+func writeSSLResponseOrFallback(format string, out io.Writer, body []byte, fallback api.SSL) error {
+	if len(body) == 0 {
+		return cmdutil.NewExporter(format, out).Write(api.RedactSSL(fallback))
+	}
+	var item api.SSL
+	if err := json.Unmarshal(body, &item); err != nil {
+		return cmdutil.NewExporter(format, out).Write(api.RedactSSL(fallback))
+	}
+	return cmdutil.NewExporter(format, out).Write(api.RedactSSL(item))
 }
 
 func maybeReadFile(input string) (string, error) {
@@ -179,7 +199,7 @@ func looksLikePath(v string) bool {
 		return true
 	}
 	info, err := os.Stat(v)
-	return err == nil && !info.IsDir()
+	return (err == nil && !info.IsDir()) || os.IsNotExist(err)
 }
 
 func parseLabels(raw []string) map[string]string {

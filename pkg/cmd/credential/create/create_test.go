@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 
@@ -80,8 +81,51 @@ func TestCreateCredential_PositionalIDSetsName(t *testing.T) {
 	if err := actionRun(opts); err != nil {
 		t.Fatalf("actionRun failed: %v", err)
 	}
-	if !strings.Contains(out.String(), `"name": "cred1"`) {
-		t.Fatalf("expected credential name in output: %s", out.String())
+	var item api.Credential
+	if err := json.Unmarshal(out.Bytes(), &item); err != nil {
+		t.Fatalf("failed to parse output: %v", err)
+	}
+	if item.Name != "cred1" {
+		t.Fatalf("expected credential name in output, got %+v", item)
+	}
+	registry.Verify(t)
+}
+
+func TestCreateCredential_FileNormalizesLegacyID(t *testing.T) {
+	ios, _, out, _ := iostreams.Test()
+	tmpFile := t.TempDir() + "/credential.json"
+	if err := os.WriteFile(tmpFile, []byte(`{"id":"cred-file","plugins":{"key-auth":{"key":"k"}}}`), 0o644); err != nil {
+		t.Fatalf("write credential file: %v", err)
+	}
+
+	registry := &httpmock.Registry{}
+	registry.RegisterResponder(http.MethodPut, "/apisix/admin/consumers/alice/credentials/cred-file", func(req *http.Request) (httpmock.Response, error) {
+		var payload map[string]interface{}
+		if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+			return httpmock.Response{}, fmt.Errorf("decode request body: %w", err)
+		}
+		if payload["name"] != "cred-file" {
+			return httpmock.Response{}, fmt.Errorf("expected legacy id to map to name, got payload: %#v", payload)
+		}
+		if _, ok := payload["id"]; ok {
+			return httpmock.Response{}, fmt.Errorf("expected legacy id to be removed, got payload: %#v", payload)
+		}
+		return httpmock.JSONResponse(`{"id":"generated","name":"cred-file"}`), nil
+	})
+
+	opts := &Options{IO: ios, Client: func() (*http.Client, error) { return registry.GetClient(), nil }, Config: func() (config.Config, error) {
+		return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
+	}, Consumer: "alice", GatewayGroup: "gg1", File: tmpFile}
+
+	if err := actionRun(opts); err != nil {
+		t.Fatalf("actionRun failed: %v", err)
+	}
+	var item api.Credential
+	if err := json.Unmarshal(out.Bytes(), &item); err != nil {
+		t.Fatalf("failed to parse output: %v", err)
+	}
+	if item.Name != "cred-file" {
+		t.Fatalf("expected credential name in output, got %+v", item)
 	}
 	registry.Verify(t)
 }

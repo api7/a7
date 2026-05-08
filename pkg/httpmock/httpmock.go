@@ -49,15 +49,15 @@ func (r *Registry) RegisterResponder(method, path string, responder func(*http.R
 // RoundTrip implements http.RoundTripper.
 func (r *Registry) RoundTrip(req *http.Request) (*http.Response, error) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	for i, m := range r.mocks {
 		if m.method == req.Method && m.path == req.URL.Path {
 			r.mocks[i].called++
 			resp := m.resp
-			if m.responder != nil {
+			responder := m.responder
+			r.mu.Unlock()
+			if responder != nil {
 				var err error
-				resp, err = m.responder(req)
+				resp, err = responder(req)
 				if err != nil {
 					return nil, err
 				}
@@ -74,6 +74,7 @@ func (r *Registry) RoundTrip(req *http.Request) (*http.Response, error) {
 			}, nil
 		}
 	}
+	r.mu.Unlock()
 	return nil, fmt.Errorf("no mock registered for %s %s", req.Method, req.URL.Path)
 }
 

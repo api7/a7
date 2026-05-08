@@ -3,6 +3,7 @@ package update
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -103,7 +104,7 @@ func actionRun(opts *Options) error {
 		if format == "" {
 			format = "json"
 		}
-		return cmdutil.NewExporter(format, opts.IO.Out).Write(json.RawMessage(body))
+		return writeSSLResponse(format, opts.IO.Out, body)
 	}
 
 	cert, err := maybeReadFile(opts.Cert)
@@ -162,7 +163,15 @@ func actionRun(opts *Options) error {
 		output = "json"
 	}
 
-	return cmdutil.NewExporter(output, opts.IO.Out).Write(updated)
+	return cmdutil.NewExporter(output, opts.IO.Out).Write(api.RedactSSL(updated))
+}
+
+func writeSSLResponse(format string, out io.Writer, body []byte) error {
+	var item api.SSL
+	if err := json.Unmarshal(body, &item); err != nil {
+		return cmdutil.NewExporter(format, out).Write(json.RawMessage(body))
+	}
+	return cmdutil.NewExporter(format, out).Write(api.RedactSSL(item))
 }
 
 func sslPayload(ssl api.SSL, opts *Options) (interface{}, error) {
@@ -212,7 +221,7 @@ func looksLikePath(v string) bool {
 		return true
 	}
 	info, err := os.Stat(v)
-	return err == nil && !info.IsDir()
+	return (err == nil && !info.IsDir()) || os.IsNotExist(err)
 }
 
 func parseLabels(raw []string) map[string]string {

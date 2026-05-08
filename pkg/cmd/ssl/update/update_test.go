@@ -69,6 +69,13 @@ func TestMaybeReadFileKeepsEmptyAndPEMLiteral(t *testing.T) {
 	}
 }
 
+func TestMaybeReadFileTreatsMissingBareFilenameAsPath(t *testing.T) {
+	_, err := maybeReadFile("missing-cert.pem")
+	if err == nil || !strings.Contains(err.Error(), `failed to read file "missing-cert.pem"`) {
+		t.Fatalf("expected missing bare filename to be treated as a path, got %v", err)
+	}
+}
+
 func TestUpdateSSL_PreservesCertificateWhenUpdatingSNI(t *testing.T) {
 	ios, _, out, _ := iostreams.Test()
 	registry := &httpmock.Registry{}
@@ -102,6 +109,13 @@ func TestUpdateSSL_PreservesCertificateWhenUpdatingSNI(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "new.example.com") {
 		t.Fatalf("expected updated ssl output, got %s", out.String())
+	}
+	var output api.SSL
+	if err := json.Unmarshal(out.Bytes(), &output); err != nil {
+		t.Fatalf("failed to parse output: %v", err)
+	}
+	if strings.Contains(out.String(), "old-key") || output.Key != api.RedactedSSLKey {
+		t.Fatalf("expected ssl key to be redacted in output, got %+v", output)
 	}
 	registry.Verify(t)
 }
