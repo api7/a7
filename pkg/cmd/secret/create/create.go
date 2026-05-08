@@ -112,12 +112,16 @@ func actionRun(opts *Options) error {
 		if err != nil {
 			return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
 		}
+		var created api.Secret
+		if err := json.Unmarshal(body, &created); err != nil {
+			return fmt.Errorf("failed to decode response: %w", err)
+		}
 
 		format := opts.Output
 		if format == "" {
 			format = "json"
 		}
-		return cmdutil.NewExporter(format, opts.IO.Out).Write(json.RawMessage(body))
+		return cmdutil.NewExporter(format, opts.IO.Out).Write(api.RedactSecret(created))
 	}
 	if opts.ID == "" {
 		return fmt.Errorf("secret provider id is required; use a positional arg or --id")
@@ -163,5 +167,5 @@ func actionRun(opts *Options) error {
 		format = "json"
 	}
 	exporter := cmdutil.NewExporter(format, opts.IO.Out)
-	return exporter.Write(created)
+	return exporter.Write(api.RedactSecret(created))
 }

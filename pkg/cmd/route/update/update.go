@@ -127,6 +127,7 @@ func actionRun(opts *Options) error {
 	}
 	if opts.URI != "" {
 		bodyReq.URI = ""
+		bodyReq.URIs = nil
 		bodyReq.Paths = []string{opts.URI}
 	}
 	if len(opts.Methods) > 0 {
@@ -174,7 +175,7 @@ func actionRun(opts *Options) error {
 }
 
 func routePayload(route api.Route, opts *Options) (interface{}, error) {
-	if (!opts.StatusSet || opts.Status != 0) && (!opts.PrioritySet || opts.Priority != 0) {
+	if !opts.StatusSet && !opts.PrioritySet {
 		return route, nil
 	}
 

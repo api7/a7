@@ -113,9 +113,14 @@ func TestSSL_UpdateFlagsWithCertificatePathsAndSNIs(t *testing.T) {
 	stdout, stderr, err := runA7WithEnv(env, "ssl", "create", "-f", tmpFile, "-g", gatewayGroup)
 	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
 
+	modRoot, err := resolveModuleRoot()
+	require.NoError(t, err)
+	certPathArg := filepath.Join(modRoot, "test/e2e/testdata/test.crt")
+	keyPathArg := filepath.Join(modRoot, "test/e2e/testdata/test.key")
+
 	stdout, stderr, err = runA7WithEnv(env, "ssl", "update", sslID,
-		"--cert", "testdata/test.crt",
-		"--key", "testdata/test.key",
+		"--cert", certPathArg,
+		"--key", keyPathArg,
 		"--sni", "new-flags.example.com",
 		"--sni", "new-flags-alt.example.com",
 		"--status", "0",
@@ -133,6 +138,8 @@ func TestSSL_UpdateFlagsWithCertificatePathsAndSNIs(t *testing.T) {
 
 	stdout, stderr, err = runA7WithEnv(env, "ssl", "delete", sslID, "--force", "-g", gatewayGroup)
 	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+	_, _, err = runA7WithEnv(env, "ssl", "get", sslID, "-g", gatewayGroup)
+	assert.Error(t, err)
 }
 
 func TestSSL_DeleteNonexistent(t *testing.T) {

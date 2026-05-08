@@ -82,11 +82,15 @@ func actionRun(opts *Options) error {
 		if err != nil {
 			return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
 		}
+		var updated api.Secret
+		if err := json.Unmarshal(body, &updated); err != nil {
+			return fmt.Errorf("failed to decode response: %w", err)
+		}
 		format := opts.Output
 		if format == "" {
 			format = "json"
 		}
-		return cmdutil.NewExporter(format, opts.IO.Out).Write(json.RawMessage(body))
+		return cmdutil.NewExporter(format, opts.IO.Out).Write(api.RedactSecret(updated))
 	}
 
 	labels := make(map[string]string)
@@ -136,5 +140,5 @@ func actionRun(opts *Options) error {
 		format = "json"
 	}
 	exporter := cmdutil.NewExporter(format, opts.IO.Out)
-	return exporter.Write(updated)
+	return exporter.Write(api.RedactSecret(updated))
 }

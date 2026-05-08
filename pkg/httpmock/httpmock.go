@@ -17,10 +17,11 @@ type Response struct {
 }
 
 type mock struct {
-	method string
-	path   string
-	resp   Response
-	called int
+	method    string
+	path      string
+	resp      Response
+	responder func(*http.Request) (Response, error)
+	called    int
 }
 
 // Registry is an HTTP mock registry that implements http.RoundTripper.
@@ -38,6 +39,13 @@ func (r *Registry) Register(method, path string, resp Response) {
 	r.mocks = append(r.mocks, mock{method: method, path: path, resp: resp})
 }
 
+// RegisterResponder adds a mock response that can inspect the request.
+func (r *Registry) RegisterResponder(method, path string, responder func(*http.Request) (Response, error)) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.mocks = append(r.mocks, mock{method: method, path: path, responder: responder})
+}
+
 // RoundTrip implements http.RoundTripper.
 func (r *Registry) RoundTrip(req *http.Request) (*http.Response, error) {
 	r.mu.Lock()
@@ -46,14 +54,22 @@ func (r *Registry) RoundTrip(req *http.Request) (*http.Response, error) {
 	for i, m := range r.mocks {
 		if m.method == req.Method && m.path == req.URL.Path {
 			r.mocks[i].called++
+			resp := m.resp
+			if m.responder != nil {
+				var err error
+				resp, err = m.responder(req)
+				if err != nil {
+					return nil, err
+				}
+			}
 			header := make(http.Header)
 			header.Set("Content-Type", "application/json")
-			for k, v := range m.resp.Header {
+			for k, v := range resp.Header {
 				header[k] = v
 			}
 			return &http.Response{
-				StatusCode: m.resp.StatusCode,
-				Body:       io.NopCloser(bytes.NewBuffer(m.resp.Body)),
+				StatusCode: resp.StatusCode,
+				Body:       io.NopCloser(bytes.NewBuffer(resp.Body)),
 				Header:     header,
 			}, nil
 		}

@@ -15,8 +15,6 @@ requires `--service-id` for stream-route list requests.
 |------|-------|---------|-------------|
 | `--gateway-group` | `-g` | | Target gateway group name (required) |
 | `--service-id` | | | Service ID whose stream routes should be listed (required by API7 EE) |
-| `--page` | | `1` | Page number for pagination |
-| `--page-size` | | `20` | Number of items per page |
 | `--output` | `-o` | `table` | Output format (table, json, yaml) |
 
 **Examples:**
@@ -122,7 +120,7 @@ API7 EE requires `--service-id` for stream-route export requests.
 
 **Examples:**
 
-Export all stream routes to a YAML file:
+Export stream routes for a service to a YAML file:
 ```bash
 a7 stream-route export -g default --service-id example-service -f stream-routes.yaml
 ```

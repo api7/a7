@@ -16,18 +16,13 @@ import (
 
 func isKnownServiceTemplateCapabilityGap(stdout, stderr string) bool {
 	combined := strings.ToLower(stdout + "\n" + stderr)
-	for _, needle := range []string{
-		"resource not found",
-		"api error (status 404)",
-		"/404",
-		"api7 enterprise",
-		"not exposed",
-	} {
-		if strings.Contains(combined, needle) {
-			return true
-		}
-	}
-	return false
+	has404 := strings.Contains(combined, "api error (status 404)") ||
+		strings.Contains(combined, "resource not found") ||
+		strings.Contains(combined, "/404")
+	isServiceTemplate := strings.Contains(combined, "service-template") ||
+		strings.Contains(combined, "/api/services/template") ||
+		strings.Contains(combined, "service template")
+	return has404 && isServiceTemplate
 }
 
 // deleteServiceTemplateViaAdmin deletes a service template via the control-plane API.
@@ -69,9 +64,9 @@ func createTestServiceTemplateViaCLI(t *testing.T, env []string, name string) st
 	stdout, stderr, err := runA7WithEnv(env, "service-template", "create", "-f", tmpFile)
 	if err != nil {
 		if isKnownServiceTemplateCapabilityGap(stdout, stderr) {
-			t.Skipf("service-template API is unavailable in this environment: stdout=%s stderr=%s", stdout, stderr)
+			t.Skip("service-template API is unavailable in this environment")
 		}
-		require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+		require.NoError(t, err, "service-template create failed")
 	}
 
 	// Parse the returned ID from JSON response.
@@ -105,9 +100,9 @@ func TestServiceTemplate_List(t *testing.T) {
 	// Service templates use /api/services/template — no -g flag.
 	stdout, stderr, err := runA7WithEnv(env, "service-template", "list")
 	if err != nil && isKnownServiceTemplateCapabilityGap(stdout, stderr) {
-		t.Skipf("service-template list is unavailable in this environment: stdout=%s stderr=%s", stdout, stderr)
+		t.Skip("service-template list is unavailable in this environment")
 	}
-	require.NoError(t, err, stderr)
+	require.NoError(t, err, "service-template list failed")
 	assert.NotEmpty(t, stdout)
 }
 
@@ -116,9 +111,9 @@ func TestServiceTemplate_ListJSON(t *testing.T) {
 
 	stdout, stderr, err := runA7WithEnv(env, "service-template", "list", "-o", "json")
 	if err != nil && isKnownServiceTemplateCapabilityGap(stdout, stderr) {
-		t.Skipf("service-template list is unavailable in this environment: stdout=%s stderr=%s", stdout, stderr)
+		t.Skip("service-template list is unavailable in this environment")
 	}
-	require.NoError(t, err, stderr)
+	require.NoError(t, err, "service-template list JSON failed")
 	assert.NotEmpty(t, stdout)
 }
 
@@ -128,9 +123,9 @@ func TestServiceTemplate_Alias(t *testing.T) {
 	// Test the "st" alias.
 	stdout, stderr, err := runA7WithEnv(env, "st", "list")
 	if err != nil && isKnownServiceTemplateCapabilityGap(stdout, stderr) {
-		t.Skipf("service-template list alias is unavailable in this environment: stdout=%s stderr=%s", stdout, stderr)
+		t.Skip("service-template list alias is unavailable in this environment")
 	}
-	require.NoError(t, err, stderr)
+	require.NoError(t, err, "service-template list alias failed")
 	assert.NotEmpty(t, stdout)
 }
 
@@ -143,8 +138,8 @@ func TestServiceTemplate_CRUD(t *testing.T) {
 	t.Cleanup(func() { deleteServiceTemplateViaAdmin(t, stID) })
 
 	// Get
-	stdout, stderr, err := runA7WithEnv(env, "service-template", "get", stID)
-	require.NoError(t, err, stderr)
+	stdout, _, err := runA7WithEnv(env, "service-template", "get", stID)
+	require.NoError(t, err, "service-template get failed")
 	assert.Contains(t, stdout, stName)
 
 	// Get JSON
@@ -167,16 +162,16 @@ func TestServiceTemplate_CRUD(t *testing.T) {
 	tmpFile := filepath.Join(t.TempDir(), "service-template-update.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(updateJSON), 0644))
 
-	stdout, stderr, err = runA7WithEnv(env, "service-template", "update", stID, "-f", tmpFile)
-	require.NoError(t, err, stderr)
+	stdout, _, err = runA7WithEnv(env, "service-template", "update", stID, "-f", tmpFile)
+	require.NoError(t, err, "service-template update failed")
 
 	// Verify update
 	runA7JSON(t, env, &template, "service-template", "get", stID, "-o", "json")
 	assert.Equal(t, "e2e-template-updated", template["name"])
 
 	// Delete
-	stdout, stderr, err = runA7WithEnv(env, "service-template", "delete", stID, "--force")
-	require.NoError(t, err, stderr)
+	stdout, _, err = runA7WithEnv(env, "service-template", "delete", stID, "--force")
+	require.NoError(t, err, "service-template delete failed")
 	_, _, err = runA7WithEnv(env, "service-template", "get", stID)
 	assert.Error(t, err)
 }
@@ -187,9 +182,9 @@ func TestServiceTemplate_CreateWithName(t *testing.T) {
 	// We need to capture the ID from the JSON response to clean up.
 	stdout, stderr, err := runA7WithEnv(env, "service-template", "create", "--name", "e2e-named-template")
 	if err != nil && isKnownServiceTemplateCapabilityGap(stdout, stderr) {
-		t.Skipf("service-template create is unavailable in this environment: stdout=%s stderr=%s", stdout, stderr)
+		t.Skip("service-template create is unavailable in this environment")
 	}
-	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+	require.NoError(t, err, "service-template create with name failed")
 
 	// Parse ID from response for cleanup.
 	var resp map[string]interface{}
@@ -214,9 +209,9 @@ func TestServiceTemplate_Publish(t *testing.T) {
 	stdout, stderr, err := runA7WithEnv(env, "service-template", "publish", stID,
 		"--gateway-group-id", gatewayGroup)
 	if err != nil && isKnownServiceTemplateCapabilityGap(stdout, stderr) {
-		t.Skipf("service-template publish is unavailable in this environment: stdout=%s stderr=%s", stdout, stderr)
+		t.Skip("service-template publish is unavailable in this environment")
 	}
-	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+	require.NoError(t, err, "service-template publish failed")
 }
 
 func TestServiceTemplate_PublishMissingFlag(t *testing.T) {

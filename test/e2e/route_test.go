@@ -195,7 +195,7 @@ func TestRoute_UpdateFlagsMapsURIToPaths(t *testing.T) {
 	assert.Equal(t, routeID, route["id"])
 	assert.Equal(t, svcID, route["service_id"])
 	paths := requireJSONArray(t, route["paths"], "route.paths")
-	assert.Contains(t, paths, "/test-update-flags-new")
+	assert.Equal(t, []interface{}{"/test-update-flags-new"}, paths)
 	labels := requireJSONObject(t, route["labels"], "route.labels")
 	assert.Equal(t, "flag", labels["mode"])
 }

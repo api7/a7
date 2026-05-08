@@ -59,7 +59,7 @@ func TestUpdateSecret_JSON(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &item); err != nil {
 		t.Fatalf("failed to parse output: %v", err)
 	}
-	if item.ID != "vault/s1" || item.Prefix != "kv2" {
+	if item.ID != "vault/s1" || item.Prefix != "kv2" || item.Token != api.RedactedSecretToken {
 		t.Fatalf("unexpected item: %+v", item)
 	}
 
@@ -91,7 +91,7 @@ func TestUpdateSecret_PreservesCurrentFieldsWhenOmitted(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &item); err != nil {
 		t.Fatalf("failed to parse output: %v", err)
 	}
-	if item.Prefix != "kv1" || item.Token != "tok1" {
+	if item.Prefix != "kv1" || item.Token != api.RedactedSecretToken {
 		t.Fatalf("expected omitted fields to be preserved, got: %+v", item)
 	}
 

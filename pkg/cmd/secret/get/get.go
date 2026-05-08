@@ -73,7 +73,7 @@ func actionRun(opts *Options) error {
 
 	if opts.Output != "" {
 		exporter := cmdutil.NewExporter(opts.Output, opts.IO.Out)
-		return exporter.Write(item)
+		return exporter.Write(api.RedactSecret(item))
 	}
 
 	tp := tableprinter.New(opts.IO.Out)
@@ -81,6 +81,6 @@ func actionRun(opts *Options) error {
 	tp.AddRow("id", item.ID)
 	tp.AddRow("uri", item.URI)
 	tp.AddRow("prefix", item.Prefix)
-	tp.AddRow("token", item.Token)
+	tp.AddRow("token", api.RedactedSecretToken)
 	return tp.Render()
 }

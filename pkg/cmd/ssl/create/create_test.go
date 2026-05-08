@@ -2,29 +2,18 @@ package create
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 )
 
 func TestMaybeReadFileReadsBareRelativePath(t *testing.T) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("get cwd: %v", err)
-	}
 	tmp := t.TempDir()
-	if err := os.Chdir(tmp); err != nil {
-		t.Fatalf("chdir temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.Chdir(cwd); err != nil {
-			t.Fatalf("restore cwd: %v", err)
-		}
-	})
-
-	if err := os.WriteFile("cert.pem", []byte("file-cert"), 0o644); err != nil {
+	path := filepath.Join(tmp, "cert.pem")
+	if err := os.WriteFile(path, []byte("file-cert"), 0o644); err != nil {
 		t.Fatalf("write cert: %v", err)
 	}
 
-	got, err := maybeReadFile("cert.pem")
+	got, err := maybeReadFile(path)
 	if err != nil {
 		t.Fatalf("maybeReadFile failed: %v", err)
 	}

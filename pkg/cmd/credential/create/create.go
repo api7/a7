@@ -81,6 +81,7 @@ func actionRun(opts *Options) error {
 
 		if opts.ID != "" {
 			payload["name"] = opts.ID
+			delete(payload, "id")
 		}
 
 		httpClient, err := opts.Client()

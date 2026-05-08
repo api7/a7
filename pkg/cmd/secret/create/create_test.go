@@ -60,7 +60,7 @@ func TestCreateSecret_JSON(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &item); err != nil {
 		t.Fatalf("failed to parse output: %v", err)
 	}
-	if item.ID != "vault/s1" || item.URI != "http://vault" {
+	if item.ID != "vault/s1" || item.URI != "http://vault" || item.Token != api.RedactedSecretToken {
 		t.Fatalf("unexpected item: %+v", item)
 	}
 

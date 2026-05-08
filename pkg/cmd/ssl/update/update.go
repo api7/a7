@@ -148,9 +148,13 @@ func actionRun(opts *Options) error {
 	if err != nil {
 		return err
 	}
-	_, err = client.Put("/apisix/admin/ssls/"+opts.ID+"?gateway_group_id="+ggID, payload)
+	updatedBody, err := client.Put("/apisix/admin/ssls/"+opts.ID+"?gateway_group_id="+ggID, payload)
 	if err != nil {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
+	}
+	var updated api.SSL
+	if err := json.Unmarshal(updatedBody, &updated); err != nil {
+		return fmt.Errorf("failed to decode response: %w", err)
 	}
 
 	output := opts.Output
@@ -158,7 +162,7 @@ func actionRun(opts *Options) error {
 		output = "json"
 	}
 
-	return cmdutil.NewExporter(output, opts.IO.Out).Write(body)
+	return cmdutil.NewExporter(output, opts.IO.Out).Write(updated)
 }
 
 func sslPayload(ssl api.SSL, opts *Options) (interface{}, error) {

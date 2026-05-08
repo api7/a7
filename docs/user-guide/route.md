@@ -135,7 +135,7 @@ service.
 
 **Examples:**
 
-Export all routes to a YAML file:
+Export routes for a service to a YAML file:
 ```bash
 a7 route export -g default --service-id example-service -f routes.yaml
 ```
