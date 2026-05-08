@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -108,6 +109,9 @@ func createRun(opts *Options, f *cmd.Factory) error {
 		GatewayGroup:  opts.GatewayGroup,
 		TLSSkipVerify: opts.TLSSkipVerify,
 		CACert:        opts.CACert,
+	}
+	if ctx.Token == "" {
+		ctx.Token = os.Getenv("A7_TOKEN")
 	}
 
 	// Validate context before saving (unless --skip-validation is set)

@@ -2,6 +2,7 @@ package update
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -34,6 +35,7 @@ func (m *mockConfig) Save() error                                     { return n
 func TestUpdateService_Success(t *testing.T) {
 	ios, _, out, _ := iostreams.Test()
 	registry := &httpmock.Registry{}
+	registry.Register(http.MethodGet, "/apisix/admin/services/s1", httpmock.JSONResponse(`{"id":"s1","name":"svc-1","desc":"d1","upstream_id":"u1"}`))
 	registry.Register(http.MethodPut, "/apisix/admin/services/s1", httpmock.JSONResponse(`{"id":"s1","name":"svc-1-updated","desc":"d2","upstream_id":"u2"}`))
 
 	opts := &Options{
@@ -65,6 +67,38 @@ func TestUpdateService_Success(t *testing.T) {
 	registry.Verify(t)
 }
 
+func TestUpdateService_PreservesCurrentNameWhenOmitted(t *testing.T) {
+	ios, _, out, _ := iostreams.Test()
+	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		switch req.Method {
+		case http.MethodGet:
+			return jsonHTTPResponse(`{"id":"s1","name":"svc-1","desc":"old"}`), nil
+		case http.MethodPut:
+			var payload map[string]interface{}
+			if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+				t.Fatalf("decode request body: %v", err)
+			}
+			if payload["name"] != "svc-1" || payload["desc"] != "new" {
+				t.Fatalf("expected update to preserve existing name and apply desc, got payload: %#v", payload)
+			}
+			return jsonHTTPResponse(`{"id":"s1","name":"svc-1","desc":"new"}`), nil
+		default:
+			t.Fatalf("unexpected method: %s", req.Method)
+			return nil, nil
+		}
+	})}
+
+	opts := &Options{IO: ios, Client: func() (*http.Client, error) { return client, nil }, Config: func() (config.Config, error) {
+		return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
+	}, ID: "s1", Desc: "new", GatewayGroup: "gg1"}
+	if err := actionRun(opts); err != nil {
+		t.Fatalf("actionRun failed: %v", err)
+	}
+	if !strings.Contains(out.String(), `"name": "svc-1"`) {
+		t.Fatalf("expected preserved service name in output: %s", out.String())
+	}
+}
+
 func TestUpdateService_MissingGatewayGroup(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
 	registry := &httpmock.Registry{}
@@ -83,6 +117,7 @@ func TestUpdateService_MissingGatewayGroup(t *testing.T) {
 func TestUpdateService_APIError(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
 	registry := &httpmock.Registry{}
+	registry.Register(http.MethodGet, "/apisix/admin/services/s1", httpmock.JSONResponse(`{"id":"s1","name":"svc-1"}`))
 	registry.Register(http.MethodPut, "/apisix/admin/services/s1", httpmock.StringResponse(http.StatusInternalServerError, `{"message":"boom"}`))
 
 	err := actionRun(&Options{
@@ -98,6 +133,20 @@ func TestUpdateService_APIError(t *testing.T) {
 		t.Fatalf("expected API 500 error, got: %v", err)
 	}
 	registry.Verify(t)
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func jsonHTTPResponse(body string) *http.Response {
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(body)),
+	}
 }
 
 func TestUpdateService_ValidationError(t *testing.T) {

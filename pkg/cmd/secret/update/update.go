@@ -46,7 +46,7 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 
 	c.Flags().StringVar(&opts.URI, "uri", "", "Secret provider URI")
 	c.Flags().StringVar(&opts.Prefix, "prefix", "", "Secret provider prefix")
-	c.Flags().StringVar(&opts.Token, "token", "", "Secret provider token")
+	c.Flags().StringVar(&opts.Token, "provider-token", "", "Secret provider token")
 	c.Flags().StringSliceVar(&opts.Labels, "labels", nil, "Labels in key=value format")
 	c.Flags().StringVarP(&opts.File, "file", "f", "", "Path to JSON/YAML file with resource definition")
 
@@ -98,16 +98,29 @@ func actionRun(opts *Options) error {
 		labels[parts[0]] = parts[1]
 	}
 
-	bodyReq := api.Secret{
-		URI:    opts.URI,
-		Prefix: opts.Prefix,
-		Token:  opts.Token,
+	client := api.NewClient(httpClient, cfg.BaseURL())
+	currentBody, err := client.Get("/apisix/admin/secret_providers/"+opts.ID, map[string]string{"gateway_group_id": ggID})
+	if err != nil {
+		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
+	}
+	var bodyReq api.Secret
+	if err := json.Unmarshal(currentBody, &bodyReq); err != nil {
+		return fmt.Errorf("failed to decode current secret provider: %w", err)
+	}
+
+	if opts.URI != "" {
+		bodyReq.URI = opts.URI
+	}
+	if opts.Prefix != "" {
+		bodyReq.Prefix = opts.Prefix
+	}
+	if opts.Token != "" {
+		bodyReq.Token = opts.Token
 	}
 	if len(labels) > 0 {
 		bodyReq.Labels = labels
 	}
 
-	client := api.NewClient(httpClient, cfg.BaseURL())
 	body, err := client.Put("/apisix/admin/secret_providers/"+opts.ID+"?gateway_group_id="+ggID, bodyReq)
 	if err != nil {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))

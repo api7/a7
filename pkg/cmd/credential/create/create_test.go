@@ -2,6 +2,7 @@ package create
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -53,6 +54,48 @@ func TestCreateCredential_JSONOutput(t *testing.T) {
 	}
 
 	registry.Verify(t)
+}
+
+func TestCreateCredential_PositionalIDSetsName(t *testing.T) {
+	ios, _, out, _ := iostreams.Test()
+	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		if req.Method != http.MethodPost || req.URL.Path != "/apisix/admin/consumers/alice/credentials" {
+			t.Fatalf("unexpected request: %s %s", req.Method, req.URL.Path)
+		}
+		var payload map[string]interface{}
+		if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		if payload["name"] != "cred1" {
+			t.Fatalf("expected positional id to map to name, got payload: %#v", payload)
+		}
+		return jsonHTTPResponse(`{"id":"generated","name":"cred1"}`), nil
+	})}
+
+	opts := &Options{IO: ios, Client: func() (*http.Client, error) { return client, nil }, Config: func() (config.Config, error) {
+		return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
+	}, Consumer: "alice", GatewayGroup: "gg1", ID: "cred1", PluginsJSON: `{"key-auth":{"key":"k"}}`}
+
+	if err := actionRun(opts); err != nil {
+		t.Fatalf("actionRun failed: %v", err)
+	}
+	if !strings.Contains(out.String(), `"name": "cred1"`) {
+		t.Fatalf("expected credential name in output: %s", out.String())
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func jsonHTTPResponse(body string) *http.Response {
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(body)),
+	}
 }
 
 func TestCreateCredential_MissingGatewayGroup(t *testing.T) {

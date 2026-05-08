@@ -64,7 +64,7 @@ func actionRun(opts *Options) error {
 	query := map[string]string{"gateway_group_id": ggID}
 	body, err := client.Get("/apisix/admin/plugin_configs/"+opts.ID, query)
 	if err != nil {
-		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
+		return fmt.Errorf("%s", cmdutil.FormatAPISIXCompatibilityResourceError(err, "plugin-config"))
 	}
 
 	var item api.PluginConfig

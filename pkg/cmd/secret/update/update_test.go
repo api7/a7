@@ -7,6 +7,7 @@ import (
 
 	"github.com/api7/a7/internal/config"
 	"github.com/api7/a7/pkg/api"
+	cmd "github.com/api7/a7/pkg/cmd"
 	"github.com/api7/a7/pkg/httpmock"
 	"github.com/api7/a7/pkg/iostreams"
 )
@@ -33,6 +34,7 @@ func (m *mockConfig) Save() error                                     { return n
 func TestUpdateSecret_JSON(t *testing.T) {
 	ios, _, out, _ := iostreams.Test()
 	registry := &httpmock.Registry{}
+	registry.Register(http.MethodGet, "/apisix/admin/secret_providers/vault/s1", httpmock.JSONResponse(`{"id":"vault/s1","uri":"http://vault1","prefix":"kv1","token":"tok1"}`))
 	registry.Register(http.MethodPut, "/apisix/admin/secret_providers/vault/s1", httpmock.JSONResponse(`{"id":"vault/s1","uri":"http://vault2","prefix":"kv2","token":"tok2"}`))
 
 	opts := &Options{
@@ -62,4 +64,48 @@ func TestUpdateSecret_JSON(t *testing.T) {
 	}
 
 	registry.Verify(t)
+}
+
+func TestUpdateSecret_PreservesCurrentFieldsWhenOmitted(t *testing.T) {
+	ios, _, out, _ := iostreams.Test()
+	registry := &httpmock.Registry{}
+	registry.Register(http.MethodGet, "/apisix/admin/secret_providers/vault/s1", httpmock.JSONResponse(`{"id":"vault/s1","uri":"http://vault1","prefix":"kv1","token":"tok1"}`))
+	registry.Register(http.MethodPut, "/apisix/admin/secret_providers/vault/s1", httpmock.JSONResponse(`{"id":"vault/s1","uri":"http://vault2","prefix":"kv1","token":"tok1"}`))
+
+	opts := &Options{
+		IO:     ios,
+		Client: func() (*http.Client, error) { return registry.GetClient(), nil },
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
+		},
+		GatewayGroup: "gg1",
+		ID:           "vault/s1",
+		URI:          "http://vault2",
+	}
+
+	if err := actionRun(opts); err != nil {
+		t.Fatalf("actionRun failed: %v", err)
+	}
+
+	var item api.Secret
+	if err := json.Unmarshal(out.Bytes(), &item); err != nil {
+		t.Fatalf("failed to parse output: %v", err)
+	}
+	if item.Prefix != "kv1" || item.Token != "tok1" {
+		t.Fatalf("expected omitted fields to be preserved, got: %+v", item)
+	}
+
+	registry.Verify(t)
+}
+
+func TestUpdateCommandUsesProviderTokenFlag(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	c := NewCmd(&cmd.Factory{IOStreams: ios})
+
+	if c.Flags().Lookup("provider-token") == nil {
+		t.Fatal("expected provider-token flag")
+	}
+	if c.Flags().Lookup("token") != nil {
+		t.Fatal("secret update must not define a local token flag that shadows the global API token")
+	}
 }

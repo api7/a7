@@ -99,10 +99,24 @@ func actionRun(opts *Options) error {
 		labels[parts[0]] = parts[1]
 	}
 
-	bodyReq := api.Service{
-		Name:       opts.Name,
-		Desc:       opts.Desc,
-		UpstreamID: opts.UpstreamID,
+	client := api.NewClient(httpClient, cfg.BaseURL())
+	currentBody, err := client.Get("/apisix/admin/services/"+opts.ID, map[string]string{"gateway_group_id": ggID})
+	if err != nil {
+		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
+	}
+	var bodyReq api.Service
+	if err := json.Unmarshal(currentBody, &bodyReq); err != nil {
+		return fmt.Errorf("failed to decode current service: %w", err)
+	}
+
+	if opts.Name != "" {
+		bodyReq.Name = opts.Name
+	}
+	if opts.Desc != "" {
+		bodyReq.Desc = opts.Desc
+	}
+	if opts.UpstreamID != "" {
+		bodyReq.UpstreamID = opts.UpstreamID
 	}
 	if len(labels) > 0 {
 		bodyReq.Labels = labels
@@ -111,7 +125,6 @@ func actionRun(opts *Options) error {
 		bodyReq.Hosts = []string{opts.Host}
 	}
 
-	client := api.NewClient(httpClient, cfg.BaseURL())
 	body, err := client.Put("/apisix/admin/services/"+opts.ID+"?gateway_group_id="+ggID, bodyReq)
 	if err != nil {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))

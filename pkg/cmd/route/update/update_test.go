@@ -1,6 +1,8 @@
 package update
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -34,6 +36,7 @@ func (m *mockConfig) Save() error                                     { return n
 func TestUpdateRoute_Success(t *testing.T) {
 	ios, _, out, _ := iostreams.Test()
 	registry := &httpmock.Registry{}
+	registry.Register(http.MethodGet, "/apisix/admin/routes/r1", httpmock.JSONResponse(`{"id":"r1","name":"old-name","paths":["/old"],"service_id":"svc1"}`))
 	registry.Register(http.MethodPut, "/apisix/admin/routes/r1", httpmock.JSONResponse(`{"id":"r1","name":"new-name"}`))
 	opts := &Options{IO: ios, Client: func() (*http.Client, error) { return registry.GetClient(), nil }, Config: func() (config.Config, error) {
 		return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
@@ -45,6 +48,65 @@ func TestUpdateRoute_Success(t *testing.T) {
 		t.Fatalf("expected updated route output: %s", out.String())
 	}
 	registry.Verify(t)
+}
+
+func TestUpdateRoute_URIMapsToPathsAndPreservesCurrentRoute(t *testing.T) {
+	ios, _, out, _ := iostreams.Test()
+	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		switch req.Method {
+		case http.MethodGet:
+			if req.URL.Path != "/apisix/admin/routes/r1" {
+				t.Fatalf("unexpected GET path: %s", req.URL.Path)
+			}
+			return jsonHTTPResponse(`{"id":"r1","name":"old-name","paths":["/old"],"service_id":"svc1","status":1}`), nil
+		case http.MethodPut:
+			var payload map[string]interface{}
+			if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+				t.Fatalf("decode request body: %v", err)
+			}
+			if _, ok := payload["uri"]; ok {
+				t.Fatalf("route update should not send uri to API7 EE: %#v", payload)
+			}
+			paths, ok := payload["paths"].([]interface{})
+			if !ok || len(paths) != 1 || paths[0] != "/new" {
+				t.Fatalf("expected uri to map to paths, got payload: %#v", payload)
+			}
+			if payload["name"] != "old-name" || payload["service_id"] != "svc1" {
+				t.Fatalf("expected current route fields to be preserved, got payload: %#v", payload)
+			}
+			if payload["status"] != float64(0) {
+				t.Fatalf("expected explicit status 0 to be sent, got payload: %#v", payload)
+			}
+			return jsonHTTPResponse(`{"id":"r1","name":"old-name","paths":["/new"],"service_id":"svc1","status":0}`), nil
+		default:
+			t.Fatalf("unexpected method: %s", req.Method)
+			return nil, nil
+		}
+	})}
+
+	opts := &Options{IO: ios, Client: func() (*http.Client, error) { return client, nil }, Config: func() (config.Config, error) {
+		return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
+	}, ID: "r1", URI: "/new", Status: 0, StatusSet: true, GatewayGroup: "gg1"}
+	if err := actionRun(opts); err != nil {
+		t.Fatalf("actionRun failed: %v", err)
+	}
+	if !strings.Contains(out.String(), "/new") {
+		t.Fatalf("expected updated route output: %s", out.String())
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func jsonHTTPResponse(body string) *http.Response {
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(body)),
+	}
 }
 
 func TestUpdateRoute_InvalidLabel(t *testing.T) {

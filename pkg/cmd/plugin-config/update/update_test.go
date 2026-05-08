@@ -3,6 +3,8 @@ package update
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -57,6 +59,36 @@ func TestUpdatePluginConfig_Success(t *testing.T) {
 	}
 	if item.ID != "pc1" {
 		t.Fatalf("unexpected response: %+v", item)
+	}
+
+	registry.Verify(t)
+}
+
+func TestUpdatePluginConfig_FileModeDoesNotRequirePluginsJSON(t *testing.T) {
+	ios, _, out, _ := iostreams.Test()
+	registry := &httpmock.Registry{}
+	registry.Register(http.MethodPut, "/apisix/admin/plugin_configs/pc1", httpmock.JSONResponse(`{"id":"pc1","desc":"from-file","plugins":{"cors":{}}}`))
+
+	tmpFile := filepath.Join(t.TempDir(), "plugin-config.json")
+	if err := os.WriteFile(tmpFile, []byte(`{"desc":"from-file","plugins":{"cors":{}}}`), 0o644); err != nil {
+		t.Fatalf("write temp file: %v", err)
+	}
+
+	err := actionRun(&Options{
+		IO:           ios,
+		Client:       func() (*http.Client, error) { return registry.GetClient(), nil },
+		GatewayGroup: "gg1",
+		ID:           "pc1",
+		File:         tmpFile,
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("actionRun failed: %v", err)
+	}
+	if !strings.Contains(out.String(), "from-file") {
+		t.Fatalf("expected file-mode output, got: %s", out.String())
 	}
 
 	registry.Verify(t)

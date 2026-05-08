@@ -55,7 +55,7 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 	c.Flags().StringVarP(&opts.File, "file", "f", "", "Path to JSON/YAML file with resource definition")
 	c.Flags().StringVar(&opts.URI, "uri", "", "Secret provider URI")
 	c.Flags().StringVar(&opts.Prefix, "prefix", "", "Secret provider prefix")
-	c.Flags().StringVar(&opts.Token, "token", "", "Secret provider token")
+	c.Flags().StringVar(&opts.Token, "provider-token", "", "Secret provider token")
 	c.Flags().StringSliceVar(&opts.Labels, "labels", nil, "Labels in key=value format")
 
 	return c
@@ -148,7 +148,7 @@ func actionRun(opts *Options) error {
 	}
 
 	client := api.NewClient(httpClient, cfg.BaseURL())
-	body, err := client.Post("/apisix/admin/secret_providers?gateway_group_id="+ggID, bodyReq)
+	body, err := client.Put("/apisix/admin/secret_providers/"+opts.ID+"?gateway_group_id="+ggID, bodyReq)
 	if err != nil {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
 	}

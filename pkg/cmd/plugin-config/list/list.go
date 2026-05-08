@@ -70,7 +70,7 @@ func actionRun(opts *Options) error {
 	}
 	body, err := client.Get("/apisix/admin/plugin_configs", query)
 	if err != nil {
-		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
+		return fmt.Errorf("%s", cmdutil.FormatAPISIXCompatibilityResourceError(err, "plugin-config"))
 	}
 
 	var resp api.ListResponse[api.PluginConfig]

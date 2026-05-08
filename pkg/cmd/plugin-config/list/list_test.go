@@ -126,3 +126,23 @@ func TestListPluginConfigs_APIError(t *testing.T) {
 
 	registry.Verify(t)
 }
+
+func TestListPluginConfigs_NotFoundExplainsAPI7EECompatibility(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	registry := &httpmock.Registry{}
+	registry.Register(http.MethodGet, "/apisix/admin/plugin_configs", httpmock.StringResponse(http.StatusNotFound, `{"error_msg":"not found"}`))
+
+	err := actionRun(&Options{
+		IO:           ios,
+		Client:       func() (*http.Client, error) { return registry.GetClient(), nil },
+		GatewayGroup: "gg1",
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "APISIX compatibility") {
+		t.Fatalf("expected compatibility error, got: %v", err)
+	}
+
+	registry.Verify(t)
+}

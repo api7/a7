@@ -172,7 +172,14 @@ func maybeReadFile(input string) (string, error) {
 }
 
 func looksLikePath(v string) bool {
-	return strings.HasPrefix(v, "/") || strings.HasPrefix(v, "./") || strings.HasPrefix(v, "~/")
+	if strings.Contains(v, "-----BEGIN ") || strings.Contains(v, "\n") {
+		return false
+	}
+	if strings.HasPrefix(v, "/") || strings.HasPrefix(v, "./") || strings.HasPrefix(v, "~/") {
+		return true
+	}
+	info, err := os.Stat(v)
+	return err == nil && !info.IsDir()
 }
 
 func parseLabels(raw []string) map[string]string {

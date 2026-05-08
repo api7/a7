@@ -65,7 +65,7 @@ func actionRun(opts *Options) error {
 	client := api.NewClient(httpClient, cfg.BaseURL())
 	items, err := fetchAll(client, ggID, opts.Label)
 	if err != nil {
-		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
+		return fmt.Errorf("%s", cmdutil.FormatAPISIXCompatibilityResourceError(err, "plugin-config"))
 	}
 
 	if len(items) == 0 {

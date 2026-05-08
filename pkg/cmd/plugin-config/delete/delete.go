@@ -76,7 +76,7 @@ func actionRun(opts *Options) error {
 		}
 	}
 	if _, err := client.Delete("/apisix/admin/plugin_configs/"+opts.ID, query); err != nil {
-		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
+		return fmt.Errorf("%s", cmdutil.FormatAPISIXCompatibilityResourceError(err, "plugin-config"))
 	}
 
 	_, err = fmt.Fprintf(opts.IO.Out, "Plugin config %q deleted.\n", opts.ID)

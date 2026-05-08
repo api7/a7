@@ -50,6 +50,7 @@ func TestListStreamRoutes_Table(t *testing.T) {
 			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
 		},
 		GatewayGroup: "gg1",
+		ServiceID:    "svc1",
 	}
 
 	if err := actionRun(opts); err != nil {
@@ -81,6 +82,7 @@ func TestListStreamRoutes_JSON(t *testing.T) {
 		Client:       func() (*http.Client, error) { return registry.GetClient(), nil },
 		Output:       "json",
 		GatewayGroup: "gg1",
+		ServiceID:    "svc1",
 		Config: func() (config.Config, error) {
 			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
 		},
@@ -118,6 +120,24 @@ func TestListStreamRoutes_MissingGatewayGroup(t *testing.T) {
 	}
 }
 
+func TestListStreamRoutes_MissingServiceID(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+
+	opts := &Options{
+		IO:     ios,
+		Client: func() (*http.Client, error) { return (&httpmock.Registry{}).GetClient(), nil },
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
+		},
+		GatewayGroup: "gg1",
+	}
+
+	err := actionRun(opts)
+	if err == nil || !strings.Contains(err.Error(), "--service-id is required by API7 EE") {
+		t.Fatalf("expected service-id error, got: %v", err)
+	}
+}
+
 func TestListStreamRoutes_APIError(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
 	registry := &httpmock.Registry{}
@@ -127,6 +147,7 @@ func TestListStreamRoutes_APIError(t *testing.T) {
 		IO:           ios,
 		Client:       func() (*http.Client, error) { return registry.GetClient(), nil },
 		GatewayGroup: "gg1",
+		ServiceID:    "svc1",
 		Config: func() (config.Config, error) {
 			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
 		},

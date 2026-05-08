@@ -187,6 +187,73 @@ func TestCreateRun_SkipValidation(t *testing.T) {
 	assert.Equal(t, "fake-token", saved.Token)
 }
 
+func TestCreateRun_UsesA7TokenEnvWhenTokenFlagOmitted(t *testing.T) {
+	cfgPath := fmt.Sprintf("%s/config.yaml", t.TempDir())
+	cfg := config.NewFileConfigWithPath(cfgPath)
+	t.Setenv("A7_TOKEN", "env-token")
+
+	opts := &Options{
+		Config: func() (config.Config, error) {
+			return cfg, nil
+		},
+		Name:           "env-ctx",
+		Server:         "https://127.0.0.1:1",
+		SkipValidation: true,
+	}
+
+	ios, _, _, _ := iostreams.Test()
+	f := &cmd.Factory{
+		IOStreams: ios,
+		Config: func() (config.Config, error) {
+			return cfg, nil
+		},
+	}
+
+	err := createRun(opts, f)
+	require.NoError(t, err)
+
+	saved, err := cfg.GetContext("env-ctx")
+	require.NoError(t, err)
+	assert.Equal(t, "env-token", saved.Token)
+}
+
+func TestCreateRun_DoesNotReuseCurrentContextTokenWhenTokenFlagOmitted(t *testing.T) {
+	cfgPath := fmt.Sprintf("%s/config.yaml", t.TempDir())
+	cfg := config.NewFileConfigWithPath(cfgPath)
+	require.NoError(t, cfg.AddContext(config.Context{
+		Name:   "current",
+		Server: "https://current.example.com",
+		Token:  "current-token",
+	}))
+	require.NoError(t, cfg.SetCurrentContext("current"))
+	require.NoError(t, cfg.Save())
+	t.Setenv("A7_TOKEN", "")
+
+	opts := &Options{
+		Config: func() (config.Config, error) {
+			return cfg, nil
+		},
+		Name:           "new-ctx",
+		Server:         "https://127.0.0.1:1",
+		SkipValidation: true,
+	}
+
+	ios, _, _, _ := iostreams.Test()
+	f := &cmd.Factory{
+		IOStreams: ios,
+		Config: func() (config.Config, error) {
+			return cfg, nil
+		},
+	}
+
+	err := createRun(opts, f)
+	require.NoError(t, err)
+
+	saved, err := cfg.GetContext("new-ctx")
+	require.NoError(t, err)
+	assert.Empty(t, saved.Token)
+}
+
 func TestCreateRun_ValidationFails(t *testing.T) {
 	cfgPath := fmt.Sprintf("%s/config.yaml", t.TempDir())
 	cfg := config.NewFileConfigWithPath(cfgPath)

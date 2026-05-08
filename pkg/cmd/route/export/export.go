@@ -22,6 +22,7 @@ type Options struct {
 	Config       func() (config.Config, error)
 	GatewayGroup string
 	Label        string
+	ServiceID    string
 	Output       string
 	File         string
 }
@@ -38,6 +39,7 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 		},
 	}
 	c.Flags().StringVar(&opts.Label, "label", "", "Filter by label (key=value)")
+	c.Flags().StringVar(&opts.ServiceID, "service-id", "", "Filter by service ID (required by API7 EE)")
 	c.Flags().StringVarP(&opts.Output, "output", "o", "yaml", "Output format: json, yaml")
 	c.Flags().StringVarP(&opts.File, "file", "f", "", "Write output to file")
 	return c
@@ -63,7 +65,10 @@ func actionRun(opts *Options) error {
 	}
 
 	client := api.NewClient(httpClient, cfg.BaseURL())
-	items, err := fetchAll(client, ggID, opts.Label)
+	if opts.ServiceID == "" {
+		return fmt.Errorf("--service-id is required by API7 EE")
+	}
+	items, err := fetchAll(client, ggID, opts.ServiceID, opts.Label)
 	if err != nil {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
 	}
@@ -91,7 +96,7 @@ func actionRun(opts *Options) error {
 	return cmdutil.NewExporter(format, out).Write(stripTimestamps(items))
 }
 
-func fetchAll(client *api.Client, ggID, label string) ([]api.Route, error) {
+func fetchAll(client *api.Client, ggID, serviceID, label string) ([]api.Route, error) {
 	page := 1
 	pageSize := 100
 	var all []api.Route
@@ -100,6 +105,7 @@ func fetchAll(client *api.Client, ggID, label string) ([]api.Route, error) {
 	for {
 		query := map[string]string{
 			"gateway_group_id": ggID,
+			"service_id":       serviceID,
 			"page":             fmt.Sprintf("%d", page),
 			"page_size":        fmt.Sprintf("%d", pageSize),
 		}

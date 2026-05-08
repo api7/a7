@@ -8,20 +8,22 @@ The `a7 stream-route` command allows you to manage API7 Enterprise Edition (API7
 
 ### `a7 stream-route list`
 
-Lists all stream routes in the specified gateway group.
+Lists stream routes for a service in the specified gateway group. API7 EE
+requires `--service-id` for stream-route list requests.
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--gateway-group` | `-g` | | Target gateway group name (required) |
+| `--service-id` | | | Service ID whose stream routes should be listed (required by API7 EE) |
 | `--page` | | `1` | Page number for pagination |
 | `--page-size` | | `20` | Number of items per page |
 | `--output` | `-o` | `table` | Output format (table, json, yaml) |
 
 **Examples:**
 
-List all stream routes in the "default" gateway group:
+List stream routes for a service in the "default" gateway group:
 ```bash
-a7 stream-route list -g default
+a7 stream-route list -g default --service-id example-service
 ```
 
 ### `a7 stream-route get <id>`
@@ -109,10 +111,12 @@ a7 stream-route delete 1 -g default --force
 ### `a7 stream-route export`
 
 Exports stream routes from a gateway group to a file or stdout.
+API7 EE requires `--service-id` for stream-route export requests.
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--gateway-group` | `-g` | | Target gateway group name (required) |
+| `--service-id` | | | Service ID whose stream routes should be exported (required by API7 EE) |
 | `--output` | `-o` | `yaml` | Output format (json, yaml) |
 | `--file` | `-f` | | Path to save the exported configuration |
 
@@ -120,7 +124,7 @@ Exports stream routes from a gateway group to a file or stdout.
 
 Export all stream routes to a YAML file:
 ```bash
-a7 stream-route export -g default -f all-stream-routes.yaml
+a7 stream-route export -g default --service-id example-service -f stream-routes.yaml
 ```
 
 ## Configuration Reference
