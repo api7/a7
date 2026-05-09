@@ -43,6 +43,20 @@ func TestUpdateGatewayGroup_PreservesRequiredFields(t *testing.T) {
 		if err != nil {
 			return httpmock.Response{}, err
 		}
+		var raw map[string]interface{}
+		if err := json.Unmarshal(body, &raw); err != nil {
+			return httpmock.Response{}, err
+		}
+		if _, ok := raw["status"]; ok {
+			t.Fatalf("request must not include response-only field status: %s", string(body))
+		}
+		if _, ok := raw["created_at"]; ok {
+			t.Fatalf("request must not include response-only field created_at: %s", string(body))
+		}
+		if _, ok := raw["updated_at"]; ok {
+			t.Fatalf("request must not include response-only field updated_at: %s", string(body))
+		}
+
 		var payload api.GatewayGroup
 		if err := json.Unmarshal(body, &payload); err != nil {
 			return httpmock.Response{}, err

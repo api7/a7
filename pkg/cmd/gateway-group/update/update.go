@@ -108,22 +108,32 @@ func updateRun(opts *Options) error {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
 	}
 
-	var request api.GatewayGroup
-	if err := json.Unmarshal(currentBody, &request); err != nil {
+	var current api.GatewayGroup
+	if err := json.Unmarshal(currentBody, &current); err != nil {
 		return fmt.Errorf("failed to decode current gateway group: %w", err)
 	}
-	request.ID = opts.ID
+
+	request := map[string]interface{}{
+		"name":        current.Name,
+		"description": current.Description,
+	}
+	if current.Prefix != "" {
+		request["prefix"] = current.Prefix
+	}
+	if current.Labels != nil {
+		request["labels"] = current.Labels
+	}
 	if opts.NameSet {
-		request.Name = opts.Name
+		request["name"] = opts.Name
 	}
 	if opts.DescriptionSet {
-		request.Description = opts.Description
+		request["description"] = opts.Description
 	}
 	if opts.PrefixSet {
-		request.Prefix = opts.Prefix
+		request["prefix"] = opts.Prefix
 	}
 	if opts.LabelsSet {
-		request.Labels = labels
+		request["labels"] = labels
 	}
 
 	body, err := client.Put(fmt.Sprintf("/api/gateway_groups/%s", opts.ID), request)
