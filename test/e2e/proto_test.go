@@ -68,6 +68,20 @@ func TestProto_CRUD(t *testing.T) {
 	require.True(t, ok, "proto.content should be a string")
 	assert.Contains(t, content, "helloworld")
 
+	// Update via flags and verify required content is preserved.
+	stdout, stderr, err = runA7WithEnv(env, "proto", "update", protoID,
+		"--desc", "updated e2e test proto",
+		"-g", gatewayGroup,
+		"-o", "json")
+	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+
+	runA7JSON(t, env, &proto, "proto", "get", protoID, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, protoID, proto["id"])
+	assert.Equal(t, "updated e2e test proto", proto["desc"])
+	content, ok = proto["content"].(string)
+	require.True(t, ok, "proto.content should be a string")
+	assert.Contains(t, content, "helloworld")
+
 	// Export (use get -o json; export is batch-only with cobra.NoArgs)
 	runA7JSON(t, env, &proto, "proto", "get", protoID, "-g", gatewayGroup, "-o", "json")
 	content, ok = proto["content"].(string)
