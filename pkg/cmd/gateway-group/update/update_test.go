@@ -14,7 +14,7 @@ import (
 
 type mockConfig struct{}
 
-func (m *mockConfig) BaseURL() string                                 { return "" }
+func (m *mockConfig) BaseURL() string                                 { return "http://api.local" }
 func (m *mockConfig) Token() string                                   { return "" }
 func (m *mockConfig) GatewayGroup() string                            { return "" }
 func (m *mockConfig) TLSSkipVerify() bool                             { return false }

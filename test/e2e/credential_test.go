@@ -97,13 +97,20 @@ func TestCredential_CreateWithPositionalID(t *testing.T) {
 		"--consumer", username,
 		"--plugins-json", `{"key-auth":{"key":"e2e-positional-key-12345"}}`,
 		"-g", gatewayGroup)
-	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+	require.NoError(t, err, "credential create failed")
 
 	var created map[string]interface{}
 	require.NoError(t, json.Unmarshal([]byte(stdout), &created), "credential create should return JSON")
 	actualID, ok := created["id"].(string)
 	require.True(t, ok && actualID != "", "credential create response should contain generated id: %v", created)
 	assert.Equal(t, credID, created["name"])
+	t.Cleanup(func() {
+		_, _, cleanupErr := runA7WithEnv(env, "credential", "delete", actualID,
+			"--consumer", username, "--force", "-g", gatewayGroup)
+		if cleanupErr != nil {
+			t.Logf("credential cleanup failed for %s", actualID)
+		}
+	})
 
 	var credential map[string]interface{}
 	runA7JSON(t, env, &credential, "credential", "get", actualID,
@@ -112,10 +119,6 @@ func TestCredential_CreateWithPositionalID(t *testing.T) {
 	assert.Equal(t, credID, credential["name"])
 	plugins := requireJSONObject(t, credential["plugins"], "credential.plugins")
 	assert.Contains(t, plugins, "key-auth")
-
-	stdout, stderr, err = runA7WithEnv(env, "credential", "delete", actualID,
-		"--consumer", username, "--force", "-g", gatewayGroup)
-	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
 }
 
 func TestCredential_UpdateFlagsPreserveExistingFields(t *testing.T) {
@@ -126,24 +129,31 @@ func TestCredential_UpdateFlagsPreserveExistingFields(t *testing.T) {
 
 	createTestConsumerViaCLI(t, env, username)
 
-	stdout, stderr, err := runA7WithEnv(env, "credential", "create", credName,
+	stdout, _, err := runA7WithEnv(env, "credential", "create", credName,
 		"--consumer", username,
 		"--plugins-json", `{"key-auth":{"key":"e2e-update-key-12345"}}`,
 		"--desc", "old credential desc",
 		"-g", gatewayGroup)
-	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+	require.NoError(t, err, "credential create failed")
 
 	var created map[string]interface{}
 	require.NoError(t, json.Unmarshal([]byte(stdout), &created), "credential create should return JSON")
 	actualID, ok := created["id"].(string)
 	require.True(t, ok && actualID != "", "credential create response should contain generated id: %v", created)
+	t.Cleanup(func() {
+		_, _, cleanupErr := runA7WithEnv(env, "credential", "delete", actualID,
+			"--consumer", username, "--force", "-g", gatewayGroup)
+		if cleanupErr != nil {
+			t.Logf("credential cleanup failed for %s", actualID)
+		}
+	})
 
-	stdout, stderr, err = runA7WithEnv(env, "credential", "update", actualID,
+	stdout, _, err = runA7WithEnv(env, "credential", "update", actualID,
 		"--consumer", username,
 		"--desc", "updated credential desc",
 		"-g", gatewayGroup,
 		"-o", "json")
-	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+	require.NoError(t, err, "credential update failed")
 
 	var credential map[string]interface{}
 	require.NoError(t, json.Unmarshal([]byte(stdout), &credential), "credential update should return JSON")
@@ -151,6 +161,8 @@ func TestCredential_UpdateFlagsPreserveExistingFields(t *testing.T) {
 	assert.Equal(t, credName, credential["name"])
 	plugins := requireJSONObject(t, credential["plugins"], "credential.plugins")
 	assert.Contains(t, plugins, "key-auth")
+	keyAuth := requireJSONObject(t, plugins["key-auth"], "credential.plugins.key-auth")
+	assert.Equal(t, "e2e-update-key-12345", keyAuth["key"])
 
 	runA7JSON(t, env, &credential, "credential", "get", actualID,
 		"--consumer", username, "-g", gatewayGroup, "-o", "json")
@@ -158,10 +170,8 @@ func TestCredential_UpdateFlagsPreserveExistingFields(t *testing.T) {
 	assert.Equal(t, credName, credential["name"])
 	plugins = requireJSONObject(t, credential["plugins"], "credential.plugins")
 	assert.Contains(t, plugins, "key-auth")
-
-	stdout, stderr, err = runA7WithEnv(env, "credential", "delete", actualID,
-		"--consumer", username, "--force", "-g", gatewayGroup)
-	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+	keyAuth = requireJSONObject(t, plugins["key-auth"], "credential.plugins.key-auth")
+	assert.Equal(t, "e2e-update-key-12345", keyAuth["key"])
 }
 
 func TestCredential_RequiresConsumerFlag(t *testing.T) {
