@@ -106,6 +106,18 @@ func TestUpdateCredential_MissingConsumer(t *testing.T) {
 	}
 }
 
+func TestUpdateCredential_EmptyPluginsJSON(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	opts := &Options{IO: ios, Client: func() (*http.Client, error) { return (&httpmock.Registry{}).GetClient(), nil }, Config: func() (config.Config, error) {
+		return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
+	}, Consumer: "alice", ID: "cred1", GatewayGroup: "gg1", PluginsSet: true, PluginsJSON: " \t"}
+
+	err := actionRun(opts)
+	if err == nil || !strings.Contains(err.Error(), "--plugins-json cannot be empty") || !strings.Contains(err.Error(), "{}") {
+		t.Fatalf("expected empty plugins-json error with clear hint, got: %v", err)
+	}
+}
+
 func TestUpdateCredential_APIError(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
 	registry := &httpmock.Registry{}

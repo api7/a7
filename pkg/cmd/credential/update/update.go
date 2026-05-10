@@ -104,6 +104,9 @@ func actionRun(opts *Options) error {
 
 	pl := make(map[string]interface{})
 	if opts.PluginsSet {
+		if strings.TrimSpace(opts.PluginsJSON) == "" {
+			return fmt.Errorf("--plugins-json cannot be empty; pass {} to clear plugins")
+		}
 		if err := json.Unmarshal([]byte(opts.PluginsJSON), &pl); err != nil {
 			return fmt.Errorf("invalid --plugins-json: %w", err)
 		}

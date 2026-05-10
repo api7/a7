@@ -108,7 +108,7 @@ func TestCredential_CreateWithPositionalID(t *testing.T) {
 		_, _, cleanupErr := runA7WithEnv(env, "credential", "delete", actualID,
 			"--consumer", username, "--force", "-g", gatewayGroup)
 		if cleanupErr != nil {
-			t.Logf("credential cleanup failed for %s", actualID)
+			t.Logf("credential cleanup failed for %s: %v", actualID, cleanupErr)
 		}
 	})
 
@@ -144,7 +144,7 @@ func TestCredential_UpdateFlagsPreserveExistingFields(t *testing.T) {
 		_, _, cleanupErr := runA7WithEnv(env, "credential", "delete", actualID,
 			"--consumer", username, "--force", "-g", gatewayGroup)
 		if cleanupErr != nil {
-			t.Logf("credential cleanup failed for %s", actualID)
+			t.Logf("credential cleanup failed for %s: %v", actualID, cleanupErr)
 		}
 	})
 
@@ -172,6 +172,18 @@ func TestCredential_UpdateFlagsPreserveExistingFields(t *testing.T) {
 	assert.Contains(t, plugins, "key-auth")
 	keyAuth = requireJSONObject(t, plugins["key-auth"], "credential.plugins.key-auth")
 	assert.Equal(t, "e2e-update-key-12345", keyAuth["key"])
+}
+
+func TestCredential_UpdateRejectsEmptyPluginsJSON(t *testing.T) {
+	env := setupEnv(t)
+
+	_, stderr, err := runA7WithEnv(env, "credential", "update", "missing-credential",
+		"--consumer", "missing-consumer",
+		"--plugins-json", "",
+		"-g", gatewayGroup)
+	require.Error(t, err)
+	assert.Contains(t, stderr, "--plugins-json cannot be empty")
+	assert.Contains(t, stderr, "{}")
 }
 
 func TestCredential_RequiresConsumerFlag(t *testing.T) {
