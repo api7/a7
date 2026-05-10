@@ -93,7 +93,7 @@ func TestCredential_CreateWithPositionalID(t *testing.T) {
 
 	createTestConsumerViaCLI(t, env, username)
 
-	stdout, stderr, err := runA7WithEnv(env, "credential", "create", credID,
+	stdout, _, err := runA7WithEnv(env, "credential", "create", credID,
 		"--consumer", username,
 		"--plugins-json", `{"key-auth":{"key":"e2e-positional-key-12345"}}`,
 		"-g", gatewayGroup)
