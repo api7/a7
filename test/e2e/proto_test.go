@@ -68,16 +68,19 @@ func TestProto_CRUD(t *testing.T) {
 	require.True(t, ok, "proto.content should be a string")
 	assert.Contains(t, content, "helloworld")
 
-	// Update via flags and verify required content is preserved.
+	// Update via flags and verify required content is preserved. The runtime
+	// proto API does not consistently persist desc, so use labels for a
+	// server-observable mutation.
 	stdout, stderr, err = runA7WithEnv(env, "proto", "update", protoID,
-		"--desc", "updated e2e test proto",
+		"--labels", "e2e=updated",
 		"-g", gatewayGroup,
 		"-o", "json")
 	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
 
 	runA7JSON(t, env, &proto, "proto", "get", protoID, "-g", gatewayGroup, "-o", "json")
 	assert.Equal(t, protoID, proto["id"])
-	assert.Equal(t, "updated e2e test proto", proto["desc"])
+	labels := requireJSONObject(t, proto["labels"], "proto.labels")
+	assert.Equal(t, "updated", labels["e2e"])
 	content, ok = proto["content"].(string)
 	require.True(t, ok, "proto.content should be a string")
 	assert.Contains(t, content, "helloworld")
