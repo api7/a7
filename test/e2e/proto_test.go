@@ -68,9 +68,8 @@ func TestProto_CRUD(t *testing.T) {
 	require.True(t, ok, "proto.content should be a string")
 	assert.Contains(t, content, "helloworld")
 
-	// Update via flags and verify required content is preserved. The runtime
-	// proto API does not consistently persist desc, so use labels for a
-	// server-observable mutation.
+	// Update via flags and verify required content is preserved. Labels provide
+	// a server-observable mutation without depending on optional display fields.
 	stdout, stderr, err = runA7WithEnv(env, "proto", "update", protoID,
 		"--labels", "e2e=updated",
 		"-g", gatewayGroup,
