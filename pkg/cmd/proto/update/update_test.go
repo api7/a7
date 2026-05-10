@@ -2,6 +2,7 @@ package update
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"testing"
 
@@ -33,7 +34,32 @@ func (m *mockConfig) Save() error                                     { return n
 func TestUpdateProto_JSON(t *testing.T) {
 	ios, _, out, _ := iostreams.Test()
 	registry := &httpmock.Registry{}
-	registry.Register(http.MethodPut, "/apisix/admin/protos/p1", httpmock.JSONResponse(`{"id":"p1","desc":"d2","content":"message X {}"}`))
+	registry.Register(http.MethodGet, "/apisix/admin/protos/p1", httpmock.JSONResponse(`{
+		"id":"p1",
+		"desc":"d1",
+		"content":"syntax = \"proto3\"; message X {}",
+		"labels":{"env":"old"}
+	}`))
+	registry.RegisterResponder(http.MethodPut, "/apisix/admin/protos/p1", func(r *http.Request) (httpmock.Response, error) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			return httpmock.Response{}, err
+		}
+		var payload api.Proto
+		if err := json.Unmarshal(body, &payload); err != nil {
+			return httpmock.Response{}, err
+		}
+		if payload.Content != `syntax = "proto3"; message X {}` {
+			t.Fatalf("expected existing proto content to be preserved, got %q", payload.Content)
+		}
+		if payload.Desc != "d2" {
+			t.Fatalf("expected desc to be updated, got %q", payload.Desc)
+		}
+		if payload.Labels["env"] != "dev" {
+			t.Fatalf("expected labels to be replaced from flags, got %+v", payload.Labels)
+		}
+		return httpmock.JSONResponse(`{"id":"p1","desc":"d2","content":"syntax = \"proto3\"; message X {}","labels":{"env":"dev"}}`), nil
+	})
 
 	opts := &Options{
 		IO:     ios,
@@ -44,8 +70,9 @@ func TestUpdateProto_JSON(t *testing.T) {
 		GatewayGroup: "gg1",
 		ID:           "p1",
 		Desc:         "d2",
-		Content:      "message X {}",
+		DescSet:      true,
 		Labels:       []string{"env=dev"},
+		LabelsSet:    true,
 	}
 	if err := actionRun(opts); err != nil {
 		t.Fatalf("actionRun failed: %v", err)

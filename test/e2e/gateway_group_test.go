@@ -170,6 +170,18 @@ func TestGatewayGroup_CRUD(t *testing.T) {
 	require.NoError(t, err, stderr)
 	assert.Contains(t, stdout, ggName)
 
+	// Update via flags and verify required fields from the current resource are preserved.
+	stdout, stderr, err = runA7WithEnv(env, "gateway-group", "update", ggID,
+		"--description", "Updated by e2e tests",
+		"-o", "json")
+	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+
+	var updated map[string]interface{}
+	require.NoError(t, json.Unmarshal([]byte(stdout), &updated), "gateway-group update should return JSON")
+	assert.Equal(t, ggID, updated["id"])
+	assert.Equal(t, ggName, updated["name"])
+	assert.Equal(t, "Updated by e2e tests", updated["description"])
+
 	// Delete
 	stdout, stderr, err = runA7WithEnv(env, "gateway-group", "delete", ggID, "--force")
 	require.NoError(t, err, stderr)

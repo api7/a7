@@ -17,16 +17,20 @@ import (
 )
 
 type Options struct {
-	IO          *iostreams.IOStreams
-	Client      func() (*http.Client, error)
-	Config      func() (config.Config, error)
-	Output      string
-	File        string
-	ID          string
-	Name        string
-	Description string
-	Labels      []string
-	Prefix      string
+	IO             *iostreams.IOStreams
+	Client         func() (*http.Client, error)
+	Config         func() (config.Config, error)
+	Output         string
+	File           string
+	ID             string
+	Name           string
+	Description    string
+	Labels         []string
+	Prefix         string
+	NameSet        bool
+	DescriptionSet bool
+	LabelsSet      bool
+	PrefixSet      bool
 }
 
 func NewCmd(f *cmd.Factory) *cobra.Command {
@@ -42,6 +46,10 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.ID = args[0]
 			opts.Output, _ = c.Flags().GetString("output")
+			opts.NameSet = c.Flags().Changed("name")
+			opts.DescriptionSet = c.Flags().Changed("description")
+			opts.LabelsSet = c.Flags().Changed("labels")
+			opts.PrefixSet = c.Flags().Changed("prefix")
 			return updateRun(opts)
 		},
 	}
@@ -84,29 +92,50 @@ func updateRun(opts *Options) error {
 	}
 
 	labels := map[string]string{}
-	for _, item := range opts.Labels {
-		key, value, found := strings.Cut(item, "=")
-		if !found || key == "" {
-			return &cmdutil.FlagError{Err: fmt.Errorf("invalid --labels value %q, expected key=value", item)}
+	if opts.LabelsSet {
+		for _, item := range opts.Labels {
+			key, value, found := strings.Cut(item, "=")
+			if !found || key == "" {
+				return &cmdutil.FlagError{Err: fmt.Errorf("invalid --labels value %q, expected key=value", item)}
+			}
+			labels[key] = value
 		}
-		labels[key] = value
-	}
-
-	request := map[string]interface{}{}
-	if opts.Name != "" {
-		request["name"] = opts.Name
-	}
-	if opts.Description != "" {
-		request["description"] = opts.Description
-	}
-	if opts.Prefix != "" {
-		request["prefix"] = opts.Prefix
-	}
-	if len(opts.Labels) > 0 {
-		request["labels"] = labels
 	}
 
 	client := api.NewClient(httpClient, cfg.BaseURL())
+	currentBody, err := client.Get(fmt.Sprintf("/api/gateway_groups/%s", opts.ID), nil)
+	if err != nil {
+		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
+	}
+
+	var current api.GatewayGroup
+	if err := json.Unmarshal(currentBody, &current); err != nil {
+		return fmt.Errorf("failed to decode current gateway group: %w", err)
+	}
+
+	request := map[string]interface{}{
+		"name":        current.Name,
+		"description": current.Description,
+	}
+	if current.Prefix != "" {
+		request["prefix"] = current.Prefix
+	}
+	if current.Labels != nil {
+		request["labels"] = current.Labels
+	}
+	if opts.NameSet {
+		request["name"] = opts.Name
+	}
+	if opts.DescriptionSet {
+		request["description"] = opts.Description
+	}
+	if opts.PrefixSet {
+		request["prefix"] = opts.Prefix
+	}
+	if opts.LabelsSet {
+		request["labels"] = labels
+	}
+
 	body, err := client.Put(fmt.Sprintf("/api/gateway_groups/%s", opts.ID), request)
 	if err != nil {
 		return fmt.Errorf("failed to update gateway group: %s", cmdutil.FormatAPIError(err))

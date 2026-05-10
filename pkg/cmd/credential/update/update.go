@@ -28,6 +28,9 @@ type Options struct {
 	Desc        string
 	PluginsJSON string
 	Labels      []string
+	DescSet     bool
+	PluginsSet  bool
+	LabelsSet   bool
 }
 
 func NewCmd(f *cmd.Factory) *cobra.Command {
@@ -41,6 +44,9 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 			opts.Output, _ = c.Flags().GetString("output")
 			opts.GatewayGroup, _ = c.Flags().GetString("gateway-group")
 			opts.Consumer, _ = c.Flags().GetString("consumer")
+			opts.DescSet = c.Flags().Changed("desc")
+			opts.PluginsSet = c.Flags().Changed("plugins-json")
+			opts.LabelsSet = c.Flags().Changed("labels")
 			return actionRun(opts)
 		},
 	}
@@ -97,30 +103,47 @@ func actionRun(opts *Options) error {
 	}
 
 	pl := make(map[string]interface{})
-	if opts.PluginsJSON != "" {
+	if opts.PluginsSet {
+		if strings.TrimSpace(opts.PluginsJSON) == "" {
+			return fmt.Errorf("--plugins-json cannot be empty; pass {} to clear plugins")
+		}
 		if err := json.Unmarshal([]byte(opts.PluginsJSON), &pl); err != nil {
 			return fmt.Errorf("invalid --plugins-json: %w", err)
 		}
 	}
 
 	labels := make(map[string]string)
-	for _, label := range opts.Labels {
-		parts := strings.SplitN(label, "=", 2)
-		if len(parts) != 2 || parts[0] == "" {
-			return fmt.Errorf("invalid label %q, expected key=value", label)
+	if opts.LabelsSet {
+		for _, label := range opts.Labels {
+			parts := strings.SplitN(label, "=", 2)
+			if len(parts) != 2 || parts[0] == "" {
+				return fmt.Errorf("invalid label %q, expected key=value", label)
+			}
+			labels[parts[0]] = parts[1]
 		}
-		labels[parts[0]] = parts[1]
-	}
-
-	bodyReq := api.Credential{ID: opts.ID, Desc: opts.Desc}
-	if len(pl) > 0 {
-		bodyReq.Plugins = pl
-	}
-	if len(labels) > 0 {
-		bodyReq.Labels = labels
 	}
 
 	client := api.NewClient(httpClient, cfg.BaseURL())
+	currentBody, err := client.Get(path, nil)
+	if err != nil {
+		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
+	}
+
+	var bodyReq api.Credential
+	if err := json.Unmarshal(currentBody, &bodyReq); err != nil {
+		return fmt.Errorf("failed to decode current credential: %w", err)
+	}
+	bodyReq.ID = opts.ID
+	if opts.DescSet {
+		bodyReq.Desc = opts.Desc
+	}
+	if opts.PluginsSet {
+		bodyReq.Plugins = pl
+	}
+	if opts.LabelsSet {
+		bodyReq.Labels = labels
+	}
+
 	body, err := client.Put(path, bodyReq)
 	if err != nil {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))

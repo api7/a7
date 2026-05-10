@@ -2,6 +2,7 @@ package update
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -34,11 +35,37 @@ func (m *mockConfig) Save() error                                     { return n
 func TestUpdateCredential_JSONOutput(t *testing.T) {
 	ios, _, out, _ := iostreams.Test()
 	registry := &httpmock.Registry{}
-	registry.Register(http.MethodPut, "/apisix/admin/consumers/alice/credentials/cred1", httpmock.JSONResponse(`{"id":"cred1","desc":"updated"}`))
+	registry.Register(http.MethodGet, "/apisix/admin/consumers/alice/credentials/cred1", httpmock.JSONResponse(`{
+		"id":"cred1",
+		"name":"apikey",
+		"desc":"old",
+		"plugins":{"key-auth":{"key":"old-key"}},
+		"labels":{"env":"dev"}
+	}`))
+	registry.RegisterResponder(http.MethodPut, "/apisix/admin/consumers/alice/credentials/cred1", func(r *http.Request) (httpmock.Response, error) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			return httpmock.Response{}, err
+		}
+		var payload api.Credential
+		if err := json.Unmarshal(body, &payload); err != nil {
+			return httpmock.Response{}, err
+		}
+		if payload.Name != "apikey" {
+			t.Fatalf("expected existing credential name to be preserved, got %q", payload.Name)
+		}
+		if payload.Plugins["key-auth"] == nil {
+			t.Fatalf("expected existing plugins to be preserved: %+v", payload.Plugins)
+		}
+		if payload.Desc != "updated" {
+			t.Fatalf("expected desc to be updated, got %q", payload.Desc)
+		}
+		return httpmock.JSONResponse(`{"id":"cred1","name":"apikey","desc":"updated","plugins":{"key-auth":{"key":"old-key"}}}`), nil
+	})
 
 	opts := &Options{IO: ios, Client: func() (*http.Client, error) { return registry.GetClient(), nil }, Config: func() (config.Config, error) {
 		return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
-	}, Consumer: "alice", ID: "cred1", GatewayGroup: "gg1", Desc: "updated"}
+	}, Consumer: "alice", ID: "cred1", GatewayGroup: "gg1", Desc: "updated", DescSet: true}
 
 	if err := actionRun(opts); err != nil {
 		t.Fatalf("actionRun failed: %v", err)
@@ -79,9 +106,22 @@ func TestUpdateCredential_MissingConsumer(t *testing.T) {
 	}
 }
 
+func TestUpdateCredential_EmptyPluginsJSON(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	opts := &Options{IO: ios, Client: func() (*http.Client, error) { return (&httpmock.Registry{}).GetClient(), nil }, Config: func() (config.Config, error) {
+		return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
+	}, Consumer: "alice", ID: "cred1", GatewayGroup: "gg1", PluginsSet: true, PluginsJSON: " \t"}
+
+	err := actionRun(opts)
+	if err == nil || !strings.Contains(err.Error(), "--plugins-json cannot be empty") || !strings.Contains(err.Error(), "{}") {
+		t.Fatalf("expected empty plugins-json error with clear hint, got: %v", err)
+	}
+}
+
 func TestUpdateCredential_APIError(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
 	registry := &httpmock.Registry{}
+	registry.Register(http.MethodGet, "/apisix/admin/consumers/alice/credentials/cred1", httpmock.JSONResponse(`{"id":"cred1","name":"apikey","plugins":{"key-auth":{}}}`))
 	registry.Register(http.MethodPut, "/apisix/admin/consumers/alice/credentials/cred1", httpmock.StringResponse(http.StatusInternalServerError, `{"message":"boom"}`))
 
 	opts := &Options{IO: ios, Client: func() (*http.Client, error) { return registry.GetClient(), nil }, Config: func() (config.Config, error) {

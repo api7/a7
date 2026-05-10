@@ -24,9 +24,12 @@ type Options struct {
 	GatewayGroup string
 	ID           string
 
-	Desc    string
-	Content string
-	Labels  []string
+	Desc       string
+	Content    string
+	Labels     []string
+	DescSet    bool
+	ContentSet bool
+	LabelsSet  bool
 }
 
 func NewCmd(f *cmd.Factory) *cobra.Command {
@@ -39,6 +42,9 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 			opts.ID = args[0]
 			opts.Output, _ = c.Flags().GetString("output")
 			opts.GatewayGroup, _ = c.Flags().GetString("gateway-group")
+			opts.DescSet = c.Flags().Changed("desc")
+			opts.ContentSet = c.Flags().Changed("content")
+			opts.LabelsSet = c.Flags().Changed("labels")
 			return actionRun(opts)
 		},
 	}
@@ -88,23 +94,37 @@ func actionRun(opts *Options) error {
 	}
 
 	labels := make(map[string]string)
-	for _, label := range opts.Labels {
-		parts := strings.SplitN(label, "=", 2)
-		if len(parts) != 2 || parts[0] == "" {
-			return fmt.Errorf("invalid label %q, expected key=value", label)
+	if opts.LabelsSet {
+		for _, label := range opts.Labels {
+			parts := strings.SplitN(label, "=", 2)
+			if len(parts) != 2 || parts[0] == "" {
+				return fmt.Errorf("invalid label %q, expected key=value", label)
+			}
+			labels[parts[0]] = parts[1]
 		}
-		labels[parts[0]] = parts[1]
-	}
-
-	bodyReq := api.Proto{
-		Desc:    opts.Desc,
-		Content: opts.Content,
-	}
-	if len(labels) > 0 {
-		bodyReq.Labels = labels
 	}
 
 	client := api.NewClient(httpClient, cfg.BaseURL())
+	currentBody, err := client.Get("/apisix/admin/protos/"+opts.ID, map[string]string{"gateway_group_id": ggID})
+	if err != nil {
+		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
+	}
+
+	var bodyReq api.Proto
+	if err := json.Unmarshal(currentBody, &bodyReq); err != nil {
+		return fmt.Errorf("failed to decode current proto: %w", err)
+	}
+	bodyReq.ID = opts.ID
+	if opts.DescSet {
+		bodyReq.Desc = opts.Desc
+	}
+	if opts.ContentSet {
+		bodyReq.Content = opts.Content
+	}
+	if opts.LabelsSet {
+		bodyReq.Labels = labels
+	}
+
 	body, err := client.Put("/apisix/admin/protos/"+opts.ID+"?gateway_group_id="+ggID, bodyReq)
 	if err != nil {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
