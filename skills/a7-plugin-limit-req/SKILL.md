@@ -99,10 +99,22 @@ Incoming requests → [   Bucket (burst capacity)   ] → Leak at 'rate' per sec
 ### 1. Strict QPS limit (no burst)
 
 ```bash
+a7 service create -g default -f - <<'EOF'
+{
+  "id": "rate-limit-backend",
+  "name": "rate-limit-backend",
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
+  }
+}
+EOF
+
 a7 route create -g default -f - <<'EOF'
 {
   "id": "strict-qps",
   "uri": "/api/*",
+  "service_id": "rate-limit-backend",
   "plugins": {
     "limit-req": {
       "rate": 10,
@@ -111,10 +123,6 @@ a7 route create -g default -f - <<'EOF'
       "rejected_code": 429,
       "nodelay": true
     }
-  },
-  "upstream": {
-    "type": "roundrobin",
-    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -125,10 +133,22 @@ EOF
 ### 2. Smooth traffic with burst allowance
 
 ```bash
+a7 service create -g default -f - <<'EOF'
+{
+  "id": "smooth-api-backend",
+  "name": "smooth-api-backend",
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
+  }
+}
+EOF
+
 a7 route create -g default -f - <<'EOF'
 {
   "id": "smooth-api",
   "uri": "/api/*",
+  "service_id": "smooth-api-backend",
   "plugins": {
     "limit-req": {
       "rate": 5,
@@ -136,10 +156,6 @@ a7 route create -g default -f - <<'EOF'
       "key": "remote_addr",
       "rejected_code": 429
     }
-  },
-  "upstream": {
-    "type": "roundrobin",
-    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -240,21 +256,23 @@ This prevents both short-term spikes and long-term abuse.
 
 ```yaml
 version: "1"
-gateway_groups:
-  - name: default
-    routes:
-      - id: smooth-api
-        uri: /api/*
-        plugins:
-          limit-req:
-            rate: 10
-            burst: 20
-            key: remote_addr
-            rejected_code: 429
-        upstream:
-          type: roundrobin
-          nodes:
-            - host: backend
-              port: 8080
-              weight: 1
+services:
+  - id: smooth-api-backend
+    name: smooth-api-backend
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: backend
+          port: 8080
+          weight: 1
+routes:
+  - id: smooth-api
+    uri: /api/*
+    service_id: smooth-api-backend
+    plugins:
+      limit-req:
+        rate: 10
+        burst: 20
+        key: remote_addr
+        rejected_code: 429
 ```

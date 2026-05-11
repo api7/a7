@@ -70,10 +70,18 @@ Instead of sending a standard `messages` array, clients send:
 All runtime resources must be scoped to a gateway group using `--gateway-group` or `-g`.
 
 ```bash
+a7 service create -g default -f - <<'EOF'
+{
+  "id": "ai-chat-service",
+  "name": "AI Chat Service"
+}
+EOF
+
 a7 route create -g default -f - <<'EOF'
 {
   "id": "templated-chat",
   "uri": "/v1/chat/completions",
+  "service_id": "ai-chat-service",
   "methods": ["POST"],
   "plugins": {
     "ai-proxy": {
@@ -163,9 +171,13 @@ a7 config sync -f config.yaml --gateway-group default
 
 ```yaml
 version: "1"
+services:
+  - id: ai-chat-service
+    name: AI Chat Service
 routes:
   - id: templated-chat
     uri: /v1/chat/completions
+    service_id: ai-chat-service
     methods:
       - POST
     plugins:

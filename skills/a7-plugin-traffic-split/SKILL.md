@@ -83,10 +83,22 @@ deployments, and A/B testing — all without modifying DNS or load balancers.
 Configure a 20/80 split for gateway group `default`:
 
 ```bash
+a7 service create --gateway-group default -f - <<'EOF'
+{
+  "id": "stable-api-service",
+  "name": "stable-api-service",
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": [{"host": "backend-v1", "port": 8080, "weight": 1}]
+  }
+}
+EOF
+
 a7 route create --gateway-group default -f - <<'EOF'
 {
   "id": "canary-release",
   "uri": "/api/*",
+  "service_id": "stable-api-service",
   "plugins": {
     "traffic-split": {
       "rules": [
@@ -107,10 +119,6 @@ a7 route create --gateway-group default -f - <<'EOF'
         }
       ]
     }
-  },
-  "upstream": {
-    "type": "roundrobin",
-    "nodes": [{"host": "backend-v1", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -121,10 +129,22 @@ Result: 20% traffic → `backend-v2`, 80% → `backend-v1` (route default).
 ### 2. Blue-green deployment — header-based switching
 
 ```bash
+a7 service create --gateway-group prod -f - <<'EOF'
+{
+  "id": "blue-api-service",
+  "name": "blue-api-service",
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": [{"host": "blue-backend", "port": 8080, "weight": 1}]
+  }
+}
+EOF
+
 a7 route create --gateway-group prod -f - <<'EOF'
 {
   "id": "blue-green",
   "uri": "/api/*",
+  "service_id": "blue-api-service",
   "plugins": {
     "traffic-split": {
       "rules": [
@@ -149,10 +169,6 @@ a7 route create --gateway-group prod -f - <<'EOF'
         }
       ]
     }
-  },
-  "upstream": {
-    "type": "roundrobin",
-    "nodes": [{"host": "blue-backend", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -301,10 +317,19 @@ on service upstream configuration when needed.
 
 ```yaml
 version: "1"
-gateway_group: default
+services:
+  - id: stable-api-service
+    name: stable-api-service
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: stable-backend
+          port: 8080
+          weight: 1
 routes:
   - id: canary-api
     uri: /api/*
+    service_id: stable-api-service
     plugins:
       traffic-split:
         rules:
@@ -317,10 +342,4 @@ routes:
                       weight: 1
                 weight: 2
               - weight: 8
-    upstream:
-      type: roundrobin
-      nodes:
-        - host: stable-backend
-          port: 8080
-          weight: 1
 ```

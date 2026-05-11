@@ -198,6 +198,31 @@ routes:
 	reg.Verify(t)
 }
 
+func TestConfigDiff_RejectsUnsupportedSections(t *testing.T) {
+	reg := &httpmock.Registry{}
+	registerEmptyResources(reg, nil)
+
+	local := writeConfig(t, `
+version: "1"
+upstreams:
+  - id: u1
+    nodes:
+      127.0.0.1:8080: 1
+consumer_groups:
+  - id: group1
+`)
+
+	ios, _, _, _ := iostreams.Test()
+	c := NewCmdDiff(newFactory(reg, ios))
+	c.SetArgs([]string{"-f", local})
+	err := c.Execute()
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported declarative config sections")
+	assert.Contains(t, err.Error(), "upstreams")
+	assert.Contains(t, err.Error(), "consumer_groups")
+}
+
 func TestConfigDiff_JSONOutput(t *testing.T) {
 	reg := &httpmock.Registry{}
 	registerEmptyResources(reg, nil)

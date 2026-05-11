@@ -176,6 +176,13 @@ func FetchRemoteConfig(client *api.Client, gatewayGroup string) (*api.ConfigFile
 }
 
 func ComputeDiff(local, remote api.ConfigFile) (*DiffResult, error) {
+	if err := validateSupportedSections(local); err != nil {
+		return nil, err
+	}
+	if err := validateSupportedSections(remote); err != nil {
+		return nil, fmt.Errorf("remote config: %w", err)
+	}
+
 	type diffSpec struct {
 		local    interface{}
 		remote   interface{}
@@ -225,6 +232,20 @@ func ComputeDiff(local, remote api.ConfigFile) (*DiffResult, error) {
 		Secrets:        diffs[8],
 		PluginMetadata: diffs[9],
 	}, nil
+}
+
+func validateSupportedSections(cfg api.ConfigFile) error {
+	var unsupported []string
+	if len(cfg.Upstreams) > 0 {
+		unsupported = append(unsupported, "upstreams")
+	}
+	if len(cfg.ConsumerGroups) > 0 {
+		unsupported = append(unsupported, "consumer_groups")
+	}
+	if len(unsupported) > 0 {
+		return fmt.Errorf("unsupported declarative config sections: %s; define upstreams inline on services and omit API7 EE unsupported resources", strings.Join(unsupported, ", "))
+	}
+	return nil
 }
 
 func FormatDiffSummary(result *DiffResult) string {

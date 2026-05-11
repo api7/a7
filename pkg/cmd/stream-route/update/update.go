@@ -82,6 +82,14 @@ func actionRun(opts *Options) error {
 		if err != nil {
 			return err
 		}
+		if opts.ServiceID != "" {
+			if _, ok := payload["service_id"]; !ok {
+				payload["service_id"] = opts.ServiceID
+			}
+		}
+		if serviceID, ok := payload["service_id"]; !ok || strings.TrimSpace(fmt.Sprint(serviceID)) == "" {
+			return fmt.Errorf("--service-id is required for current API7 EE")
+		}
 		client := api.NewClient(httpClient, cfg.BaseURL())
 		body, err := client.Put("/apisix/admin/stream_routes/"+opts.ID+"?gateway_group_id="+ggID, payload)
 		if err != nil {
@@ -92,6 +100,9 @@ func actionRun(opts *Options) error {
 			format = "json"
 		}
 		return cmdutil.NewExporter(format, opts.IO.Out).Write(json.RawMessage(body))
+	}
+	if opts.ServiceID == "" {
+		return fmt.Errorf("--service-id is required for current API7 EE")
 	}
 	httpClient, err := opts.Client()
 	if err != nil {

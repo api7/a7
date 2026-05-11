@@ -208,6 +208,7 @@ key material.
 
 ```bash
 a7 consumer list -g platform
+a7 credential list -g platform --consumer startup-xyz
 a7 service get tenant-api-service -g platform -o json
 a7 route get multi-tenant-api -g platform -o json
 ```

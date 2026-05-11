@@ -60,18 +60,26 @@ your backend service.
 Strip `/api/v1` prefix so `/api/v1/users` becomes `/users` for gateway group `default`:
 
 ```bash
+a7 service create --gateway-group default -f - <<'EOF'
+{
+  "id": "proxy-rewrite-backend",
+  "name": "proxy-rewrite-backend",
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
+  }
+}
+EOF
+
 a7 route create --gateway-group default -f - <<'EOF'
 {
   "id": "strip-prefix",
   "uri": "/api/v1/*",
+  "service_id": "proxy-rewrite-backend",
   "plugins": {
     "proxy-rewrite": {
       "regex_uri": ["^/api/v1/(.*)", "/$1"]
     }
-  },
-  "upstream": {
-    "type": "roundrobin",
-    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -82,18 +90,26 @@ EOF
 Route to a different virtual host on the backend:
 
 ```bash
+a7 service create --gateway-group prod -f - <<'EOF'
+{
+  "id": "legacy-backend-service",
+  "name": "legacy-backend-service",
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
+  }
+}
+EOF
+
 a7 route create --gateway-group prod -f - <<'EOF'
 {
   "id": "rewrite-host",
   "uri": "/legacy/*",
+  "service_id": "legacy-backend-service",
   "plugins": {
     "proxy-rewrite": {
       "host": "legacy.internal.svc"
     }
-  },
-  "upstream": {
-    "type": "roundrobin",
-    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -102,10 +118,22 @@ EOF
 ### 3. Add and remove headers
 
 ```bash
+a7 service create --gateway-group stage -f - <<'EOF'
+{
+  "id": "header-backend-service",
+  "name": "header-backend-service",
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
+  }
+}
+EOF
+
 a7 route create --gateway-group stage -f - <<'EOF'
 {
   "id": "header-manip",
   "uri": "/api/*",
+  "service_id": "header-backend-service",
   "plugins": {
     "proxy-rewrite": {
       "headers": {
@@ -119,10 +147,6 @@ a7 route create --gateway-group stage -f - <<'EOF'
         "remove": ["X-Internal-Debug", "X-Secret-Token"]
       }
     }
-  },
-  "upstream": {
-    "type": "roundrobin",
-    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -217,10 +241,19 @@ Replace the entire URI path:
 
 ```yaml
 version: "1"
-gateway_group: default
+services:
+  - id: proxy-rewrite-backend
+    name: proxy-rewrite-backend
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: backend
+          port: 8080
+          weight: 1
 routes:
   - id: api-rewrite
     uri: /api/v1/*
+    service_id: proxy-rewrite-backend
     plugins:
       proxy-rewrite:
         regex_uri:
@@ -231,10 +264,4 @@ routes:
             X-Forwarded-Prefix: "/api/v1"
           remove:
             - X-Debug
-    upstream:
-      type: roundrobin
-      nodes:
-        - host: backend
-          port: 8080
-          weight: 1
 ```

@@ -1,6 +1,8 @@
 package sync
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -75,7 +77,20 @@ func writeConfig(t *testing.T, content string) string {
 func TestConfigSync_CreatesNewResources(t *testing.T) {
 	reg := &httpmock.Registry{}
 	registerEmptyResources(reg, nil)
-	reg.Register(http.MethodPut, "/apisix/admin/routes/r1", httpmock.JSONResponse(`{"id":"r1"}`))
+	reg.RegisterResponder(http.MethodPut, "/apisix/admin/routes/r1", func(r *http.Request) (httpmock.Response, error) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			return httpmock.Response{}, err
+		}
+		var payload map[string]interface{}
+		if err := json.Unmarshal(body, &payload); err != nil {
+			return httpmock.Response{}, err
+		}
+		if payload["service_id"] != "svc-1" {
+			t.Fatalf("expected service_id svc-1 in route payload, got: %v", payload["service_id"])
+		}
+		return httpmock.JSONResponse(`{"id":"r1"}`), nil
+	})
 
 	local := writeConfig(t, `
 version: "1"

@@ -3,6 +3,8 @@ package update
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -75,6 +77,44 @@ func TestUpdateStreamRoute_MissingGatewayGroup(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "gateway group is required") {
 		t.Fatalf("expected gateway group error, got: %v", err)
+	}
+}
+
+func TestUpdateStreamRoute_MissingServiceID(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	err := actionRun(&Options{
+		IO:           ios,
+		Client:       func() (*http.Client, error) { return (&httpmock.Registry{}).GetClient(), nil },
+		GatewayGroup: "gg1",
+		ID:           "sr1",
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "--service-id is required") {
+		t.Fatalf("expected service-id required error, got: %v", err)
+	}
+}
+
+func TestUpdateStreamRoute_FileMissingServiceID(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	path := filepath.Join(t.TempDir(), "stream-route.json")
+	if err := os.WriteFile(path, []byte(`{"desc":"mysql-updated"}`), 0o600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	err := actionRun(&Options{
+		IO:           ios,
+		Client:       func() (*http.Client, error) { return (&httpmock.Registry{}).GetClient(), nil },
+		GatewayGroup: "gg1",
+		ID:           "sr1",
+		File:         path,
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "--service-id is required") {
+		t.Fatalf("expected service-id required error, got: %v", err)
 	}
 }
 

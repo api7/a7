@@ -58,15 +58,14 @@ a7 stream-route create -g default -f stream-route.json
 ```
 
 **Sample `stream-route.json`:**
+Create the service first and use its `id` as `service_id`; current API7 EE stores upstream configuration on services.
+
 ```json
 {
   "id": "tcp-proxy",
   "name": "tcp-proxy",
   "server_port": 9100,
-  "upstream": {
-    "type": "roundrobin",
-    "nodes": [{"host": "127.0.0.1", "port": 8080, "weight": 1}]
-  }
+  "service_id": "tcp-service"
 }
 ```
 
@@ -148,9 +147,6 @@ Key fields in the stream route configuration (sent to `/apisix/admin/stream_rout
   "name": "sni-route",
   "sni": "tcp.example.com",
   "server_port": 9443,
-  "upstream": {
-    "type": "roundrobin",
-    "nodes": [{"host": "127.0.0.1", "port": 9000, "weight": 1}]
-  }
+  "service_id": "sni-service"
 }
 ```

@@ -25,7 +25,7 @@ metadata:
 ## Overview
 
 The `consumer-restriction` plugin in API7 Enterprise Edition (API7 EE) restricts access to routes or services based
-on the authenticated consumer's identity. It supports four restriction types
+on the authenticated consumer's identity. It supports three restriction types
 and three matching modes (blacklist, whitelist, method-level).
 
 **Priority:** 2400 (runs in the `access` phase after authentication plugins).
