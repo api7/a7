@@ -19,12 +19,9 @@ A7 supports the following resource types in its declarative configuration:
 - `protos`
 - `secrets`
 - `plugin_metadata`
-- `gateway_groups` (Control Plane resource)
-- `service_templates` (Control Plane resource)
 - `credentials` (Nested under consumers)
-- `canary_release`
 
-> **Note:** `upstreams`, `plugin_configs`, and `consumer_groups` are not exposed via the API7 EE Admin API and are excluded from declarative config operations.
+> **Note:** `upstreams`, `consumer_groups`, and `service_templates` are not supported as top-level API7 EE declarative resources. Define upstreams inline under `services` instead.
 
 ### Structure with Gateway Groups
 

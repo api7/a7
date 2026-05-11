@@ -37,12 +37,10 @@ func (d ResourceDiff) HasDifferences() bool {
 type DiffResult struct {
 	Routes         ResourceDiff `json:"routes"`
 	Services       ResourceDiff `json:"services"`
-	Upstreams      ResourceDiff `json:"upstreams"`
 	Consumers      ResourceDiff `json:"consumers"`
 	SSL            ResourceDiff `json:"ssl"`
 	GlobalRules    ResourceDiff `json:"global_rules"`
 	PluginConfigs  ResourceDiff `json:"plugin_configs"`
-	ConsumerGroups ResourceDiff `json:"consumer_groups"`
 	StreamRoutes   ResourceDiff `json:"stream_routes"`
 	Protos         ResourceDiff `json:"protos"`
 	Secrets        ResourceDiff `json:"secrets"`
@@ -73,10 +71,8 @@ func (r *DiffResult) Sections() []DiffSection {
 		return nil
 	}
 	return []DiffSection{
-		{Name: "upstreams", Diff: r.Upstreams},
 		{Name: "services", Diff: r.Services},
 		{Name: "consumers", Diff: r.Consumers},
-		{Name: "consumer_groups", Diff: r.ConsumerGroups},
 		{Name: "plugin_configs", Diff: r.PluginConfigs},
 		{Name: "ssl", Diff: r.SSL},
 		{Name: "global_rules", Diff: r.GlobalRules},
@@ -128,10 +124,6 @@ func FetchRemoteConfig(client *api.Client, gatewayGroup string) (*api.ConfigFile
 	if err != nil {
 		return nil, err
 	}
-	upstreams, err := fetchPaginated[api.Upstream](client, "/apisix/admin/upstreams", query)
-	if err != nil {
-		return nil, err
-	}
 	consumers, err := fetchPaginated[api.Consumer](client, "/apisix/admin/consumers", query)
 	if err != nil {
 		return nil, err
@@ -145,10 +137,6 @@ func FetchRemoteConfig(client *api.Client, gatewayGroup string) (*api.ConfigFile
 		return nil, err
 	}
 	pluginConfigs, err := fetchPaginated[api.PluginConfig](client, "/apisix/admin/plugin_configs", query)
-	if err != nil {
-		return nil, err
-	}
-	consumerGroups, err := fetchPaginated[api.ConsumerGroup](client, "/apisix/admin/consumer_groups", query)
 	if err != nil {
 		return nil, err
 	}
@@ -174,12 +162,10 @@ func FetchRemoteConfig(client *api.Client, gatewayGroup string) (*api.ConfigFile
 		Version:        "1",
 		Routes:         stripTimestampsFromSlice(routes),
 		Services:       stripTimestampsFromSlice(services),
-		Upstreams:      stripTimestampsFromSlice(upstreams),
 		Consumers:      stripTimestampsFromSlice(consumers),
 		SSL:            stripTimestampsFromSlice(ssl),
 		GlobalRules:    stripTimestampsFromSlice(globalRules),
 		PluginConfigs:  stripTimestampsFromSlice(pluginConfigs),
-		ConsumerGroups: stripTimestampsFromSlice(consumerGroups),
 		StreamRoutes:   stripTimestampsFromSlice(streamRoutes),
 		Protos:         stripTimestampsFromSlice(protos),
 		Secrets:        stripTimestampsFromSlice(secrets),
@@ -200,12 +186,10 @@ func ComputeDiff(local, remote api.ConfigFile) (*DiffResult, error) {
 	specs := []diffSpec{
 		{local.Routes, remote.Routes, "id", "routes"},
 		{local.Services, remote.Services, "id", "services"},
-		{local.Upstreams, remote.Upstreams, "id", "upstreams"},
 		{local.Consumers, remote.Consumers, "username", "consumers"},
 		{local.SSL, remote.SSL, "id", "ssl"},
 		{local.GlobalRules, remote.GlobalRules, "id", "global_rules"},
 		{local.PluginConfigs, remote.PluginConfigs, "id", "plugin_configs"},
-		{local.ConsumerGroups, remote.ConsumerGroups, "id", "consumer_groups"},
 		{local.StreamRoutes, remote.StreamRoutes, "id", "stream_routes"},
 		{local.Protos, remote.Protos, "id", "protos"},
 		{local.Secrets, remote.Secrets, "id", "secrets"},
@@ -232,16 +216,14 @@ func ComputeDiff(local, remote api.ConfigFile) (*DiffResult, error) {
 	return &DiffResult{
 		Routes:         diffs[0],
 		Services:       diffs[1],
-		Upstreams:      diffs[2],
-		Consumers:      diffs[3],
-		SSL:            diffs[4],
-		GlobalRules:    diffs[5],
-		PluginConfigs:  diffs[6],
-		ConsumerGroups: diffs[7],
-		StreamRoutes:   diffs[8],
-		Protos:         diffs[9],
-		Secrets:        diffs[10],
-		PluginMetadata: diffs[11],
+		Consumers:      diffs[2],
+		SSL:            diffs[3],
+		GlobalRules:    diffs[4],
+		PluginConfigs:  diffs[5],
+		StreamRoutes:   diffs[6],
+		Protos:         diffs[7],
+		Secrets:        diffs[8],
+		PluginMetadata: diffs[9],
 	}, nil
 }
 

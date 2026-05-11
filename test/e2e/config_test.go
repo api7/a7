@@ -71,10 +71,16 @@ func TestConfigValidate_Valid(t *testing.T) {
 routes:
   - id: valid-route-1
     uri: /test
+    service_id: valid-service-1
+services:
+  - id: valid-service-1
+    name: valid-service-1
     upstream:
       type: roundrobin
       nodes:
-        "127.0.0.1:8080": 1
+        - host: 127.0.0.1
+          port: 8080
+          weight: 1
 consumers:
   - username: valid-consumer-1
 `
@@ -95,9 +101,18 @@ func TestConfigValidate_ValidJSON(t *testing.T) {
 			{
 				"id": "valid-route-json",
 				"uri": "/test-json",
+				"service_id": "valid-service-json"
+			}
+		],
+		"services": [
+			{
+				"id": "valid-service-json",
+				"name": "valid-service-json",
 				"upstream": {
 					"type": "roundrobin",
-					"nodes": {"127.0.0.1:8080": 1}
+					"nodes": [
+						{"host": "127.0.0.1", "port": 8080, "weight": 1}
+					]
 				}
 			}
 		]
@@ -142,12 +157,50 @@ routes:
 	assert.Error(t, err)
 }
 
+func TestConfigValidate_RejectsUnsupportedTopLevelUpstreams(t *testing.T) {
+	env := setupEnv(t)
+
+	invalidYAML := `version: "1"
+upstreams:
+  - id: removed-upstream
+    type: roundrobin
+    nodes:
+      127.0.0.1:8080: 1
+`
+	tmpFile := filepath.Join(t.TempDir(), "unsupported-upstreams.yaml")
+	require.NoError(t, os.WriteFile(tmpFile, []byte(invalidYAML), 0644))
+
+	_, stderr, err := runA7WithEnv(env, "config", "validate", "-f", tmpFile)
+	assert.Error(t, err)
+	assert.Contains(t, stderr, "upstreams are not supported as top-level API7 EE resources")
+}
+
+func TestConfigValidate_RejectsUnsupportedConsumerGroups(t *testing.T) {
+	env := setupEnv(t)
+
+	invalidYAML := `version: "1"
+consumer_groups:
+  - id: removed-group
+    plugins:
+      limit-count:
+        count: 10
+        time_window: 60
+`
+	tmpFile := filepath.Join(t.TempDir(), "unsupported-consumer-groups.yaml")
+	require.NoError(t, os.WriteFile(tmpFile, []byte(invalidYAML), 0644))
+
+	_, stderr, err := runA7WithEnv(env, "config", "validate", "-f", tmpFile)
+	assert.Error(t, err)
+	assert.Contains(t, stderr, "consumer_groups are not supported by current API7 EE")
+}
+
 func TestConfigValidate_MissingRouteURI(t *testing.T) {
 	env := setupEnv(t)
 
 	invalidYAML := `version: "1"
 routes:
   - id: no-uri-route
+    service_id: service-1
 `
 	tmpFile := filepath.Join(t.TempDir(), "invalid-no-uri.yaml")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(invalidYAML), 0644))
@@ -163,8 +216,10 @@ func TestConfigValidate_DuplicateIDs(t *testing.T) {
 routes:
   - id: dup-route
     uri: /test-1
+    service_id: service-1
   - id: dup-route
     uri: /test-2
+    service_id: service-1
 `
 	tmpFile := filepath.Join(t.TempDir(), "invalid-dup-ids.yaml")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(invalidYAML), 0644))
@@ -219,10 +274,16 @@ func TestConfigDiff_WithDifferences(t *testing.T) {
 routes:
   - id: e2e-diff-extra-route
     uri: /diff-extra
+    service_id: e2e-diff-extra-service
+services:
+  - id: e2e-diff-extra-service
+    name: e2e-diff-extra-service
     upstream:
       type: roundrobin
       nodes:
-        "127.0.0.1:8080": 1
+        - host: 127.0.0.1
+          port: 8080
+          weight: 1
 `
 	tmpFile := filepath.Join(t.TempDir(), "diff-config.yaml")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(diffYAML), 0644))
@@ -239,10 +300,16 @@ func TestConfigDiff_JSONOutput(t *testing.T) {
 routes:
   - id: e2e-diff-json-route
     uri: /diff-json
+    service_id: e2e-diff-json-service
+services:
+  - id: e2e-diff-json-service
+    name: e2e-diff-json-service
     upstream:
       type: roundrobin
       nodes:
-        "127.0.0.1:8080": 1
+        - host: 127.0.0.1
+          port: 8080
+          weight: 1
 `
 	tmpFile := filepath.Join(t.TempDir(), "diff-json-config.yaml")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(diffYAML), 0644))

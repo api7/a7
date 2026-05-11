@@ -29,7 +29,7 @@ type Options struct {
 	ServerAddr string
 	ServerPort int
 	SNI        string
-	UpstreamID string
+	ServiceID  string
 	Labels     []string
 }
 
@@ -52,7 +52,7 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 	c.Flags().StringVar(&opts.ServerAddr, "server-addr", "", "Server address")
 	c.Flags().IntVar(&opts.ServerPort, "server-port", 0, "Server port")
 	c.Flags().StringVar(&opts.SNI, "sni", "", "SNI")
-	c.Flags().StringVar(&opts.UpstreamID, "upstream-id", "", "Bound upstream ID")
+	c.Flags().StringVar(&opts.ServiceID, "service-id", "", "Bound service ID")
 	c.Flags().StringSliceVar(&opts.Labels, "labels", nil, "Labels in key=value format")
 	c.Flags().StringVarP(&opts.File, "file", "f", "", "Path to JSON/YAML file with resource definition")
 
@@ -93,10 +93,6 @@ func actionRun(opts *Options) error {
 		}
 		return cmdutil.NewExporter(format, opts.IO.Out).Write(json.RawMessage(body))
 	}
-	if opts.UpstreamID == "" {
-		return fmt.Errorf("--upstream-id is required")
-	}
-
 	httpClient, err := opts.Client()
 	if err != nil {
 		return err
@@ -117,7 +113,7 @@ func actionRun(opts *Options) error {
 		ServerAddr: opts.ServerAddr,
 		ServerPort: opts.ServerPort,
 		SNI:        opts.SNI,
-		UpstreamID: opts.UpstreamID,
+		ServiceID:  opts.ServiceID,
 	}
 	if len(labels) > 0 {
 		bodyReq.Labels = labels

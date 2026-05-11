@@ -2,7 +2,7 @@
 
 The `a7 service` command allows you to manage API7 Enterprise Edition (API7 EE) runtime services. You can list, create, update, get, and delete services within a specific gateway group using the CLI.
 
-> **Note:** This command manages **runtime services** via the `/apisix/admin/services` endpoint. These are different from **service templates** which are used for control-plane design-time configurations.
+> **Note:** This command manages API7 EE runtime services via the `/apisix/admin/services` endpoint. Current `a7` workflows define upstreams inline on services.
 >
 > The `--gateway-group` (or `-g`) flag is required for all service commands if not specified in your current context.
 
@@ -73,9 +73,7 @@ a7 service create -g default -f service.json
   "name": "example-service",
   "upstream": {
     "type": "roundrobin",
-    "nodes": {
-      "httpbin.org:80": 1
-    }
+    "nodes": [{"host": "httpbin.org", "port": 80, "weight": 1}]
   }
 }
 ```
@@ -142,7 +140,6 @@ Key fields in the service configuration (sent to `/apisix/admin/services`):
 | `name` | string | Human-readable name for the service |
 | `desc` | string | Description of the service |
 | `upstream` | object | Inline upstream configuration |
-| `upstream_id` | string | Reference to an existing upstream ID |
 | `status` | integer | Service status (1 for enabled, 0 for disabled) |
 | `plugins` | object | Plugin configurations for the service |
 | `hosts` | array | List of hostnames the service handles |
@@ -157,9 +154,7 @@ Key fields in the service configuration (sent to `/apisix/admin/services`):
   "name": "protected-service",
   "upstream": {
     "type": "roundrobin",
-    "nodes": {
-      "127.0.0.1:8080": 1
-    }
+    "nodes": [{"host": "127.0.0.1", "port": 8080, "weight": 1}]
   },
   "plugins": {
     "limit-count": {

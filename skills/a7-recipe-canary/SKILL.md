@@ -88,7 +88,7 @@ a7 route create --gateway-group default -f - <<'EOF'
             {
               "upstream": {
                 "type": "roundrobin",
-                "nodes": {"canary-v2:8080": 1}
+                "nodes": [{"host": "canary-v2", "port": 8080, "weight": 1}]
               },
               "weight": 5
             },
@@ -118,7 +118,7 @@ a7 route update api --gateway-group default -f - <<'EOF'
             {
               "upstream": {
                 "type": "roundrobin",
-                "nodes": {"canary-v2:8080": 1}
+                "nodes": [{"host": "canary-v2", "port": 8080, "weight": 1}]
               },
               "weight": 25
             },
@@ -195,7 +195,7 @@ a7 route update api --gateway-group default -f - <<'EOF'
             {
               "upstream": {
                 "type": "roundrobin",
-                "nodes": {"canary-v2:8080": 1}
+                "nodes": [{"host": "canary-v2", "port": 8080, "weight": 1}]
               },
               "weight": 1
             }
@@ -237,7 +237,7 @@ EOF
     "traffic-split": {
       "rules": [{
         "weighted_upstreams": [
-          {"upstream": {"type": "roundrobin", "nodes": {"canary-v2:8080": 1}}, "weight": $w},
+          {"upstream": {"type": "roundrobin", "nodes": [{"host": "canary-v2", "port": 8080, "weight": 1}]}, "weight": $w},
           {"weight": $stable_w}
         ]
       }]
@@ -291,7 +291,9 @@ routes:
               - upstream:
                   type: roundrobin
                   nodes:
-                    "canary-v2:8080": 1
+                    - host: canary-v2
+                      port: 8080
+                      weight: 1
                 weight: 10
               - weight: 90
 ```

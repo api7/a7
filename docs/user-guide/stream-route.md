@@ -65,9 +65,7 @@ a7 stream-route create -g default -f stream-route.json
   "server_port": 9100,
   "upstream": {
     "type": "roundrobin",
-    "nodes": {
-      "127.0.0.1:8080": 1
-    }
+    "nodes": [{"host": "127.0.0.1", "port": 8080, "weight": 1}]
   }
 }
 ```
@@ -137,8 +135,7 @@ Key fields in the stream route configuration (sent to `/apisix/admin/stream_rout
 | `server_addr` | string | Match destination server address |
 | `server_port` | integer | Match destination server port |
 | `sni` | string | Match TLS SNI |
-| `upstream` | object | Inline upstream configuration |
-| `upstream_id` | string | Reference to an existing upstream ID |
+| `service_id` | string | Required by current API7 EE; reference to the service that owns the upstream configuration |
 | `plugins` | object | Plugin configurations |
 | `labels` | object | Key-value pairs for filtering and organization |
 
@@ -153,9 +150,7 @@ Key fields in the stream route configuration (sent to `/apisix/admin/stream_rout
   "server_port": 9443,
   "upstream": {
     "type": "roundrobin",
-    "nodes": {
-      "127.0.0.1:9000": 1
-    }
+    "nodes": [{"host": "127.0.0.1", "port": 9000, "weight": 1}]
   }
 }
 ```

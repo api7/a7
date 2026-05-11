@@ -45,7 +45,6 @@ func TestCreateService_Success(t *testing.T) {
 		GatewayGroup: "gg1",
 		Name:         "svc-1",
 		Desc:         "d1",
-		UpstreamID:   "u1",
 		Host:         "example.com",
 		Labels:       []string{"k=v"},
 	}

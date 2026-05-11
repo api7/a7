@@ -17,7 +17,7 @@ metadata:
   a7_commands:
     - a7 route create
     - a7 route update
-    - a7 service-template create
+    - a7 service create
     - a7 config sync
 ---
 
@@ -40,7 +40,7 @@ Both must be used alongside `ai-proxy` or `ai-proxy-multi`.
 - Block toxic, hateful, or sexual content before it reaches the LLM
 - Filter harmful LLM responses before they reach clients (Aliyun only)
 - Enforce content policies with configurable thresholds
-- Apply consistent moderation policies using **Service Templates**
+- Apply consistent moderation policies directly on services or routes
 
 ## Plugin Execution Order
 
@@ -159,12 +159,12 @@ a7 route create -g default -f - <<'EOF'
 EOF
 ```
 
-## Using Service Templates
+## Using Services
 
-You can define standard moderation policies on a **Service Template** to reuse them across multiple services.
+You can define standard moderation policies on a service and attach routes to that service.
 
 ```bash
-a7 service-template create -f - <<'EOF'
+a7 service create -g default -f - <<'EOF'
 {
   "id": "standard-moderation",
   "name": "Standard Moderation",

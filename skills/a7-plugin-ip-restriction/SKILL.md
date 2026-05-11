@@ -76,9 +76,7 @@ a7 route create -g default -f - <<'EOF'
   },
   "upstream": {
     "type": "roundrobin",
-    "nodes": {
-      "backend:8080": 1
-    }
+    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -113,9 +111,7 @@ a7 route create -g default -f - <<'EOF'
   },
   "upstream": {
     "type": "roundrobin",
-    "nodes": {
-      "backend:8080": 1
-    }
+    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -201,10 +197,10 @@ gateway_groups:
             whitelist:
               - "10.0.0.0/8"
               - "172.16.0.0/12"
-        upstream_id: admin-upstream
-    upstreams:
-      - id: admin-upstream
-        type: roundrobin
-        nodes:
-          "backend:8080": 1
+        upstream:
+          type: roundrobin
+          nodes:
+            - host: backend
+              port: 8080
+              weight: 1
 ```

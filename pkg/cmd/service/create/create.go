@@ -23,11 +23,10 @@ type Options struct {
 	GatewayGroup string
 	File         string
 
-	Name       string
-	Desc       string
-	UpstreamID string
-	Labels     []string
-	Host       string
+	Name   string
+	Desc   string
+	Labels []string
+	Host   string
 }
 
 func NewCmd(f *cmd.Factory) *cobra.Command {
@@ -46,7 +45,6 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 	c.Flags().StringVar(&opts.Name, "name", "", "Service name")
 	c.Flags().StringVarP(&opts.File, "file", "f", "", "Path to JSON/YAML file with resource definition")
 	c.Flags().StringVar(&opts.Desc, "desc", "", "Service description")
-	c.Flags().StringVar(&opts.UpstreamID, "upstream-id", "", "Bound upstream ID")
 	c.Flags().StringSliceVar(&opts.Labels, "labels", nil, "Labels in key=value format")
 	c.Flags().StringVar(&opts.Host, "host", "", "Service host")
 	return c
@@ -112,9 +110,8 @@ func actionRun(opts *Options) error {
 	}
 
 	bodyReq := api.Service{
-		Name:       opts.Name,
-		Desc:       opts.Desc,
-		UpstreamID: opts.UpstreamID,
+		Name: opts.Name,
+		Desc: opts.Desc,
 	}
 	if len(labels) > 0 {
 		bodyReq.Labels = labels

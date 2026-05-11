@@ -206,8 +206,6 @@ func putPathAndBody(resourceType, key string, payload map[string]interface{}) (s
 		return fmt.Sprintf("/apisix/admin/routes/%s", key), payload, nil
 	case "services":
 		return fmt.Sprintf("/apisix/admin/services/%s", key), payload, nil
-	case "upstreams":
-		return fmt.Sprintf("/apisix/admin/upstreams/%s", key), payload, nil
 	case "consumers":
 		return "/apisix/admin/consumers", payload, nil
 	case "ssl":
@@ -216,8 +214,6 @@ func putPathAndBody(resourceType, key string, payload map[string]interface{}) (s
 		return fmt.Sprintf("/apisix/admin/global_rules/%s", key), payload, nil
 	case "plugin_configs":
 		return fmt.Sprintf("/apisix/admin/plugin_configs/%s", key), payload, nil
-	case "consumer_groups":
-		return fmt.Sprintf("/apisix/admin/consumer_groups/%s", key), payload, nil
 	case "stream_routes":
 		return fmt.Sprintf("/apisix/admin/stream_routes/%s", key), payload, nil
 	case "protos":
@@ -238,8 +234,6 @@ func deletePath(resourceType, key string) (string, error) {
 		return fmt.Sprintf("/apisix/admin/routes/%s", key), nil
 	case "services":
 		return fmt.Sprintf("/apisix/admin/services/%s", key), nil
-	case "upstreams":
-		return fmt.Sprintf("/apisix/admin/upstreams/%s", key), nil
 	case "consumers":
 		return fmt.Sprintf("/apisix/admin/consumers/%s", key), nil
 	case "ssl":
@@ -248,8 +242,6 @@ func deletePath(resourceType, key string) (string, error) {
 		return fmt.Sprintf("/apisix/admin/global_rules/%s", key), nil
 	case "plugin_configs":
 		return fmt.Sprintf("/apisix/admin/plugin_configs/%s", key), nil
-	case "consumer_groups":
-		return fmt.Sprintf("/apisix/admin/consumer_groups/%s", key), nil
 	case "stream_routes":
 		return fmt.Sprintf("/apisix/admin/stream_routes/%s", key), nil
 	case "protos":

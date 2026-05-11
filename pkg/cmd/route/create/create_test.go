@@ -34,7 +34,7 @@ func (m *mockConfig) Save() error                                     { return n
 func TestCreateRoute_Success(t *testing.T) {
 	ios, _, out, _ := iostreams.Test()
 	registry := &httpmock.Registry{}
-	registry.Register(http.MethodPost, "/apisix/admin/routes", httpmock.JSONResponse(`{"id":"r1","name":"demo","uri":"/demo"}`))
+	registry.Register(http.MethodPost, "/apisix/admin/routes", httpmock.JSONResponse(`{"id":"r1","name":"demo","uri":"/demo","service_id":"svc1"}`))
 
 	opts := &Options{
 		IO:     ios,
@@ -45,6 +45,7 @@ func TestCreateRoute_Success(t *testing.T) {
 		GatewayGroup: "gg1",
 		URI:          "/demo",
 		Name:         "demo",
+		ServiceID:    "svc1",
 	}
 
 	if err := actionRun(opts); err != nil {
@@ -68,6 +69,24 @@ func TestCreateRoute_MissingURI(t *testing.T) {
 	err := actionRun(opts)
 	if err == nil || !strings.Contains(err.Error(), "--uri is required") {
 		t.Fatalf("expected uri required error, got: %v", err)
+	}
+}
+
+func TestCreateRoute_MissingServiceID(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	opts := &Options{
+		IO:     ios,
+		Client: func() (*http.Client, error) { return (&httpmock.Registry{}).GetClient(), nil },
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
+		},
+		GatewayGroup: "gg1",
+		URI:          "/demo",
+		Name:         "demo",
+	}
+	err := actionRun(opts)
+	if err == nil || !strings.Contains(err.Error(), "--service-id is required") {
+		t.Fatalf("expected service-id required error, got: %v", err)
 	}
 }
 

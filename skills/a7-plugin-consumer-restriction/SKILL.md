@@ -2,8 +2,8 @@
 name: a7-plugin-consumer-restriction
 description: >-
   Skill for configuring the API7 Enterprise Edition consumer-restriction plugin via the
-  a7 CLI. Covers restricting access by consumer name, consumer group ID,
-  service ID, or route ID using whitelist/blacklist modes and per-consumer
+  a7 CLI. Covers restricting access by consumer name, service ID, or route ID
+  using whitelist/blacklist modes and per-consumer
   HTTP method restrictions.
 version: "1.0.0"
 author: API7.ai Contributors
@@ -36,7 +36,7 @@ consumer.
 
 ## When to Use
 
-- Restrict specific routes to certain consumers or consumer groups.
+- Restrict specific routes to certain consumers.
 - Implement tiered access (free vs premium consumers).
 - Control which HTTP methods each consumer can use.
 - Restrict consumers to specific services or routes.
@@ -45,7 +45,7 @@ consumer.
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `type` | string | No | `consumer_name` | Restriction type: `consumer_name`, `consumer_group_id`, `service_id`, `route_id` |
+| `type` | string | No | `consumer_name` | Restriction type: `consumer_name`, `service_id`, `route_id` |
 | `whitelist` | array[string] | One of three\* | — | Allowed identifiers |
 | `blacklist` | array[string] | One of three\* | — | Blocked identifiers |
 | `allowed_by_methods` | array[object] | One of three\* | — | Per-consumer HTTP method restrictions |
@@ -71,7 +71,6 @@ blacklist (highest) > whitelist > allowed_by_methods (lowest)
 | Type | Configure On | Description |
 |------|-------------|-------------|
 | `consumer_name` | Route/Service | Restrict which consumers can access this route |
-| `consumer_group_id` | Route/Service | Restrict which consumer groups can access this route |
 | `service_id` | **Consumer** | Restrict which services this consumer can access |
 | `route_id` | **Consumer** | Restrict which routes this consumer can access |
 
@@ -114,7 +113,7 @@ a7 route create --gateway-group default -f - <<'EOF'
   },
   "upstream": {
     "type": "roundrobin",
-    "nodes": {"backend:8080": 1}
+    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -142,43 +141,28 @@ a7 route create --gateway-group default -f - <<'EOF'
   },
   "upstream": {
     "type": "roundrobin",
-    "nodes": {"backend:8080": 1}
+    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
   }
 }
 EOF
 ```
 
-### 3. Restrict by Consumer Group
+### 3. Restrict Named Consumers
 
-Only allow consumers in `enterprise` group:
+Current API7 EE does not expose consumer group management through the Admin API.
+Use `consumer_name` allowlists or denylists when configuring consumer restrictions.
 
 ```bash
-# Create consumer group
-a7 consumer-group create --gateway-group default -f - <<'EOF'
-{
-  "id": "enterprise",
-  "plugins": {
-    "limit-count": {
-      "count": 10000,
-      "time_window": 60,
-      "group": "enterprise"
-    }
-  }
-}
-EOF
-
-# Create consumer in the group
 a7 consumer create --gateway-group default -f - <<'EOF'
 {
   "username": "acme-corp",
   "plugins": {
     "key-auth": {"key": "acme-key"}
-  },
-  "group_id": "enterprise"
+  }
 }
 EOF
 
-# Route restricted to enterprise group
+# Route restricted to named consumers
 a7 route create --gateway-group default -f - <<'EOF'
 {
   "id": "enterprise-only",
@@ -186,13 +170,13 @@ a7 route create --gateway-group default -f - <<'EOF'
   "plugins": {
     "key-auth": {},
     "consumer-restriction": {
-      "type": "consumer_group_id",
-      "whitelist": ["enterprise"]
+      "type": "consumer_name",
+      "whitelist": ["acme-corp"]
     }
   },
   "upstream": {
     "type": "roundrobin",
-    "nodes": {"backend:8080": 1}
+    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -224,7 +208,7 @@ a7 route create --gateway-group default -f - <<'EOF'
   },
   "upstream": {
     "type": "roundrobin",
-    "nodes": {"backend:8080": 1}
+    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -295,7 +279,12 @@ routes:
           - admin
         rejected_code: 403
         rejected_msg: "Admin access required"
-    upstream_id: admin-backend
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: admin-backend
+          port: 8080
+          weight: 1
 
   - id: public-api
     uri: /api/*
@@ -307,7 +296,12 @@ routes:
             methods: ["GET"]
           - user: admin
             methods: ["GET", "POST", "PUT", "DELETE"]
-    upstream_id: api-backend
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: api-backend
+          port: 8080
+          weight: 1
 ```
 
 ## Common Patterns
@@ -319,8 +313,8 @@ routes:
   "plugins": {
     "key-auth": {},
     "consumer-restriction": {
-      "type": "consumer_group_id",
-      "whitelist": ["enterprise", "pro"],
+      "type": "consumer_name",
+      "whitelist": ["enterprise-user", "pro-user"],
       "rejected_code": 402,
       "rejected_msg": "Upgrade required for this endpoint"
     }

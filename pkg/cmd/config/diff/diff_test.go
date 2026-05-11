@@ -37,12 +37,10 @@ func (m *mockConfig) Save() error                                     { return n
 func registerEmptyResources(reg *httpmock.Registry, skip map[string]bool) {
 	resources := []string{
 		"/apisix/admin/services",
-		"/apisix/admin/upstreams",
 		"/apisix/admin/consumers",
 		"/apisix/admin/ssls",
 		"/apisix/admin/global_rules",
 		"/apisix/admin/plugin_configs",
-		"/apisix/admin/consumer_groups",
 		"/apisix/admin/stream_routes",
 		"/apisix/admin/protos",
 		"/apisix/admin/secret_providers",

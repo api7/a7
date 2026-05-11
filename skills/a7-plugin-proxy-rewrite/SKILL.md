@@ -71,9 +71,7 @@ a7 route create --gateway-group default -f - <<'EOF'
   },
   "upstream": {
     "type": "roundrobin",
-    "nodes": {
-      "backend:8080": 1
-    }
+    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -95,9 +93,7 @@ a7 route create --gateway-group prod -f - <<'EOF'
   },
   "upstream": {
     "type": "roundrobin",
-    "nodes": {
-      "backend:8080": 1
-    }
+    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -126,9 +122,7 @@ a7 route create --gateway-group stage -f - <<'EOF'
   },
   "upstream": {
     "type": "roundrobin",
-    "nodes": {
-      "backend:8080": 1
-    }
+    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -237,10 +231,10 @@ routes:
             X-Forwarded-Prefix: "/api/v1"
           remove:
             - X-Debug
-    upstream_id: backend
-upstreams:
-  - id: backend
-    type: roundrobin
-    nodes:
-      "backend:8080": 1
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: backend
+          port: 8080
+          weight: 1
 ```

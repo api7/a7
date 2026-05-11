@@ -233,8 +233,14 @@ func TestSkillsDoNotReferenceRemovedA7Commands(t *testing.T) {
 	disallowed := []string{
 		"a7 health",
 		"a7 portal",
+		"a7 upstream",
 		"a7 upstream health",
+		"a7 consumer-group",
+		"a7 service-template",
 		"a7 consumer-restriction create",
+		"\nupstreams:",
+		"\n    upstreams:",
+		"upstream_id:",
 	}
 	for _, pattern := range disallowed {
 		matches, err := filepath.Glob(filepath.Join(root, "skills", "*", "SKILL.md"))

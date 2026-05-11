@@ -58,24 +58,23 @@ deployments, and A/B testing — all without modifying DNS or load balancers.
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `upstream_id` | string/integer | No | — | ID of a pre-configured upstream object. Use this to get health checks, retries, etc. |
 | `upstream` | object | No | — | Inline upstream configuration (see below). |
 | `weight` | integer | No | `1` | Traffic weight for this upstream. |
 
-**If only `weight` is set** (no `upstream` or `upstream_id`), traffic goes to the route's default upstream.
+**If only `weight` is set** (no inline `upstream`), traffic goes to the route's service upstream.
 
 ### Inline upstream object
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `type` | string | No | `"roundrobin"` | Load balancing: `"roundrobin"` or `"chash"`. |
-| `nodes` | object | Yes | — | Backend nodes as `{"host:port": weight}`. |
+| `nodes` | array | Yes | — | Backend nodes as `[{host, port, weight}]`. |
 | `timeout` | object | No | `15` (seconds) | `{"connect": N, "send": N, "read": N}` |
 | `pass_host` | string | No | `"pass"` | `"pass"` = client host, `"node"` = upstream node, `"rewrite"` = use `upstream_host`. |
 | `upstream_host` | string | No | — | Custom Host header. Only works with `pass_host: "rewrite"`. |
 | `name` | string | No | — | Human-readable name for the upstream. |
 
-**Not supported in inline upstream**: `service_name`, `discovery_type`, `checks`, `retries`, `retry_timeout`, `scheme`. Use `upstream_id` for these features.
+**Not supported in inline weighted upstreams**: `service_name`, `discovery_type`, `checks`, `retries`, and `retry_timeout`. Keep shared upstream behavior on the bound service whenever possible.
 
 ## Step-by-Step: Enable traffic-split on a Route
 
@@ -97,9 +96,7 @@ a7 route create --gateway-group default -f - <<'EOF'
               "upstream": {
                 "name": "new-version-v2",
                 "type": "roundrobin",
-                "nodes": {
-                  "backend-v2:8080": 1
-                }
+                "nodes": [{"host": "backend-v2", "port": 8080, "weight": 1}]
               },
               "weight": 2
             },
@@ -113,9 +110,7 @@ a7 route create --gateway-group default -f - <<'EOF'
   },
   "upstream": {
     "type": "roundrobin",
-    "nodes": {
-      "backend-v1:8080": 1
-    }
+    "nodes": [{"host": "backend-v1", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -146,9 +141,7 @@ a7 route create --gateway-group prod -f - <<'EOF'
               "upstream": {
                 "name": "green-env",
                 "type": "roundrobin",
-                "nodes": {
-                  "green-backend:8080": 1
-                }
+                "nodes": [{"host": "green-backend", "port": 8080, "weight": 1}]
               },
               "weight": 1
             }
@@ -159,9 +152,7 @@ a7 route create --gateway-group prod -f - <<'EOF'
   },
   "upstream": {
     "type": "roundrobin",
-    "nodes": {
-      "blue-backend:8080": 1
-    }
+    "nodes": [{"host": "blue-backend", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -183,9 +174,7 @@ a7 route update canary-release --gateway-group default -f - <<'EOF'
               "upstream": {
                 "name": "new-version-v2",
                 "type": "roundrobin",
-                "nodes": {
-                  "backend-v2:8080": 1
-                }
+                "nodes": [{"host": "backend-v2", "port": 8080, "weight": 1}]
               },
               "weight": 5
             },
@@ -223,7 +212,7 @@ EOF
               "upstream": {
                 "name": "variant-B",
                 "type": "roundrobin",
-                "nodes": {"variant-b:8080": 1}
+                "nodes": [{"host": "variant-b", "port": 8080, "weight": 1}]
               }
             }
           ]
@@ -246,13 +235,13 @@ Requests with `?variant=B` → variant B backend.
         {
           "match": [{"vars": [["http_x-api-id", "==", "1"]]}],
           "weighted_upstreams": [
-            {"upstream": {"type": "roundrobin", "nodes": {"svc-a:8080": 1}}}
+            {"upstream": {"type": "roundrobin", "nodes": [{"host": "svc-a", "port": 8080, "weight": 1}]}}
           ]
         },
         {
           "match": [{"vars": [["http_x-api-id", "==", "2"]]}],
           "weighted_upstreams": [
-            {"upstream": {"type": "roundrobin", "nodes": {"svc-b:8080": 1}}}
+            {"upstream": {"type": "roundrobin", "nodes": [{"host": "svc-b", "port": 8080, "weight": 1}]}}
           ]
         }
       ]
@@ -261,7 +250,7 @@ Requests with `?variant=B` → variant B backend.
 }
 ```
 
-### Using upstream_id for health checks
+### Health Check Considerations
 
 ```json
 {
@@ -271,7 +260,7 @@ Requests with `?variant=B` → variant B backend.
         {
           "weighted_upstreams": [
             {
-              "upstream_id": "canary-upstream",
+              "upstream": {"type": "roundrobin", "nodes": [{"host": "canary", "port": 8080, "weight": 1}]},
               "weight": 2
             },
             {
@@ -285,7 +274,9 @@ Requests with `?variant=B` → variant B backend.
 }
 ```
 
-Pre-create the upstream with `a7 upstream create` to configure health checks, retries, and other advanced settings.
+Current API7 EE does not expose standalone upstream CRUD through `a7`. Prefer
+inline weighted upstreams for traffic splitting, and keep health-check settings
+on service upstream configuration when needed.
 
 ## Match Logic Reference
 
@@ -301,7 +292,7 @@ Pre-create the upstream with `a7 upstream create` to configure health checks, re
 |---------|-------|-----|
 | Traffic ratio inaccurate | Round-robin algorithm causes slight deviation | Expected behavior; ratios converge over many requests |
 | Match rule not triggering | Variable name wrong or operator mismatch | Use `http_header-name` for headers, `arg_name` for query params |
-| Health checks not working | Inline upstream doesn't support `checks` | Use `upstream_id` referencing a pre-created upstream with health checks |
+| Health checks not working | Health checks are not configured on the service upstream | Move stable backend health-check settings to the service upstream configuration |
 | All traffic going to default | Match conditions never true | Debug with `a7 route get` and verify header/param names |
 | Weight 0 not blocking traffic | Weight 0 means "never forward" to that upstream | Correct — set weight to 0 to exclude an upstream |
 | Config not applied | Wrong gateway group specified | Ensure `--gateway-group` matches the desired cluster |
@@ -318,17 +309,18 @@ routes:
       traffic-split:
         rules:
           - weighted_upstreams:
-              - upstream_id: canary-upstream
+              - upstream:
+                  type: roundrobin
+                  nodes:
+                    - host: canary-backend
+                      port: 8080
+                      weight: 1
                 weight: 2
               - weight: 8
-    upstream_id: stable-upstream
-upstreams:
-  - id: stable-upstream
-    type: roundrobin
-    nodes:
-      "stable-backend:8080": 1
-  - id: canary-upstream
-    type: roundrobin
-    nodes:
-      "canary-backend:8080": 1
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: stable-backend
+          port: 8080
+          weight: 1
 ```

@@ -48,7 +48,6 @@ func TestUpdateService_Success(t *testing.T) {
 		ID:           "s1",
 		Name:         "svc-1-updated",
 		Desc:         "d2",
-		UpstreamID:   "u2",
 		Labels:       []string{"k=v"},
 	}
 

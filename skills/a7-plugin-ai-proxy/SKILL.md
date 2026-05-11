@@ -4,7 +4,7 @@ description: >-
   Skill for configuring the API7 Enterprise Edition ai-proxy plugin via the a7 CLI.
   Covers proxying requests to LLM providers (OpenAI, Azure OpenAI, DeepSeek,
   Anthropic, Gemini, Vertex AI, and more), authentication per provider,
-  model configuration, streaming, logging, and service template usage.
+  model configuration, streaming, logging, and route/service usage.
 version: "1.0.0"
 author: API7.ai Contributors
 license: Apache-2.0
@@ -15,7 +15,7 @@ metadata:
   a7_commands:
     - a7 route create
     - a7 route update
-    - a7 service-template create
+    - a7 service create
     - a7 config sync
 ---
 
@@ -35,7 +35,7 @@ request; the plugin translates and forwards it to the configured provider.
 - Add observability (token counts, latency) to LLM calls
 - Combine with `ai-prompt-template`, `ai-prompt-decorator`, or content
   moderation plugins for a full AI gateway pipeline
-- Apply consistent AI proxy configurations across services using **Service Templates**
+- Apply consistent AI proxy configurations directly on services or routes
 
 ## Supported Providers
 
@@ -168,12 +168,12 @@ curl http://127.0.0.1:9080/v1/chat/completions \
   }'
 ```
 
-## Using Service Templates
+## Using Services
 
-In API7 EE, you can enable `ai-proxy` on a **Service Template** to standardize AI gateway configurations across multiple services.
+In API7 EE, configure `ai-proxy` directly on a service or route. Services are the preferred place for reusable upstream and plugin configuration.
 
 ```bash
-a7 service-template create -f - <<'EOF'
+a7 service create -g default -f - <<'EOF'
 {
   "id": "standard-ai-proxy",
   "name": "Standard AI Proxy",

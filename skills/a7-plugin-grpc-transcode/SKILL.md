@@ -100,9 +100,7 @@ a7 route create --gateway-group default -f - <<'EOF'
   "upstream": {
     "scheme": "grpc",
     "type": "roundrobin",
-    "nodes": {
-      "grpc-server:50051": 1
-    }
+    "nodes": [{"host": "grpc-server", "port": 50051, "weight": 1}]
   }
 }
 EOF
@@ -236,11 +234,11 @@ routes:
         pb_option:
           - int64_as_string
           - enum_as_name
-    upstream_id: grpc-backend
-upstreams:
-  - id: grpc-backend
-    scheme: grpc
-    type: roundrobin
-    nodes:
-      "grpc-server:50051": 1
+    upstream:
+      scheme: grpc
+      type: roundrobin
+      nodes:
+        - host: grpc-server
+          port: 50051
+          weight: 1
 ```

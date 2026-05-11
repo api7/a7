@@ -168,7 +168,7 @@ a7 route create -g default -f - <<'EOF'
   },
   "upstream": {
     "type": "roundrobin",
-    "nodes": {"backend:8080": 1}
+    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -300,7 +300,12 @@ gateway_groups:
         uri: /api/*
         plugins:
           wolf-rbac: {}
-        upstream_id: api-backend
+        upstream:
+          type: roundrobin
+          nodes:
+            - host: api-backend
+              port: 8080
+              weight: 1
       - id: wolf-login
         uri: /apisix/plugin/wolf-rbac/login
         plugins:
@@ -313,11 +318,6 @@ gateway_groups:
         uri: /apisix/plugin/wolf-rbac/change_pwd
         plugins:
           public-api: {}
-    upstreams:
-      - id: api-backend
-        type: roundrobin
-        nodes:
-          "backend:8080": 1
 ```
 
 ## Injected Headers

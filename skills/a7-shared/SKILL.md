@@ -18,7 +18,6 @@ metadata:
     - a7 ssl
     - a7 plugin
     - a7 gateway-group
-    - a7 service-template
     - a7 config
     - a7 context
 ---
@@ -28,15 +27,15 @@ metadata:
 ## What is a7
 
 a7 is a Go CLI for API7 Enterprise Edition (API7 EE). It provides imperative CRUD
-for 13 resource types, declarative config sync, context management, and debug tooling.
+for current API7 EE resource types, declarative config sync, context management, and debug tooling.
 
 - **Binary**: `a7`
 - **Module**: `github.com/api7/a7`
 - **Go**: 1.22+
 - **Pattern**: noun-verb (`a7 <resource> <action> [flags]`)
 - **Dual-API Architecture**:
-  - **Control-plane API**: `/api/*` (e.g., gateway groups, users, service templates)
-  - **Runtime Admin API**: `/apisix/admin/*` (e.g., routes, upstreams, services)
+  - **Control-plane API**: `/api/*` (e.g., gateway groups)
+  - **Runtime Admin API**: `/apisix/admin/*` (e.g., routes, services, consumers)
 - **Gateway Group Scoping**: All runtime resources must be scoped to a gateway group using `--gateway-group` or `-g`.
 
 ## Project Layout
@@ -48,10 +47,8 @@ a7/
 │   ├── root/root.go                # Root command, registers all subcommands
 │   ├── factory.go                  # DI: IOStreams, HttpClient, Config
 │   ├── route/                      # a7 route list|get|create|update|delete -g <group>
-│   ├── upstream/                   # ⚠️ NOT EXPOSED in API7 EE — upstreams are inline-only (defined within services/routes)
 │   ├── service/                    # a7 service ... -g <group>
 │   ├── gateway-group/              # a7 gateway-group list|get|create|update|delete
-│   ├── service-template/           # a7 service-template list|get|create|update|delete
 │   ├── consumer/                   # a7 consumer ... -g <group>
 │   ├── ssl/                        # a7 ssl ... -g <group>
 │   ├── plugin/                     # a7 plugin list|get
@@ -122,10 +119,8 @@ For `update` actions that use `PATCH`, a7 implements JSON Patch (RFC 6902) suppo
 | Resource | Key Field | API Path (Prefix) |
 |----------|-----------|-------------------|
 | Gateway Group | `id` | `/api/gateway_groups` |
-| Service Template | `id` | `/api/services/template` |
 | Route | `id` | `/apisix/admin/routes` |
 | Service | `id` | `/apisix/admin/services` |
-| Upstream | `id` | ⚠️ NOT EXPOSED — upstreams are inline-only in API7 EE (defined within services/routes) |
 | Consumer | `username` | `/apisix/admin/consumers` |
 | SSL | `id` | `/apisix/admin/ssl` |
 | Global Rule | `id` | `/apisix/admin/global_rules` |
@@ -136,7 +131,7 @@ For `update` actions that use `PATCH`, a7 implements JSON Patch (RFC 6902) suppo
 | Plugin (read-only) | `name` | `/apisix/admin/plugins` |
 | Credential | `id` | `/apisix/admin/consumers/{username}/credentials` |
 
-Note: Runtime resources (routes, services, upstreams, etc.) are always scoped by the gateway group in the request URL or via headers.
+Note: Runtime resources (routes, services, consumers, etc.) are always scoped by the gateway group in the request URL or via headers. Upstreams are modeled inline on services or routes, not as standalone resources.
 
 ## Common Commands
 

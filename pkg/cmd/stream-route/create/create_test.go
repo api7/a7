@@ -34,14 +34,14 @@ func (m *mockConfig) Save() error                                     { return n
 func TestCreateStreamRoute_Success(t *testing.T) {
 	ios, _, out, _ := iostreams.Test()
 	registry := &httpmock.Registry{}
-	registry.Register(http.MethodPost, "/apisix/admin/stream_routes", httpmock.JSONResponse(`{"id":"sr1","desc":"mysql","upstream_id":"u1"}`))
+	registry.Register(http.MethodPost, "/apisix/admin/stream_routes", httpmock.JSONResponse(`{"id":"sr1","desc":"mysql","service_id":"svc1"}`))
 
 	err := actionRun(&Options{
 		IO:           ios,
 		Client:       func() (*http.Client, error) { return registry.GetClient(), nil },
 		GatewayGroup: "gg1",
 		Desc:         "mysql",
-		UpstreamID:   "u1",
+		ServiceID:    "svc1",
 		Config: func() (config.Config, error) {
 			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
 		},
@@ -71,17 +71,17 @@ func TestCreateStreamRoute_ValidationError(t *testing.T) {
 			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
 		},
 	})
-	if err == nil || !strings.Contains(err.Error(), "--upstream-id is required") {
-		t.Fatalf("expected missing upstream-id error, got: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "--service-id is required") {
+		t.Fatalf("expected missing service-id error, got: %v", err)
 	}
 }
 
 func TestCreateStreamRoute_MissingGatewayGroup(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
 	err := actionRun(&Options{
-		IO:         ios,
-		Client:     func() (*http.Client, error) { return (&httpmock.Registry{}).GetClient(), nil },
-		UpstreamID: "u1",
+		IO:        ios,
+		Client:    func() (*http.Client, error) { return (&httpmock.Registry{}).GetClient(), nil },
+		ServiceID: "svc1",
 		Config: func() (config.Config, error) {
 			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: ""}, nil
 		},
@@ -100,7 +100,7 @@ func TestCreateStreamRoute_APIError(t *testing.T) {
 		IO:           ios,
 		Client:       func() (*http.Client, error) { return registry.GetClient(), nil },
 		GatewayGroup: "gg1",
-		UpstreamID:   "u1",
+		ServiceID:    "svc1",
 		Config: func() (config.Config, error) {
 			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
 		},

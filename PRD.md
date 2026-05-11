@@ -92,8 +92,8 @@ a7 <resource> <action> [args] [flags]
 ### Resource Commands — Control Plane (`/api/*`)
 
 #### Service Templates (design-time)
-- `a7 service-template list|get|create|update|patch|delete`
-- `a7 service-template publish --gateway-group <id>` (publish to gateway group)
+Service templates are not part of current a7 support. Manage runtime services
+directly and define upstreams inline on services or routes.
 
 #### Gateway Groups
 - `a7 gateway-group list|get|create|update|delete`
@@ -128,7 +128,7 @@ All runtime commands require `--gateway-group <id>` (or default from context).
 - `a7 service list|get|create|update|delete|export --gateway-group <id>`
 
 #### Upstreams
-> **⚠️ NOT SUPPORTED**: Standalone upstreams are not exposed via the API7 EE Admin API. Upstreams exist only as inline objects within services and routes. The `a7 upstream` commands exist for APISIX compatibility but will not work against API7 EE.
+> **⚠️ NOT SUPPORTED**: Standalone upstreams are not exposed via the API7 EE Admin API. Upstreams exist only as inline objects within services and routes.
 
 #### Consumers
 - `a7 consumer list|get|create|update|delete|export --gateway-group <id>`
@@ -137,7 +137,7 @@ All runtime commands require `--gateway-group <id>` (or default from context).
 - `a7 credential list|get|create|update|delete --consumer <username> --gateway-group <id>`
 
 #### Consumer Groups
-> **⚠️ NOT SUPPORTED**: Consumer groups are not exposed via the API7 EE Admin API. The `a7 consumer-group` commands exist for APISIX compatibility but will not work against API7 EE.
+> **⚠️ NOT SUPPORTED**: Consumer groups are not exposed via the API7 EE Admin API, so a7 does not expose consumer group commands.
 
 #### SSL Certificates
 - `a7 ssl list|get|create|update|delete|export --gateway-group <id>`
@@ -207,7 +207,7 @@ All runtime commands require `--gateway-group <id>` (or default from context).
 
 ### Phase 3 — CLI Usability ✅ COMPLETE
 1. ✅ `-f/--file` flag: file-based create/update for all resource commands.
-2. ✅ `export` subcommand for all applicable resources (route, service, upstream, consumer, consumer-group, ssl, global-rule, stream-route, plugin-config, proto).
+2. ✅ `export` subcommand for all applicable resources (route, service, consumer, ssl, global-rule, stream-route, plugin-config, proto).
 3. ✅ `--force` flag for delete commands (skip confirmation).
 4. ✅ `--label` flag for list/export commands (label-based filtering).
 5. 🔲 `--dry-run` flag for create/update commands.
@@ -229,7 +229,7 @@ All runtime commands require `--gateway-group <id>` (or default from context).
 6. ✅ `docs/documentation-maintenance.md` — Doc update rules and templates.
 7. ✅ `docs/roadmap.md` — Per-PR development plan for Phases 5-9.
 8. ✅ `docs/api7ee-api-spec.md` — API7 EE Admin API reference (16 resources, dual-API).
-9. ✅ `docs/user-guide/` — 21 per-resource user guides (getting-started, configuration, route, service, upstream, consumer, ssl, plugin, global-rule, stream-route, plugin-config, plugin-metadata, consumer-group, credential, secret, proto, declarative-config, gateway-group, service-template, debug, bulk-operations).
+9. ✅ `docs/user-guide/` — per-resource user guides (getting-started, configuration, route, service, upstream, consumer, ssl, plugin, global-rule, stream-route, plugin-config, plugin-metadata, credential, secret, proto, declarative-config, gateway-group, debug, bulk-operations).
 
 ### Phase 6 — AI Agent Skills ✅ COMPLETE
 Port and adapt 40 SKILL.md files from a6, organized by category:
@@ -255,7 +255,7 @@ Port and adapt 40 SKILL.md files from a6, organized by category:
 ### Phase 8 — End-to-End Tests ✅ COMPLETE
 1. ✅ `test/e2e/docker-compose.yml` — Docker Compose for API7 EE (Dashboard + DP Manager + Gateway + PostgreSQL).
 2. ✅ `test/e2e/setup_test.go` — TestMain, binary build, admin/control API helpers, shared test utilities.
-3. ✅ Per-resource E2E tests (22 test files): route, service, upstream, consumer, ssl, plugin, global-rule, stream-route, plugin-config, plugin-metadata, consumer-group, credential, secret, proto, context, gateway-group, service-template.
+3. ✅ Per-resource E2E tests: route, service, consumer, ssl, plugin, global-rule, stream-route, plugin-config, plugin-metadata, credential, secret, proto, context, gateway-group.
 4. ✅ Declarative config E2E tests: dump, diff, sync, validate (config_test.go + config_sync_test.go).
 5. ✅ Export and label E2E tests (integrated into resource test files).
 6. ✅ Debug E2E tests: trace (JSON/method/headers/host/path) + logs (file mode).
@@ -317,7 +317,7 @@ The following table tracks feature parity between a7 and [a6](https://github.com
 
 | Feature | a6 | a7 | Notes |
 |---------|----|----|-------|
-| Resource CRUD (14 types) | ✅ | ✅ (13 functional in API7 EE) | a7 adds gateway-group, service-template; 3 APISIX resources (upstream, consumer-group, plugin-config) not exposed in API7 EE |
+| Resource CRUD | ✅ | ✅ (API7 EE supported resources) | a7 adds gateway-group; standalone upstreams, consumer groups, service templates, and plugin configs are not exposed in current API7 EE |
 | Context management | ✅ | ✅ | |
 | Shell completions | ✅ | ✅ | |
 | JSON/YAML/table output | ✅ | ✅ | |

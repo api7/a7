@@ -128,7 +128,7 @@ var _ = Describe("Local Stability", Ordered, func() {
 		Expect(stdout).To(ContainSubstring("vault.example.com"))
 	})
 
-	It("updates a stream route from file without forcing upstream-id flags", func() {
+	It("updates a stream route from file without forcing upstream flags", func() {
 		t := GinkgoT()
 		env := setupEnv(t)
 		svcID := "ginkgo-stream-svc"
