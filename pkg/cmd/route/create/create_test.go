@@ -145,6 +145,30 @@ func TestCreateRoute_FileMissingServiceID(t *testing.T) {
 	}
 }
 
+func TestCreateRoute_FileNullServiceID(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "route.json")
+	if err := os.WriteFile(path, []byte(`{"name":"demo-file","uri":"/demo-file","service_id":null}`), 0o600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	opts := &Options{
+		IO:     ios,
+		Client: func() (*http.Client, error) { return (&httpmock.Registry{}).GetClient(), nil },
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
+		},
+		GatewayGroup: "gg1",
+		File:         path,
+	}
+
+	err := actionRun(opts)
+	if err == nil || !strings.Contains(err.Error(), "--service-id is required") {
+		t.Fatalf("expected service-id required error, got: %v", err)
+	}
+}
+
 func TestCreateRoute_FileServiceIDFlag(t *testing.T) {
 	ios, _, out, _ := iostreams.Test()
 	registry := &httpmock.Registry{}

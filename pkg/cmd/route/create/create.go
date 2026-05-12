@@ -77,13 +77,8 @@ func actionRun(opts *Options) error {
 		if err != nil {
 			return err
 		}
-		if opts.ServiceID != "" {
-			if _, ok := payload["service_id"]; !ok {
-				payload["service_id"] = opts.ServiceID
-			}
-		}
-		if serviceID, ok := payload["service_id"]; !ok || strings.TrimSpace(fmt.Sprint(serviceID)) == "" {
-			return fmt.Errorf("--service-id is required for current API7 EE")
+		if err := cmdutil.EnsureRequiredStringField(payload, "service_id", opts.ServiceID, "--service-id is required for current API7 EE"); err != nil {
+			return err
 		}
 
 		httpClient, err := opts.Client()

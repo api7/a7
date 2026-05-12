@@ -89,8 +89,10 @@ func TestHelp(t *testing.T) {
 
 func TestUnsupportedResourceCommandsAreRemoved(t *testing.T) {
 	for _, command := range []string{"upstream", "consumer-group", "service-template"} {
-		_, _, err := runA7(command, "--help")
-		assert.Error(t, err, "command %q should not be registered", command)
+		t.Run(command, func(t *testing.T) {
+			_, _, err := runA7(command, "--help")
+			assert.Error(t, err, "command should not be registered")
+		})
 	}
 }
 

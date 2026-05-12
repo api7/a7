@@ -75,6 +75,9 @@ func actionRun(opts *Options) error {
 		if err != nil {
 			return err
 		}
+		if err := cmdutil.EnsureRequiredStringField(payload, "service_id", opts.ServiceID, "--service-id is required for current API7 EE"); err != nil {
+			return err
+		}
 
 		httpClient, err := opts.Client()
 		if err != nil {

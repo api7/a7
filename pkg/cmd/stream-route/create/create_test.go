@@ -2,7 +2,10 @@ package create
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -74,6 +77,86 @@ func TestCreateStreamRoute_ValidationError(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "--service-id is required") {
 		t.Fatalf("expected missing service-id error, got: %v", err)
 	}
+}
+
+func TestCreateStreamRoute_FileMissingServiceID(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	path := filepath.Join(t.TempDir(), "stream-route.json")
+	if err := os.WriteFile(path, []byte(`{"desc":"mysql"}`), 0o600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	err := actionRun(&Options{
+		IO:           ios,
+		Client:       func() (*http.Client, error) { return (&httpmock.Registry{}).GetClient(), nil },
+		GatewayGroup: "gg1",
+		File:         path,
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "--service-id is required") {
+		t.Fatalf("expected missing service-id error, got: %v", err)
+	}
+}
+
+func TestCreateStreamRoute_FileNullServiceID(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	path := filepath.Join(t.TempDir(), "stream-route.json")
+	if err := os.WriteFile(path, []byte(`{"desc":"mysql","service_id":null}`), 0o600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	err := actionRun(&Options{
+		IO:           ios,
+		Client:       func() (*http.Client, error) { return (&httpmock.Registry{}).GetClient(), nil },
+		GatewayGroup: "gg1",
+		File:         path,
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "--service-id is required") {
+		t.Fatalf("expected missing service-id error, got: %v", err)
+	}
+}
+
+func TestCreateStreamRoute_FileServiceIDFlag(t *testing.T) {
+	ios, _, out, _ := iostreams.Test()
+	registry := &httpmock.Registry{}
+	registry.RegisterResponder(http.MethodPost, "/apisix/admin/stream_routes", func(r *http.Request) (httpmock.Response, error) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			return httpmock.Response{}, err
+		}
+		if !strings.Contains(string(body), `"service_id":"svc-flag"`) {
+			t.Fatalf("expected injected service_id in request body, got: %s", string(body))
+		}
+		return httpmock.JSONResponse(`{"id":"sr1","service_id":"svc-flag"}`), nil
+	})
+
+	path := filepath.Join(t.TempDir(), "stream-route.json")
+	if err := os.WriteFile(path, []byte(`{"desc":"mysql"}`), 0o600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	err := actionRun(&Options{
+		IO:           ios,
+		Client:       func() (*http.Client, error) { return registry.GetClient(), nil },
+		GatewayGroup: "gg1",
+		File:         path,
+		ServiceID:    "svc-flag",
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("actionRun failed: %v", err)
+	}
+	if !strings.Contains(out.String(), "\"service_id\": \"svc-flag\"") {
+		t.Fatalf("expected created stream route in output, got: %s", out.String())
+	}
+	registry.Verify(t)
 }
 
 func TestCreateStreamRoute_MissingGatewayGroup(t *testing.T) {

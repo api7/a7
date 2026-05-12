@@ -256,6 +256,26 @@ consumer_groups:
 	assert.Contains(t, err.Error(), "consumer_groups are not supported by current API7 EE")
 }
 
+func TestConfigValidate_RejectsStreamRouteWithoutServiceID(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+
+	filePath := filepath.Join(t.TempDir(), "config.yaml")
+	err := os.WriteFile(filePath, []byte(`
+version: "1"
+stream_routes:
+  - id: tcp-route
+    server_port: 9100
+`), 0o644)
+	require.NoError(t, err)
+
+	c := NewCmdValidate(factoryWithIO(ios))
+	c.SetArgs([]string{"-f", filePath})
+	err = c.Execute()
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "stream_routes[0]: service_id is required by API7 EE")
+}
+
 func TestConfigValidate_MissingFileFlag(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
 

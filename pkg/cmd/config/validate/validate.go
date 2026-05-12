@@ -155,6 +155,11 @@ func ValidateConfigFile(cfg api.ConfigFile) []string {
 	errs = append(errs, checkDuplicateIDs(cfg.SSL, func(s api.SSL) string { return s.ID }, "ssl")...)
 	errs = append(errs, checkDuplicateIDs(cfg.GlobalRules, func(g api.GlobalRule) string { return g.ID }, "global_rules")...)
 	errs = append(errs, checkDuplicateIDs(cfg.PluginConfigs, func(p api.PluginConfig) string { return p.ID }, "plugin_configs")...)
+	for i, item := range cfg.StreamRoutes {
+		if strings.TrimSpace(item.ServiceID) == "" {
+			errs = append(errs, fmt.Sprintf("stream_routes[%d]: service_id is required by API7 EE", i))
+		}
+	}
 	errs = append(errs, checkDuplicateIDs(cfg.StreamRoutes, func(s api.StreamRoute) string { return s.ID }, "stream_routes")...)
 	errs = append(errs, checkDuplicateIDs(cfg.Protos, func(p api.Proto) string { return p.ID }, "protos")...)
 
