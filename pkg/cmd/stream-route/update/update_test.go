@@ -3,6 +3,8 @@ package update
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -34,7 +36,7 @@ func (m *mockConfig) Save() error                                     { return n
 func TestUpdateStreamRoute_Success(t *testing.T) {
 	ios, _, out, _ := iostreams.Test()
 	registry := &httpmock.Registry{}
-	registry.Register(http.MethodPut, "/apisix/admin/stream_routes/sr1", httpmock.JSONResponse(`{"id":"sr1","desc":"mysql-updated","upstream_id":"u2"}`))
+	registry.Register(http.MethodPut, "/apisix/admin/stream_routes/sr1", httpmock.JSONResponse(`{"id":"sr1","desc":"mysql-updated","service_id":"svc2"}`))
 
 	err := actionRun(&Options{
 		IO:           ios,
@@ -42,7 +44,7 @@ func TestUpdateStreamRoute_Success(t *testing.T) {
 		GatewayGroup: "gg1",
 		ID:           "sr1",
 		Desc:         "mysql-updated",
-		UpstreamID:   "u2",
+		ServiceID:    "svc2",
 		Config: func() (config.Config, error) {
 			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
 		},
@@ -62,7 +64,23 @@ func TestUpdateStreamRoute_Success(t *testing.T) {
 	registry.Verify(t)
 }
 
-func TestUpdateStreamRoute_ValidationError(t *testing.T) {
+func TestUpdateStreamRoute_MissingGatewayGroup(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	err := actionRun(&Options{
+		IO:        ios,
+		Client:    func() (*http.Client, error) { return (&httpmock.Registry{}).GetClient(), nil },
+		ID:        "sr1",
+		ServiceID: "svc1",
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: ""}, nil
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "gateway group is required") {
+		t.Fatalf("expected gateway group error, got: %v", err)
+	}
+}
+
+func TestUpdateStreamRoute_MissingServiceID(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
 	err := actionRun(&Options{
 		IO:           ios,
@@ -73,24 +91,52 @@ func TestUpdateStreamRoute_ValidationError(t *testing.T) {
 			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
 		},
 	})
-	if err == nil || !strings.Contains(err.Error(), "--upstream-id is required") {
-		t.Fatalf("expected missing upstream-id error, got: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "--service-id is required") {
+		t.Fatalf("expected service-id required error, got: %v", err)
 	}
 }
 
-func TestUpdateStreamRoute_MissingGatewayGroup(t *testing.T) {
+func TestUpdateStreamRoute_FileMissingServiceID(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
+	path := filepath.Join(t.TempDir(), "stream-route.json")
+	if err := os.WriteFile(path, []byte(`{"desc":"mysql-updated"}`), 0o600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
 	err := actionRun(&Options{
-		IO:         ios,
-		Client:     func() (*http.Client, error) { return (&httpmock.Registry{}).GetClient(), nil },
-		ID:         "sr1",
-		UpstreamID: "u1",
+		IO:           ios,
+		Client:       func() (*http.Client, error) { return (&httpmock.Registry{}).GetClient(), nil },
+		GatewayGroup: "gg1",
+		ID:           "sr1",
+		File:         path,
 		Config: func() (config.Config, error) {
-			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: ""}, nil
+			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
 		},
 	})
-	if err == nil || !strings.Contains(err.Error(), "gateway group is required") {
-		t.Fatalf("expected gateway group error, got: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "--service-id is required") {
+		t.Fatalf("expected service-id required error, got: %v", err)
+	}
+}
+
+func TestUpdateStreamRoute_FileNullServiceID(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	path := filepath.Join(t.TempDir(), "stream-route.json")
+	if err := os.WriteFile(path, []byte(`{"desc":"mysql-updated","service_id":null}`), 0o600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	err := actionRun(&Options{
+		IO:           ios,
+		Client:       func() (*http.Client, error) { return (&httpmock.Registry{}).GetClient(), nil },
+		GatewayGroup: "gg1",
+		ID:           "sr1",
+		File:         path,
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "--service-id is required") {
+		t.Fatalf("expected service-id required error, got: %v", err)
 	}
 }
 
@@ -104,7 +150,7 @@ func TestUpdateStreamRoute_APIError(t *testing.T) {
 		Client:       func() (*http.Client, error) { return registry.GetClient(), nil },
 		GatewayGroup: "gg1",
 		ID:           "sr1",
-		UpstreamID:   "u1",
+		ServiceID:    "svc1",
 		Config: func() (config.Config, error) {
 			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
 		},

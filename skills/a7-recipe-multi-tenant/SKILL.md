@@ -2,7 +2,7 @@
 name: a7-recipe-multi-tenant
 description: >-
   Recipe skill for implementing multi-tenant patterns using API7 Enterprise Edition (API7 EE)
-  and the a7 CLI. Covers gateway-group isolation, consumer-group policies,
+  and the a7 CLI. Covers gateway-group isolation, consumer policies,
   service-backed tenant routes, and credential-based tenant access.
 version: "1.0.0"
 author: API7.ai Contributors
@@ -13,8 +13,6 @@ metadata:
   a7_commands:
     - a7 gateway-group create
     - a7 global-rule create
-    - a7 consumer-group create
-    - a7 consumer-group list
     - a7 consumer create
     - a7 consumer list
     - a7 credential create
@@ -32,7 +30,7 @@ metadata:
 Multi-tenancy in API7 EE is built from three layers:
 
 1. Gateway groups for runtime isolation.
-2. Consumer groups for shared tenant policies.
+2. Consumers and credentials for tenant identity.
 3. Service-backed routes for tenant APIs.
 
 For route traffic, use the current a7 model:
@@ -75,14 +73,16 @@ a7 global-rule create -g standard-tier -f - <<'EOF'
 EOF
 ```
 
-## Approach B: Consumer Groups and Credentials
+## Approach B: Consumers and Credentials
 
-Create consumer groups in the shared gateway group:
+Current API7 EE does not expose consumer group management through the Admin API.
+Model tenants as consumers, attach per-consumer plugins when needed, and create
+credentials with `a7 credential create`.
 
 ```bash
-a7 consumer-group create -g platform -f - <<'EOF'
+a7 consumer create -g platform -f - <<'EOF'
 {
-  "id": "tenant-free",
+  "username": "startup-xyz",
   "desc": "Free tier tenants",
   "plugins": {
     "limit-count": {
@@ -97,9 +97,11 @@ a7 consumer-group create -g platform -f - <<'EOF'
 }
 EOF
 
-a7 consumer-group create -g platform -f - <<'EOF'
+a7 credential create -g platform --consumer startup-xyz --plugins-json '{"key-auth":{"key":"startup-xyz-key"}}'
+
+a7 consumer create -g platform -f - <<'EOF'
 {
-  "id": "tenant-pro",
+  "username": "acme-corp",
   "desc": "Pro tier tenants",
   "plugins": {
     "limit-count": {
@@ -113,29 +115,8 @@ a7 consumer-group create -g platform -f - <<'EOF'
   }
 }
 EOF
-```
-
-Create consumers with raw payloads when assigning them to consumer groups, then
-create key-auth credentials with `a7 credential create`.
-
-```bash
-a7 consumer create -g platform -f - <<'EOF'
-{
-  "username": "acme-corp",
-  "group_id": "tenant-pro"
-}
-EOF
 
 a7 credential create -g platform --consumer acme-corp --plugins-json '{"key-auth":{"key":"acme-secret-key"}}'
-
-a7 consumer create -g platform -f - <<'EOF'
-{
-  "username": "startup-xyz",
-  "group_id": "tenant-free"
-}
-EOF
-
-a7 credential create -g platform --consumer startup-xyz --plugins-json '{"key-auth":{"key":"startup-xyz-key"}}'
 ```
 
 ## Approach C: Tenant-Aware Service Route
@@ -171,7 +152,7 @@ a7 route create -g platform -f - <<'EOF'
     "proxy-rewrite": {
       "headers": {
         "set": {
-          "X-Tenant-ID": "$consumer_group_id",
+          "X-Tenant-ID": "$consumer_name",
           "X-User-ID": "$consumer_name",
           "X-Gateway-Group": "platform"
         }
@@ -189,21 +170,6 @@ the current `a7 config sync` workflow.
 
 ```yaml
 version: "1"
-consumer_groups:
-  - id: tenant-free
-    plugins:
-      limit-count:
-        count: 100
-        time_window: 86400
-        key_type: var
-        key: consumer_name
-  - id: tenant-pro
-    plugins:
-      limit-count:
-        count: 10000
-        time_window: 86400
-        key_type: var
-        key: consumer_name
 services:
   - id: tenant-api-service
     name: tenant-api-service
@@ -224,7 +190,7 @@ routes:
       proxy-rewrite:
         headers:
           set:
-            X-Tenant-ID: "$consumer_group_id"
+            X-Tenant-ID: "$consumer_name"
             X-User-ID: "$consumer_name"
             X-Gateway-Group: platform
 ```
@@ -236,13 +202,13 @@ a7 config sync -g platform -f platform-tenants.yaml
 ```
 
 Use `a7 consumer create -f` and `a7 credential create` for tenant identities and
-credentials when consumer group assignment or key material is required.
+key material.
 
 ## Verification
 
 ```bash
-a7 consumer-group list -g platform
 a7 consumer list -g platform
+a7 credential list -g platform --consumer startup-xyz
 a7 service get tenant-api-service -g platform -o json
 a7 route get multi-tenant-api -g platform -o json
 ```
@@ -260,7 +226,7 @@ headers after successful authentication.
 ## Important Considerations
 
 - Use different gateway groups for strict runtime isolation.
-- Use consumer groups for shared tenant policies inside one gateway group.
+- Use consumer-level plugins for tenant-specific policies inside one gateway group.
 - Keep credentials under `a7 credential`, not embedded directly in consumers.
 - `a7 config sync -g` manages one gateway group at a time.
 - Use raw consumer payloads for fields that do not have first-class CLI flags.

@@ -1,4 +1,4 @@
-# Upstream Management
+# Inline Upstream Configuration
 
 > **⚠️ Standalone upstreams are NOT exposed via the API7 Enterprise Edition Admin API.** In API7 EE, upstreams exist only as inline objects within services and routes. The `/apisix/admin/upstreams` endpoint returns "resource not found".
 
@@ -41,9 +41,9 @@ upstream:
 a7 route create -g default -f route-with-upstream.yaml
 ```
 
-## CLI Commands (Not Functional in API7 EE)
+## CLI Model
 
-The `a7 upstream` commands exist in the CLI for APISIX compatibility but will return errors when used against an API7 EE instance. Use `a7 service` or `a7 route` with inline upstream configurations instead.
+`a7` does not expose an `upstream` command group for current API7 EE. Use `a7 service` or `a7 route` with inline upstream configurations instead.
 
 ## See Also
 

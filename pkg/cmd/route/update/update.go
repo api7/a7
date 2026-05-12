@@ -29,7 +29,6 @@ type Options struct {
 	Methods     []string
 	Host        string
 	ServiceID   string
-	UpstreamID  string
 	Labels      []string
 	Status      int
 	Priority    int
@@ -58,7 +57,6 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 	c.Flags().StringSliceVar(&opts.Methods, "methods", nil, "Allowed HTTP methods")
 	c.Flags().StringVar(&opts.Host, "host", "", "Route host")
 	c.Flags().StringVar(&opts.ServiceID, "service-id", "", "Bound service ID")
-	c.Flags().StringVar(&opts.UpstreamID, "upstream-id", "", "Bound upstream ID")
 	c.Flags().StringSliceVar(&opts.Labels, "labels", nil, "Labels in key=value format")
 	c.Flags().IntVar(&opts.Status, "status", 0, "Route status")
 	c.Flags().IntVar(&opts.Priority, "priority", 0, "Route priority")
@@ -138,9 +136,6 @@ func actionRun(opts *Options) error {
 	}
 	if opts.ServiceID != "" {
 		bodyReq.ServiceID = opts.ServiceID
-	}
-	if opts.UpstreamID != "" {
-		bodyReq.UpstreamID = opts.UpstreamID
 	}
 	if opts.StatusSet {
 		bodyReq.Status = opts.Status

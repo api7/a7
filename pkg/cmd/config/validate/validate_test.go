@@ -52,6 +52,16 @@ version: "1"
 routes:
   - id: "route-1"
     uri: /hello
+    service_id: service-1
+services:
+  - id: service-1
+    name: service-1
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: 127.0.0.1
+          port: 8080
+          weight: 1
 consumers:
   - username: jack
 `), 0o644)
@@ -71,7 +81,8 @@ func TestConfigValidate_ValidJSON(t *testing.T) {
 	filePath := filepath.Join(t.TempDir(), "config.json")
 	err := os.WriteFile(filePath, []byte(`{
 		"version": "1",
-		"routes": [{"id": "route-1", "uri": "/hello"}],
+		"routes": [{"id": "route-1", "uri": "/hello", "service_id": "service-1"}],
+		"services": [{"id": "service-1", "name": "service-1", "upstream": {"type": "roundrobin", "nodes": [{"host": "127.0.0.1", "port": 8080, "weight": 1}]}}],
 		"consumers": [{"username": "jack"}]
 	}`), 0o644)
 	require.NoError(t, err)
@@ -129,8 +140,10 @@ version: "1"
 routes:
   - id: "route-1"
     uri: /hello
+    service_id: service-1
   - id: "route-1"
     uri: /hello2
+    service_id: service-1
 `), 0o644)
 	require.NoError(t, err)
 
@@ -150,6 +163,7 @@ func TestConfigValidate_MissingRouteURI(t *testing.T) {
 version: "1"
 routes:
   - id: "route-1"
+    service_id: service-1
 `), 0o644)
 	require.NoError(t, err)
 
@@ -159,6 +173,26 @@ routes:
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "either uri or uris is required")
+}
+
+func TestConfigValidate_MissingRouteServiceID(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+
+	filePath := filepath.Join(t.TempDir(), "config.yaml")
+	err := os.WriteFile(filePath, []byte(`
+version: "1"
+routes:
+  - id: "route-1"
+    uri: /hello
+`), 0o644)
+	require.NoError(t, err)
+
+	c := NewCmdValidate(factoryWithIO(ios))
+	c.SetArgs([]string{"-f", filePath})
+	err = c.Execute()
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "service_id is required by current API7 EE")
 }
 
 func TestConfigValidate_MissingConsumerUsername(t *testing.T) {
@@ -180,6 +214,66 @@ consumers:
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "username is required")
+}
+
+func TestConfigValidate_RejectsUnsupportedTopLevelUpstreams(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+
+	filePath := filepath.Join(t.TempDir(), "config.yaml")
+	err := os.WriteFile(filePath, []byte(`
+version: "1"
+upstreams:
+  - id: backend
+    nodes:
+      127.0.0.1:8080: 1
+`), 0o644)
+	require.NoError(t, err)
+
+	c := NewCmdValidate(factoryWithIO(ios))
+	c.SetArgs([]string{"-f", filePath})
+	err = c.Execute()
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "upstreams are not supported as top-level API7 EE resources")
+}
+
+func TestConfigValidate_RejectsUnsupportedConsumerGroups(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+
+	filePath := filepath.Join(t.TempDir(), "config.yaml")
+	err := os.WriteFile(filePath, []byte(`
+version: "1"
+consumer_groups:
+  - id: tenants
+`), 0o644)
+	require.NoError(t, err)
+
+	c := NewCmdValidate(factoryWithIO(ios))
+	c.SetArgs([]string{"-f", filePath})
+	err = c.Execute()
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "consumer_groups are not supported by current API7 EE")
+}
+
+func TestConfigValidate_RejectsStreamRouteWithoutServiceID(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+
+	filePath := filepath.Join(t.TempDir(), "config.yaml")
+	err := os.WriteFile(filePath, []byte(`
+version: "1"
+stream_routes:
+  - id: tcp-route
+    server_port: 9100
+`), 0o644)
+	require.NoError(t, err)
+
+	c := NewCmdValidate(factoryWithIO(ios))
+	c.SetArgs([]string{"-f", filePath})
+	err = c.Execute()
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "stream_routes[0]: service_id is required by API7 EE")
 }
 
 func TestConfigValidate_MissingFileFlag(t *testing.T) {

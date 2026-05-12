@@ -2,12 +2,12 @@
 
 > **⚠️ This project is under active development and is NOT production-ready.** APIs, commands, and output formats may change without notice.
 
-`a7` is a command-line tool for managing [API7 Enterprise Edition](https://api7.ai) API Gateway from your terminal. It wraps both the API7 EE control-plane API (`/api/*`) and the APISIX admin API (`/apisix/admin/*`) to provide convenient, scriptable access to gateway groups, routes, services, upstreams, consumers, SSL certificates, plugins, and more.
+`a7` is a command-line tool for managing [API7 Enterprise Edition](https://api7.ai) API Gateway from your terminal. It wraps both the API7 EE control-plane API (`/api/*`) and the APISIX admin API (`/apisix/admin/*`) to provide convenient, scriptable access to gateway groups, routes, services, consumers, SSL certificates, plugins, and more.
 
 ## Features
 
-- **Resource CRUD** — Create, list, get, update, and delete 13 API7 EE resource types:
-  - **Control Plane**: Gateway Group, Service Template
+- **Resource CRUD** — Create, list, get, update, and delete current API7 EE resource types:
+  - **Control Plane**: Gateway Group
   - **Runtime**: Route, Service, Consumer, SSL Certificate, Plugin, Global Rule, Stream Route, Plugin Metadata, Credential, Secret, Proto
 - **Context management** — Switch between multiple API7 EE instances (`a7 context create`, `a7 context use`, `a7 context list`)
 - **Gateway group scoping** — All runtime operations are scoped to a gateway group via `--gateway-group` flag or context config
@@ -131,7 +131,6 @@ a7 service delete <id> -g default --force
 | Command | Alias | Actions | Description |
 |---------|-------|---------|-------------|
 | `a7 gateway-group` | `gg` | list, get, create, update, delete | Manage gateway groups |
-| `a7 service-template` | `st` | list, get, create, update, delete, publish | Manage service templates |
 
 ### Runtime Resources
 

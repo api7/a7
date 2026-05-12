@@ -138,7 +138,6 @@ Key fields in the consumer configuration (sent to `/apisix/admin/consumers`):
 | `username` | string | Unique identifier for the consumer |
 | `desc` | string | Human-readable description |
 | `plugins` | object | Plugin configurations (e.g., key-auth, jwt-auth) |
-| `group_id` | string | Reference to a consumer group |
 | `labels` | object | Key-value labels for the consumer |
 
 ## Examples

@@ -70,9 +70,7 @@ a7 route create -g default -f - <<'EOF'
   },
   "upstream": {
     "type": "roundrobin",
-    "nodes": {
-      "backend:8080": 1
-    }
+    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -105,9 +103,7 @@ a7 route create -g default -f - <<'EOF'
   },
   "upstream": {
     "type": "roundrobin",
-    "nodes": {
-      "backend:8080": 1
-    }
+    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -225,10 +221,10 @@ gateway_groups:
             expose_headers: "X-Request-Id"
             max_age: 3600
             allow_credential: true
-        upstream_id: api-upstream
-    upstreams:
-      - id: api-upstream
-        type: roundrobin
-        nodes:
-          "backend:8080": 1
+        upstream:
+          type: roundrobin
+          nodes:
+            - host: backend
+              port: 8080
+              weight: 1
 ```

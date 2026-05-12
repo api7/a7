@@ -91,9 +91,7 @@ a7 route create -g default -f - <<'EOF'
   },
   "upstream": {
     "type": "roundrobin",
-    "nodes": {
-      "backend:8080": 1
-    }
+    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -191,12 +189,12 @@ gateway_groups:
         uri: /api/*
         plugins:
           basic-auth: {}
-        upstream_id: my-upstream
-    upstreams:
-      - id: my-upstream
-        type: roundrobin
-        nodes:
-          "backend:8080": 1
+        upstream:
+          type: roundrobin
+          nodes:
+            - host: backend
+              port: 8080
+              weight: 1
 ```
 
 > **Note**: Consumer credentials (username/password) must be created separately

@@ -97,10 +97,20 @@ func ValidateConfigFile(cfg api.ConfigFile) []string {
 		errs = append(errs, "version must be \"1\"")
 	}
 
+	if len(cfg.Upstreams) > 0 {
+		errs = append(errs, "upstreams are not supported as top-level API7 EE resources; define upstream inline on services instead")
+	}
+	if len(cfg.ConsumerGroups) > 0 {
+		errs = append(errs, "consumer_groups are not supported by current API7 EE")
+	}
+
 	seenRouteIDs := map[string]struct{}{}
 	for i, r := range cfg.Routes {
 		if !hasRouteURI(r) {
 			errs = append(errs, fmt.Sprintf("routes[%d]: either uri or uris is required", i))
+		}
+		if strings.TrimSpace(r.ServiceID) == "" {
+			errs = append(errs, fmt.Sprintf("routes[%d]: service_id is required by current API7 EE", i))
 		}
 		if r.ID != "" {
 			if err := checkID(r.ID, "routes", i); err != "" {
@@ -126,19 +136,6 @@ func ValidateConfigFile(cfg api.ConfigFile) []string {
 		}
 	}
 
-	seenUpstreamIDs := map[string]struct{}{}
-	for i, item := range cfg.Upstreams {
-		if item.ID != "" {
-			if err := checkID(item.ID, "upstreams", i); err != "" {
-				errs = append(errs, err)
-			} else if _, ok := seenUpstreamIDs[item.ID]; ok {
-				errs = append(errs, fmt.Sprintf("upstreams[%d]: duplicate id %q", i, item.ID))
-			} else {
-				seenUpstreamIDs[item.ID] = struct{}{}
-			}
-		}
-	}
-
 	seenConsumerUsernames := map[string]struct{}{}
 	for i, c := range cfg.Consumers {
 		if strings.TrimSpace(c.Username) == "" {
@@ -158,7 +155,11 @@ func ValidateConfigFile(cfg api.ConfigFile) []string {
 	errs = append(errs, checkDuplicateIDs(cfg.SSL, func(s api.SSL) string { return s.ID }, "ssl")...)
 	errs = append(errs, checkDuplicateIDs(cfg.GlobalRules, func(g api.GlobalRule) string { return g.ID }, "global_rules")...)
 	errs = append(errs, checkDuplicateIDs(cfg.PluginConfigs, func(p api.PluginConfig) string { return p.ID }, "plugin_configs")...)
-	errs = append(errs, checkDuplicateIDs(cfg.ConsumerGroups, func(c api.ConsumerGroup) string { return c.ID }, "consumer_groups")...)
+	for i, item := range cfg.StreamRoutes {
+		if strings.TrimSpace(item.ServiceID) == "" {
+			errs = append(errs, fmt.Sprintf("stream_routes[%d]: service_id is required by API7 EE", i))
+		}
+	}
 	errs = append(errs, checkDuplicateIDs(cfg.StreamRoutes, func(s api.StreamRoute) string { return s.ID }, "stream_routes")...)
 	errs = append(errs, checkDuplicateIDs(cfg.Protos, func(p api.Proto) string { return p.ID }, "protos")...)
 

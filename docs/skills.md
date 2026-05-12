@@ -47,7 +47,7 @@ Every skill file has two parts: YAML frontmatter and Markdown body.
 ---
 name: a7-plugin-ai-proxy
 description: >-
-  Skill for configuring AI Proxy plugin on API7 EE routes and service templates.
+  Skill for configuring AI Proxy plugin on API7 EE routes and services.
   Covers LLM provider configuration, model selection, and endpoint routing.
 version: "1.0.0"
 author: API7.ai Contributors
@@ -58,7 +58,7 @@ metadata:
   plugin_name: ai-proxy
   a7_commands:
     - a7 route create
-    - a7 service-template create
+    - a7 service create
     - a7 plugin list
 ---
 ```
@@ -88,11 +88,11 @@ The body content depends on the skill type:
 - Configuration schema reference
 - **Gateway Group Scoping**: How to enable per gateway group
 - Example: Enabling on a Route
-- Example: Enabling on a Service Template
+- Example: Enabling on a Service
 - Enterprise-only features and limitations
 
 **Recipe skills** (EE specific):
-- Enterprise workflow goal (e.g., "Create a cross-group service template")
+- Enterprise workflow goal (e.g., "Create service-backed routes across gateway groups")
 - Prerequisites (e.g., "Existing gateway groups")
 - Step-by-step instructions with `a7` commands
 - Verification using `a7` list/get commands
@@ -101,7 +101,7 @@ The body content depends on the skill type:
 **Persona skills**:
 - Role description (Platform Engineer, API Architect, App Developer)
 - Common enterprise workflows
-- Decision trees for resource selection (e.g., "Route vs Service Template")
+- Decision trees for resource selection (e.g., "Route vs Service")
 - Which other skills to load for specific tasks
 
 ## CI Validation

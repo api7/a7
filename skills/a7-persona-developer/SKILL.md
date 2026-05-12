@@ -2,8 +2,8 @@
 name: a7-persona-developer
 description: >-
   Persona skill for API developers building and testing APIs on API7 Enterprise Edition (API7 EE)
-  using the a7 CLI. Provides decision frameworks for API design, Service Template 
-  lifecycle, route publication, plugin configuration, and local-to-cloud development workflows.
+  using the a7 CLI. Provides decision frameworks for service-backed API design,
+  route configuration, plugin configuration, and local-to-cloud development workflows.
 version: "1.0.0"
 author: API7.ai Contributors
 license: Apache-2.0
@@ -11,8 +11,6 @@ metadata:
   category: persona
   apisix_version: ">=3.0.0"
   a7_commands:
-    - a7 service-template create
-    - a7 service-template publish
     - a7 route create
     - a7 service create
     - a7 consumer create
@@ -27,7 +25,7 @@ metadata:
 
 You are an **API Developer** responsible for:
 - Designing API schemas and configuring routes within a **Gateway Group**.
-- Leveraging **Service Templates** to standardize API deployments across environments.
+- Defining **Services** with inline upstreams and attaching routes with `service_id`.
 - Publishing APIs to gateway groups with service-backed routes.
 - Configuring advanced enterprise plugins (OIDC, Canary, Request/Response Transformation).
 - Debugging complex request flows using built-in enterprise tracing tools.
@@ -36,9 +34,8 @@ You are an **API Developer** responsible for:
 
 In API7 EE, developers work within a structured lifecycle:
 1. **Gateway Groups**: Your assigned workspace (e.g., `ecommerce-dev`).
-2. **Service Templates**: Blueprints for services (e.g., `payment-service-v1`).
-3. **Publication**: Promoting a Service Template to a live Gateway Group.
-4. **Service-backed Routes**: Routes should reference a service with `service_id` in current API7 EE.
+2. **Services**: Runtime service definitions with inline upstreams (e.g., `payment-service-v1`).
+3. **Service-backed Routes**: Routes should reference a service with `service_id` in current API7 EE.
 
 ## Getting Started
 
@@ -69,18 +66,19 @@ a7 plugin get openid-connect -g my-group --output json
 
 ## Building & Publishing Your API
 
-### Step 1: Create a Service Template
+### Step 1: Create a Service
 
-Standardize your service configuration before deploying it to a gateway.
+Create the service configuration in the target gateway group.
 
 ```bash
-a7 service-template create -f - <<'EOF'
+a7 service create -g staging-group -f - <<'EOF'
 {
-  "name": "user-service-template",
-  "desc": "Template for User Management API",
+  "id": "user-service",
+  "name": "user-service",
+  "desc": "User Management API",
   "upstream": {
     "type": "roundrobin",
-    "nodes": { "user-backend.internal:8080": 1 }
+    "nodes": [{"host": "user-backend.internal", "port": 8080, "weight": 1}]
   },
   "plugins": {
     "key-auth": {}
@@ -89,14 +87,7 @@ a7 service-template create -f - <<'EOF'
 EOF
 ```
 
-### Step 2: Publish to a Gateway Group
-
-```bash
-# Publish the template to the 'staging-group'
-a7 service-template publish user-service-template --group staging-group
-```
-
-### Step 3: Configure a Route within the Group
+### Step 2: Configure a Route within the Group
 
 ```bash
 a7 route create -g staging-group -f - <<'EOF'
@@ -104,7 +95,7 @@ a7 route create -g staging-group -f - <<'EOF'
   "id": "user-v1-get",
   "uri": "/v1/users/*",
   "methods": ["GET"],
-  "service_id": "user-service-template",
+  "service_id": "user-service",
   "plugins": {
     "proxy-rewrite": {
       "regex_uri": ["^/v1/users/(.*)", "/users/$1"]
@@ -178,10 +169,10 @@ Automate your API lifecycle using `a7` in your pipelines.
 
 ```yaml
 # Example GitHub Action Step
-- name: Publish Service Template
+- name: Sync Service Config
   run: |
-    a7 service-template publish ${{ env.SERVICE_NAME }} \
-      --group ${{ env.TARGET_GROUP }} \
+    a7 config sync -f api7.yaml \
+      --gateway-group ${{ env.TARGET_GROUP }} \
       --token ${{ secrets.A7_TOKEN }}
 ```
 
@@ -189,8 +180,8 @@ Automate your API lifecycle using `a7` in your pipelines.
 
 | Situation | Action | Command |
 |-----------|--------|---------|
-| Standardizing multiple APIs | Use a Service Template | `a7 service-template create` |
-| Promoting to production | Publish Template to Group | `a7 service-template publish` |
+| Standardizing multiple APIs | Use services with inline upstreams and shared plugins | `a7 service create` |
+| Promoting to production | Sync service and route config to target group | `a7 config sync` |
 | Exposing an API path | Create or update a service-backed route | `a7 route create -f route.yaml` |
 | Backend URI mismatch | Use `proxy-rewrite` | `a7 route update ...` |
 | Testing Canary version | Use `traffic-split` | `a7 route update ...` |
@@ -198,11 +189,11 @@ Automate your API lifecycle using `a7` in your pipelines.
 
 ## Best Practices
 
-1. **Templates First**: Always create a **Service Template** for reusable service logic.
+1. **Services First**: Put reusable upstream and plugin configuration on services.
 2. **Group Scoping**: Always use the `-g` flag to target the correct environment.
 3. **Port & Protocol**: Ensure you are connecting to the Dashboard via HTTPS on port `7443`.
 4. **Token Security**: Do not hardcode your `--token` in scripts; use environment variables or secrets.
 5. **Declarative Sync**: Prefer `a7 config sync` for complex multi-route deployments.
-6. **Documentation**: Always provide a description (`--desc`) for routes and templates for colleagues.
+6. **Documentation**: Always provide a description (`--desc`) for routes and services for colleagues.
 7. **Trace Verbosity**: Use `--verbose` in `debug trace` to inspect plugin input/output headers.
 8. **Route Model**: Prefer `service create` plus `route create` with `service_id`; avoid standalone upstream workflows for API7 EE.

@@ -37,12 +37,10 @@ func (m *mockConfig) Save() error                                     { return n
 func registerEmptyResources(reg *httpmock.Registry, skip map[string]bool) {
 	resources := []string{
 		"/apisix/admin/services",
-		"/apisix/admin/upstreams",
 		"/apisix/admin/consumers",
 		"/apisix/admin/ssls",
 		"/apisix/admin/global_rules",
 		"/apisix/admin/plugin_configs",
-		"/apisix/admin/consumer_groups",
 		"/apisix/admin/stream_routes",
 		"/apisix/admin/protos",
 		"/apisix/admin/secret_providers",
@@ -197,6 +195,31 @@ routes:
 	require.Error(t, err)
 	assert.True(t, cmdutil.IsSilent(err))
 	assert.Contains(t, stdout.String(), "CREATE r1")
+	reg.Verify(t)
+}
+
+func TestConfigDiff_RejectsUnsupportedSections(t *testing.T) {
+	reg := &httpmock.Registry{}
+
+	local := writeConfig(t, `
+version: "1"
+upstreams:
+  - id: u1
+    nodes:
+      127.0.0.1:8080: 1
+consumer_groups:
+  - id: group1
+`)
+
+	ios, _, _, _ := iostreams.Test()
+	c := NewCmdDiff(newFactory(reg, ios))
+	c.SetArgs([]string{"-f", local})
+	err := c.Execute()
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported declarative config sections")
+	assert.Contains(t, err.Error(), "upstreams")
+	assert.Contains(t, err.Error(), "consumer_groups")
 	reg.Verify(t)
 }
 

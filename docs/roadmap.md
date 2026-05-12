@@ -30,8 +30,8 @@ This document defines the per-PR development plan for the a7 CLI (API7 Enterpris
 **Goal**: Create 40 `SKILL.md` files enabling AI agents to operate API7 EE.
 
 ### PR-29: AI Gateway & Enterprise Skills
-- **Skills**: `a7-plugin-ai-proxy`, `a7-plugin-ai-prompt-template`, `a7-plugin-ai-rag`, `a7-recipe-gateway-group`, `a7-recipe-service-template`
-- **Focus**: Configuring LLM providers and enterprise-only design-time resources.
+- **Skills**: `a7-plugin-ai-proxy`, `a7-plugin-ai-prompt-template`, `a7-plugin-ai-rag`, `a7-recipe-gateway-group`
+- **Focus**: Configuring LLM providers and supported API7 EE runtime resources.
 
 ### PR-30: Security & Auth Skills
 - **Skills**: `a7-plugin-key-auth`, `a7-plugin-openid-connect`, `a7-plugin-wolf-rbac`, `a7-recipe-rbac-setup`

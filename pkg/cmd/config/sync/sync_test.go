@@ -1,6 +1,8 @@
 package sync
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -36,12 +38,10 @@ func (m *mockConfig) Save() error                                     { return n
 func registerEmptyResources(reg *httpmock.Registry, skip map[string]bool) {
 	resources := []string{
 		"/apisix/admin/services",
-		"/apisix/admin/upstreams",
 		"/apisix/admin/consumers",
 		"/apisix/admin/ssls",
 		"/apisix/admin/global_rules",
 		"/apisix/admin/plugin_configs",
-		"/apisix/admin/consumer_groups",
 		"/apisix/admin/stream_routes",
 		"/apisix/admin/protos",
 		"/apisix/admin/secret_providers",
@@ -77,13 +77,27 @@ func writeConfig(t *testing.T, content string) string {
 func TestConfigSync_CreatesNewResources(t *testing.T) {
 	reg := &httpmock.Registry{}
 	registerEmptyResources(reg, nil)
-	reg.Register(http.MethodPut, "/apisix/admin/routes/r1", httpmock.JSONResponse(`{"id":"r1"}`))
+	reg.RegisterResponder(http.MethodPut, "/apisix/admin/routes/r1", func(r *http.Request) (httpmock.Response, error) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			return httpmock.Response{}, err
+		}
+		var payload map[string]interface{}
+		if err := json.Unmarshal(body, &payload); err != nil {
+			return httpmock.Response{}, err
+		}
+		if payload["service_id"] != "svc-1" {
+			t.Fatalf("expected service_id svc-1 in route payload, got: %v", payload["service_id"])
+		}
+		return httpmock.JSONResponse(`{"id":"r1"}`), nil
+	})
 
 	local := writeConfig(t, `
 version: "1"
 routes:
   - id: r1
     uri: /sync
+    service_id: svc-1
 `)
 
 	ios, _, stdout, _ := iostreams.Test()
@@ -106,7 +120,7 @@ func TestConfigSync_UpdatesExistingResources(t *testing.T) {
 	}`))
 	reg.Register(http.MethodGet, "/apisix/admin/routes", httpmock.JSONResponse(`{
 		"total":1,
-		"list":[{"id":"r1","uri":"/old","name":"old"}]
+		"list":[{"id":"r1","uri":"/old","name":"old","service_id":"svc-1"}]
 	}`))
 	reg.Register(http.MethodPut, "/apisix/admin/routes/r1", httpmock.JSONResponse(`{"id":"r1"}`))
 
@@ -119,6 +133,7 @@ routes:
   - id: r1
     uri: /new
     name: new
+    service_id: svc-1
 `)
 
 	ios, _, stdout, _ := iostreams.Test()
@@ -170,6 +185,7 @@ version: "1"
 routes:
   - id: r1
     uri: /sync
+    service_id: svc-1
 `)
 
 	ios, _, stdout, _ := iostreams.Test()

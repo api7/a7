@@ -121,7 +121,7 @@ a7 route create -g production -f - <<'EOF'
             {
               "upstream": {
                 "type": "roundrobin",
-                "nodes": {"v2-backend:8080": 1}
+                "nodes": [{"host": "v2-backend", "port": 8080, "weight": 1}]
               },
               "weight": 1
             }
@@ -155,7 +155,7 @@ a7 route update route-v1 -g production -f - <<'EOF'
             {
               "upstream": {
                 "type": "roundrobin",
-                "nodes": {"v2-backend:8080": 1}
+                "nodes": [{"host": "v2-backend", "port": 8080, "weight": 1}]
               },
               "weight": 1
             },

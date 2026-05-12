@@ -176,9 +176,7 @@ a7 route create -g default -f - <<'EOF'
   },
   "upstream": {
     "type": "roundrobin",
-    "nodes": {
-      "webapp:3000": 1
-    }
+    "nodes": [{"host": "webapp", "port": 3000, "weight": 1}]
   }
 }
 EOF
@@ -212,9 +210,7 @@ a7 route create -g default -f - <<'EOF'
   },
   "upstream": {
     "type": "roundrobin",
-    "nodes": {
-      "backend:8080": 1
-    }
+    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -332,10 +328,10 @@ gateway_groups:
             redirect_uri: http://127.0.0.1:9080/app/redirect
             session:
               secret: my-16-char-secret
-        upstream_id: webapp-upstream
-    upstreams:
-      - id: webapp-upstream
-        type: roundrobin
-        nodes:
-          "webapp:3000": 1
+        upstream:
+          type: roundrobin
+          nodes:
+            - host: webapp
+              port: 3000
+              weight: 1
 ```

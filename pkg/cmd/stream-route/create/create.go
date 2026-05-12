@@ -28,7 +28,7 @@ type Options struct {
 	ServerAddr string
 	ServerPort int
 	SNI        string
-	UpstreamID string
+	ServiceID  string
 	Labels     []string
 }
 
@@ -51,7 +51,7 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 	c.Flags().StringVar(&opts.ServerAddr, "server-addr", "", "Server address")
 	c.Flags().IntVar(&opts.ServerPort, "server-port", 0, "Server port")
 	c.Flags().StringVar(&opts.SNI, "sni", "", "SNI")
-	c.Flags().StringVar(&opts.UpstreamID, "upstream-id", "", "Bound upstream ID")
+	c.Flags().StringVar(&opts.ServiceID, "service-id", "", "Bound service ID")
 	c.Flags().StringSliceVar(&opts.Labels, "labels", nil, "Labels in key=value format")
 
 	return c
@@ -73,6 +73,9 @@ func actionRun(opts *Options) error {
 	if opts.File != "" {
 		payload, err := cmdutil.ReadResourceFile(opts.File, opts.IO.In)
 		if err != nil {
+			return err
+		}
+		if err := cmdutil.EnsureRequiredStringField(payload, "service_id", opts.ServiceID, "--service-id is required for current API7 EE"); err != nil {
 			return err
 		}
 
@@ -98,8 +101,8 @@ func actionRun(opts *Options) error {
 		}
 		return cmdutil.NewExporter(format, opts.IO.Out).Write(json.RawMessage(body))
 	}
-	if opts.UpstreamID == "" {
-		return fmt.Errorf("--upstream-id is required")
+	if opts.ServiceID == "" {
+		return fmt.Errorf("--service-id is required for current API7 EE")
 	}
 
 	httpClient, err := opts.Client()
@@ -122,7 +125,7 @@ func actionRun(opts *Options) error {
 		ServerAddr: opts.ServerAddr,
 		ServerPort: opts.ServerPort,
 		SNI:        opts.SNI,
-		UpstreamID: opts.UpstreamID,
+		ServiceID:  opts.ServiceID,
 	}
 	if len(labels) > 0 {
 		bodyReq.Labels = labels

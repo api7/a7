@@ -53,6 +53,9 @@ func diffRun(opts *Options) error {
 	if err != nil {
 		return err
 	}
+	if err := configutil.ValidateSupportedSections(local); err != nil {
+		return err
+	}
 
 	cfg, err := opts.Config()
 	if err != nil {

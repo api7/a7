@@ -3,9 +3,11 @@ package cmdutil
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -46,6 +48,26 @@ func ReadResourceFile(path string, stdin io.Reader) (map[string]interface{}, err
 	}
 
 	return payload, nil
+}
+
+// EnsureRequiredStringField injects a default string when the field is absent,
+// then verifies that the field is a non-empty string.
+func EnsureRequiredStringField(payload map[string]interface{}, field, defaultValue, message string) error {
+	if defaultValue != "" {
+		if _, ok := payload[field]; !ok {
+			payload[field] = defaultValue
+		}
+	}
+
+	raw, ok := payload[field]
+	if !ok {
+		return errors.New(message)
+	}
+	value, ok := raw.(string)
+	if !ok || strings.TrimSpace(value) == "" {
+		return errors.New(message)
+	}
+	return nil
 }
 
 // WriteToFileOrStdout writes data to a file if path is non-empty, otherwise to stdout.

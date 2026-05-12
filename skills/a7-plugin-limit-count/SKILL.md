@@ -117,9 +117,7 @@ a7 route create -g default -f - <<'EOF'
   },
   "upstream": {
     "type": "roundrobin",
-    "nodes": {
-      "backend:8080": 1
-    }
+    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -298,10 +296,10 @@ gateway_groups:
             time_window: 60
             key: remote_addr
             rejected_code: 429
-        upstream_id: api-upstream
-    upstreams:
-      - id: api-upstream
-        type: roundrobin
-        nodes:
-          "backend:8080": 1
+        upstream:
+          type: roundrobin
+          nodes:
+            - host: backend
+              port: 8080
+              weight: 1
 ```

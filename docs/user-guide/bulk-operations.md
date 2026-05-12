@@ -34,7 +34,7 @@ Each resource will have an `export` command to dump multiple resources to a file
 
 ```bash
 # Planned
-a7 upstream export -g default
+a7 service export -g default
 ```
 
 #### Export by Label

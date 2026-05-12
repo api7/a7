@@ -42,8 +42,6 @@ a7/
 │   │   │   ├── delete/delete.go
 │   │   │   └── shared/display.go    # Shared display logic for route resources
 │   │   ├── gateway-group/            # Gateway group commands (control-plane)
-│   │   ├── service-template/         # Service template commands (control-plane)
-│   │   ├── upstream/                 # Same pattern as route/
 │   │   ├── service/
 │   │   ├── consumer/
 │   │   ├── ssl/

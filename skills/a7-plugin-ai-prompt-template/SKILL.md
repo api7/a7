@@ -14,7 +14,7 @@ metadata:
   a7_commands:
     - a7 route create
     - a7 route update
-    - a7 service-template create
+    - a7 service create
     - a7 config sync
 ---
 
@@ -37,7 +37,7 @@ clients from sending arbitrary system prompts.
 - Accept user inputs only for specific fields (fill-in-the-blank)
 - Prevent prompt injection by controlling the system message
 - Build prompt libraries that clients select by name
-- Standardize prompt templates across services using **Service Templates**
+- Standardize prompt templates directly on services or routes
 
 ## Plugin Configuration Reference
 
@@ -70,10 +70,18 @@ Instead of sending a standard `messages` array, clients send:
 All runtime resources must be scoped to a gateway group using `--gateway-group` or `-g`.
 
 ```bash
+a7 service create -g default -f - <<'EOF'
+{
+  "id": "ai-chat-service",
+  "name": "AI Chat Service"
+}
+EOF
+
 a7 route create -g default -f - <<'EOF'
 {
   "id": "templated-chat",
   "uri": "/v1/chat/completions",
+  "service_id": "ai-chat-service",
   "methods": ["POST"],
   "plugins": {
     "ai-proxy": {
@@ -124,12 +132,12 @@ curl http://127.0.0.1:9080/v1/chat/completions \
   }'
 ```
 
-## Using Service Templates
+## Using Services
 
-You can define standard prompt templates on a **Service Template** to reuse them across multiple services.
+You can define standard prompt templates on a service and attach routes to that service.
 
 ```bash
-a7 service-template create -f - <<'EOF'
+a7 service create -g default -f - <<'EOF'
 {
   "id": "global-ai-prompts",
   "name": "Global AI Prompts",
@@ -163,9 +171,13 @@ a7 config sync -f config.yaml --gateway-group default
 
 ```yaml
 version: "1"
+services:
+  - id: ai-chat-service
+    name: AI Chat Service
 routes:
   - id: templated-chat
     uri: /v1/chat/completions
+    service_id: ai-chat-service
     methods:
       - POST
     plugins:

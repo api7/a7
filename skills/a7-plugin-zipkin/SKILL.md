@@ -87,9 +87,7 @@ a7 route create --gateway-group default -f - <<'EOF'
   },
   "upstream": {
     "type": "roundrobin",
-    "nodes": {
-      "backend:8080": 1
-    }
+    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -178,10 +176,10 @@ routes:
         sample_ratio: 1
         service_name: my-gateway
         span_version: 2
-    upstream_id: my-upstream
-upstreams:
-  - id: my-upstream
-    type: roundrobin
-    nodes:
-      "backend:8080": 1
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: backend
+          port: 8080
+          weight: 1
 ```

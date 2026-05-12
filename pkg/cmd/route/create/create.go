@@ -23,15 +23,14 @@ type Options struct {
 	GatewayGroup string
 	File         string
 
-	Name       string
-	URI        string
-	Paths      []string
-	Methods    []string
-	Host       string
-	ServiceID  string
-	UpstreamID string
-	Labels     []string
-	Status     int
+	Name      string
+	URI       string
+	Paths     []string
+	Methods   []string
+	Host      string
+	ServiceID string
+	Labels    []string
+	Status    int
 }
 
 func NewCmd(f *cmd.Factory) *cobra.Command {
@@ -54,7 +53,6 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 	c.Flags().StringSliceVar(&opts.Methods, "methods", nil, "Allowed HTTP methods")
 	c.Flags().StringVar(&opts.Host, "host", "", "Route host")
 	c.Flags().StringVar(&opts.ServiceID, "service-id", "", "Bound service ID")
-	c.Flags().StringVar(&opts.UpstreamID, "upstream-id", "", "Bound upstream ID")
 	c.Flags().StringSliceVar(&opts.Labels, "labels", nil, "Labels in key=value format")
 	c.Flags().IntVar(&opts.Status, "status", 1, "Route status")
 
@@ -77,6 +75,9 @@ func actionRun(opts *Options) error {
 	if opts.File != "" {
 		payload, err := cmdutil.ReadResourceFile(opts.File, opts.IO.In)
 		if err != nil {
+			return err
+		}
+		if err := cmdutil.EnsureRequiredStringField(payload, "service_id", opts.ServiceID, "--service-id is required for current API7 EE"); err != nil {
 			return err
 		}
 
@@ -109,6 +110,9 @@ func actionRun(opts *Options) error {
 	if opts.Name == "" {
 		return fmt.Errorf("--name is required for flag-based route creation")
 	}
+	if opts.ServiceID == "" {
+		return fmt.Errorf("--service-id is required for current API7 EE")
+	}
 
 	// Convert --uri to Paths for API7 EE compatibility.
 	paths := opts.Paths
@@ -131,14 +135,13 @@ func actionRun(opts *Options) error {
 	}
 
 	bodyReq := api.Route{
-		Name:       opts.Name,
-		Paths:      paths,
-		Methods:    opts.Methods,
-		Host:       opts.Host,
-		ServiceID:  opts.ServiceID,
-		UpstreamID: opts.UpstreamID,
-		Labels:     labels,
-		Status:     opts.Status,
+		Name:      opts.Name,
+		Paths:     paths,
+		Methods:   opts.Methods,
+		Host:      opts.Host,
+		ServiceID: opts.ServiceID,
+		Labels:    labels,
+		Status:    opts.Status,
 	}
 
 	client := api.NewClient(httpClient, cfg.BaseURL())

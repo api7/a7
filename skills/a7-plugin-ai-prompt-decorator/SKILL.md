@@ -14,7 +14,7 @@ metadata:
   a7_commands:
     - a7 route create
     - a7 route update
-    - a7 service-template create
+    - a7 service create
     - a7 config sync
 ---
 
@@ -36,7 +36,7 @@ without modifying client code.
 - Append output format instructions (e.g. "respond in JSON")
 - Add conversation context that clients should not control
 - Combine with `ai-prompt-template` for structured + decorated prompts
-- Apply consistent prompt decorations across services using **Service Templates**
+- Apply consistent prompt decorations directly on services or routes
 
 ## Plugin Configuration Reference
 
@@ -100,12 +100,12 @@ curl http://127.0.0.1:9080/v1/chat/completions \
   }'
 ```
 
-## Using Service Templates
+## Using Services
 
-You can define standard prompt decorations on a **Service Template** to reuse them across multiple services.
+You can define standard prompt decorations on a service and attach routes to that service.
 
 ```bash
-a7 service-template create -f - <<'EOF'
+a7 service create -g default -f - <<'EOF'
 {
   "id": "global-ai-safety",
   "name": "Global AI Safety",

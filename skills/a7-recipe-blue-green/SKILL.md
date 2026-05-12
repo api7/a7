@@ -138,7 +138,7 @@ a7 route update api --gateway-group default -f - <<'EOF'
             {
               "upstream": {
                 "type": "roundrobin",
-                "nodes": {"green-backend-1:8080": 1}
+                "nodes": [{"host": "green-backend-1", "port": 8080, "weight": 1}]
               },
               "weight": 1
             }

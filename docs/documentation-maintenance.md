@@ -19,9 +19,8 @@ docs/
     ├── getting-started.md         # Installation + first commands
     ├── configuration.md           # Context management, config file format
     ├── gateway-group.md           # Gateway group commands (EE)
-    ├── service-template.md        # Service template commands (EE)
     ├── route.md                   # Route command reference
-    ├── upstream.md                # ⚠️ Deprecated — upstreams are inline-only in API7 EE
+    ├── upstream.md                # Inline upstream configuration guide
     ├── service.md                 # Service command reference
     ├── consumer.md                # Consumer command reference
     ├── ssl.md                     # SSL command reference
