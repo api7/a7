@@ -153,8 +153,12 @@ func TestCreateStreamRoute_FileServiceIDFlag(t *testing.T) {
 	if err != nil {
 		t.Fatalf("actionRun failed: %v", err)
 	}
-	if !strings.Contains(out.String(), "\"service_id\": \"svc-flag\"") {
-		t.Fatalf("expected created stream route in output, got: %s", out.String())
+	var item api.StreamRoute
+	if err := json.Unmarshal(out.Bytes(), &item); err != nil {
+		t.Fatalf("failed to parse JSON output: %v\noutput: %s", err, out.String())
+	}
+	if item.ServiceID != "svc-flag" {
+		t.Fatalf("expected created stream route service_id svc-flag, got: %+v", item)
 	}
 	registry.Verify(t)
 }
