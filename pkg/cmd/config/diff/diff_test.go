@@ -200,7 +200,6 @@ routes:
 
 func TestConfigDiff_RejectsUnsupportedSections(t *testing.T) {
 	reg := &httpmock.Registry{}
-	registerEmptyResources(reg, nil)
 
 	local := writeConfig(t, `
 version: "1"
@@ -221,6 +220,7 @@ consumer_groups:
 	assert.Contains(t, err.Error(), "unsupported declarative config sections")
 	assert.Contains(t, err.Error(), "upstreams")
 	assert.Contains(t, err.Error(), "consumer_groups")
+	reg.Verify(t)
 }
 
 func TestConfigDiff_JSONOutput(t *testing.T) {

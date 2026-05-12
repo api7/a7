@@ -176,10 +176,10 @@ func FetchRemoteConfig(client *api.Client, gatewayGroup string) (*api.ConfigFile
 }
 
 func ComputeDiff(local, remote api.ConfigFile) (*DiffResult, error) {
-	if err := validateSupportedSections(local); err != nil {
+	if err := ValidateSupportedSections(local); err != nil {
 		return nil, err
 	}
-	if err := validateSupportedSections(remote); err != nil {
+	if err := ValidateSupportedSections(remote); err != nil {
 		return nil, fmt.Errorf("remote config: %w", err)
 	}
 
@@ -234,7 +234,7 @@ func ComputeDiff(local, remote api.ConfigFile) (*DiffResult, error) {
 	}, nil
 }
 
-func validateSupportedSections(cfg api.ConfigFile) error {
+func ValidateSupportedSections(cfg api.ConfigFile) error {
 	var unsupported []string
 	if len(cfg.Upstreams) > 0 {
 		unsupported = append(unsupported, "upstreams")

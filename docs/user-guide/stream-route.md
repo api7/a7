@@ -58,7 +58,8 @@ a7 stream-route create -g default -f stream-route.json
 ```
 
 **Sample `stream-route.json`:**
-Create the service first and use its `id` as `service_id`; current API7 EE stores upstream configuration on services.
+
+Create a service first with upstream configuration (see [Service Management](service.md)), then use its `id` as `service_id`. API7 EE stores upstream configuration at the service level.
 
 ```json
 {
@@ -134,7 +135,7 @@ Key fields in the stream route configuration (sent to `/apisix/admin/stream_rout
 | `server_addr` | string | Match destination server address |
 | `server_port` | integer | Match destination server port |
 | `sni` | string | Match TLS SNI |
-| `service_id` | string | Required by current API7 EE; reference to the service that owns the upstream configuration |
+| `service_id` | string | Required by API7 EE; reference to the service that owns the upstream configuration |
 | `plugins` | object | Plugin configurations |
 | `labels` | object | Key-value pairs for filtering and organization |
 
