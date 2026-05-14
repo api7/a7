@@ -70,8 +70,10 @@ func actionRun(opts *Options) error {
 		return fmt.Errorf("failed to parse plugin response: %w", err)
 	}
 
-	if opts.Output == "json" {
-		return cmdutil.NewExporter("json", opts.IO.Out).Write(item)
+	if opts.Output != "" {
+		// Honor the requested format (json or yaml); previously any value
+		// other than "json" fell through to a hardcoded JSON encoder.
+		return cmdutil.NewExporter(opts.Output, opts.IO.Out).Write(item)
 	}
 
 	enc := json.NewEncoder(opts.IO.Out)
