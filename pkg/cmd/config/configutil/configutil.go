@@ -242,6 +242,9 @@ func ValidateSupportedSections(cfg api.ConfigFile) error {
 	if len(cfg.ConsumerGroups) > 0 {
 		unsupported = append(unsupported, "consumer_groups")
 	}
+	if len(cfg.ServiceTemplates) > 0 {
+		unsupported = append(unsupported, "service_templates")
+	}
 	if len(unsupported) > 0 {
 		return fmt.Errorf("unsupported declarative config sections: %s; define upstreams inline on services and omit API7 EE unsupported resources", strings.Join(unsupported, ", "))
 	}

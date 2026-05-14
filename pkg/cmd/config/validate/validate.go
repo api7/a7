@@ -103,6 +103,9 @@ func ValidateConfigFile(cfg api.ConfigFile) []string {
 	if len(cfg.ConsumerGroups) > 0 {
 		errs = append(errs, "consumer_groups are not supported by current API7 EE")
 	}
+	if len(cfg.ServiceTemplates) > 0 {
+		errs = append(errs, "service_templates are not supported by current API7 EE")
+	}
 
 	seenRouteIDs := map[string]struct{}{}
 	for i, r := range cfg.Routes {
