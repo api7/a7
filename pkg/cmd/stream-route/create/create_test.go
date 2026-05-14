@@ -43,6 +43,7 @@ func TestCreateStreamRoute_Success(t *testing.T) {
 		IO:           ios,
 		Client:       func() (*http.Client, error) { return registry.GetClient(), nil },
 		GatewayGroup: "gg1",
+		Name:         "sr1",
 		Desc:         "mysql",
 		ServiceID:    "svc1",
 		Config: func() (config.Config, error) {
@@ -146,6 +147,7 @@ func TestCreateStreamRoute_FileServiceIDFlag(t *testing.T) {
 		GatewayGroup: "gg1",
 		File:         path,
 		ServiceID:    "svc-flag",
+		Name:         "sr-flag",
 		Config: func() (config.Config, error) {
 			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
 		},
@@ -187,6 +189,7 @@ func TestCreateStreamRoute_APIError(t *testing.T) {
 		IO:           ios,
 		Client:       func() (*http.Client, error) { return registry.GetClient(), nil },
 		GatewayGroup: "gg1",
+		Name:         "sr1",
 		ServiceID:    "svc1",
 		Config: func() (config.Config, error) {
 			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
@@ -197,4 +200,45 @@ func TestCreateStreamRoute_APIError(t *testing.T) {
 	}
 
 	registry.Verify(t)
+}
+
+// TestCreateStreamRoute_MissingName guards the flag-based create path: API7 EE
+// requires a name, and the command must reject the request before calling the API.
+func TestCreateStreamRoute_MissingName(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	err := actionRun(&Options{
+		IO:           ios,
+		Client:       func() (*http.Client, error) { return (&httpmock.Registry{}).GetClient(), nil },
+		GatewayGroup: "gg1",
+		ServiceID:    "svc1",
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "--name is required") {
+		t.Fatalf("expected missing name error, got: %v", err)
+	}
+}
+
+// TestCreateStreamRoute_FileMissingName guards the -f path: name must be
+// present in the file or supplied via --name.
+func TestCreateStreamRoute_FileMissingName(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	path := filepath.Join(t.TempDir(), "stream-route.json")
+	if err := os.WriteFile(path, []byte(`{"desc":"mysql","service_id":"svc1"}`), 0o600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	err := actionRun(&Options{
+		IO:           ios,
+		Client:       func() (*http.Client, error) { return (&httpmock.Registry{}).GetClient(), nil },
+		GatewayGroup: "gg1",
+		File:         path,
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "name is required") {
+		t.Fatalf("expected missing name error, got: %v", err)
+	}
 }

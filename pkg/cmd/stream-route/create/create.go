@@ -23,6 +23,7 @@ type Options struct {
 	GatewayGroup string
 	File         string
 
+	Name       string
 	Desc       string
 	RemoteAddr string
 	ServerAddr string
@@ -45,6 +46,7 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 		},
 	}
 
+	c.Flags().StringVar(&opts.Name, "name", "", "Stream route name (required by API7 EE)")
 	c.Flags().StringVar(&opts.Desc, "desc", "", "Stream route description")
 	c.Flags().StringVarP(&opts.File, "file", "f", "", "Path to JSON/YAML file with resource definition")
 	c.Flags().StringVar(&opts.RemoteAddr, "remote-addr", "", "Remote address")
@@ -78,6 +80,9 @@ func actionRun(opts *Options) error {
 		if err := cmdutil.EnsureRequiredStringField(payload, "service_id", opts.ServiceID, "--service-id is required for current API7 EE"); err != nil {
 			return err
 		}
+		if err := cmdutil.EnsureRequiredStringField(payload, "name", opts.Name, "name is required by API7 EE; set it in the file or pass --name"); err != nil {
+			return err
+		}
 
 		httpClient, err := opts.Client()
 		if err != nil {
@@ -104,6 +109,9 @@ func actionRun(opts *Options) error {
 	if opts.ServiceID == "" {
 		return fmt.Errorf("--service-id is required for current API7 EE")
 	}
+	if opts.Name == "" {
+		return fmt.Errorf("--name is required by API7 EE")
+	}
 
 	httpClient, err := opts.Client()
 	if err != nil {
@@ -120,6 +128,7 @@ func actionRun(opts *Options) error {
 	}
 
 	bodyReq := api.StreamRoute{
+		Name:       opts.Name,
 		Desc:       opts.Desc,
 		RemoteAddr: opts.RemoteAddr,
 		ServerAddr: opts.ServerAddr,
