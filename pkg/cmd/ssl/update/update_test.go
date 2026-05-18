@@ -88,7 +88,7 @@ func TestUpdateSSL_WithCertKeyAndSNI(t *testing.T) {
 			return httpmock.Response{}, fmt.Errorf("decode request: %w", err)
 		}
 		if !strings.Contains(body.Cert, "NEWCERT") || !strings.Contains(body.Key, "NEWKEY") {
-			return httpmock.Response{}, fmt.Errorf("expected cert/key from flags in payload, got %#v", body)
+			return httpmock.Response{}, fmt.Errorf("expected cert/key from flags in payload")
 		}
 		if len(body.SNIs) != 1 || body.SNIs[0] != "new.example.com" {
 			return httpmock.Response{}, fmt.Errorf("expected updated sni, got %#v", body.SNIs)

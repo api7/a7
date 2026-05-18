@@ -104,7 +104,14 @@ func actionRun(opts *Options) error {
 		if format == "" {
 			format = "json"
 		}
-		return cmdutil.NewExporter(format, opts.IO.Out).Write(json.RawMessage(body))
+		// Decode the response before handing it to the exporter: writing
+		// json.RawMessage directly would cause yaml.v3 to serialize the
+		// raw []byte as a list of integers under -o yaml.
+		var decoded map[string]interface{}
+		if err := json.Unmarshal(body, &decoded); err != nil {
+			return fmt.Errorf("failed to decode response: %w", err)
+		}
+		return cmdutil.NewExporter(format, opts.IO.Out).Write(decoded)
 	}
 	if opts.ServiceID == "" {
 		return fmt.Errorf("--service-id is required for current API7 EE")

@@ -286,3 +286,45 @@ func TestConfigValidate_MissingFileFlag(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "required flag \"file\" not set")
 }
+
+// TestConfigValidate_EmptyUnsupportedSections asserts that declaring an
+// unsupported top-level section (upstreams, consumer_groups, service_templates)
+// is rejected even when the section is explicitly empty. Presence alone is
+// enough — the user is asserting an unsupported resource type.
+func TestConfigValidate_EmptyUnsupportedSections(t *testing.T) {
+	cases := []struct {
+		name    string
+		body    string
+		wantErr string
+	}{
+		{
+			name:    "upstreams",
+			body:    "version: \"1\"\nupstreams: []\n",
+			wantErr: "upstreams are not supported",
+		},
+		{
+			name:    "consumer_groups",
+			body:    "version: \"1\"\nconsumer_groups: []\n",
+			wantErr: "consumer_groups are not supported",
+		},
+		{
+			name:    "service_templates",
+			body:    "version: \"1\"\nservice_templates: []\n",
+			wantErr: "service_templates are not supported",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ios, _, _, _ := iostreams.Test()
+			filePath := filepath.Join(t.TempDir(), "config.yaml")
+			require.NoError(t, os.WriteFile(filePath, []byte(tc.body), 0o644))
+
+			c := NewCmdValidate(factoryWithIO(ios))
+			c.SetArgs([]string{"-f", filePath})
+			err := c.Execute()
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.wantErr)
+		})
+	}
+}

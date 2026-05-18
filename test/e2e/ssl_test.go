@@ -173,11 +173,13 @@ func TestSSL_UpdateFlagsRequireCertAndKey(t *testing.T) {
 	require.Error(t, err, "ssl update without --cert/--key must error")
 	assert.Contains(t, stderr, "--cert and --key")
 
-	// The SNI on the server must be unchanged.
+	// The SNI on the server must be unchanged: original SNI present, the
+	// rejected SNI must not have been written.
 	var ssl map[string]interface{}
 	runA7JSON(t, env, &ssl, "ssl", "get", sslID, "-g", gatewayGroup, "-o", "json")
 	snis := requireJSONArray(t, ssl["snis"], "ssl.snis")
 	assert.Contains(t, snis, "require-cert.example.com")
+	assert.NotContains(t, snis, "require-cert-updated.example.com")
 
 	// Supplying --cert and --key makes the update succeed and persist.
 	modRoot, err := resolveModuleRoot()

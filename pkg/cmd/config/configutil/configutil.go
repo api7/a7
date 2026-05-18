@@ -236,13 +236,16 @@ func ComputeDiff(local, remote api.ConfigFile) (*DiffResult, error) {
 
 func ValidateSupportedSections(cfg api.ConfigFile) error {
 	var unsupported []string
-	if len(cfg.Upstreams) > 0 {
+	// Reject any presence of these sections, including explicit empty
+	// (e.g. `upstreams: []`): declaring an unsupported section is itself an
+	// error, even when no resources are listed under it.
+	if cfg.Upstreams != nil {
 		unsupported = append(unsupported, "upstreams")
 	}
-	if len(cfg.ConsumerGroups) > 0 {
+	if cfg.ConsumerGroups != nil {
 		unsupported = append(unsupported, "consumer_groups")
 	}
-	if len(cfg.ServiceTemplates) > 0 {
+	if cfg.ServiceTemplates != nil {
 		unsupported = append(unsupported, "service_templates")
 	}
 	if len(unsupported) > 0 {

@@ -97,13 +97,16 @@ func ValidateConfigFile(cfg api.ConfigFile) []string {
 		errs = append(errs, "version must be \"1\"")
 	}
 
-	if len(cfg.Upstreams) > 0 {
+	// Reject any presence of these sections, including explicit empty
+	// (e.g. `upstreams: []`): declaring an unsupported section is itself an
+	// error, even when no resources are listed under it.
+	if cfg.Upstreams != nil {
 		errs = append(errs, "upstreams are not supported as top-level API7 EE resources; define upstream inline on services instead")
 	}
-	if len(cfg.ConsumerGroups) > 0 {
+	if cfg.ConsumerGroups != nil {
 		errs = append(errs, "consumer_groups are not supported by current API7 EE")
 	}
-	if len(cfg.ServiceTemplates) > 0 {
+	if cfg.ServiceTemplates != nil {
 		errs = append(errs, "service_templates are not supported by current API7 EE")
 	}
 
