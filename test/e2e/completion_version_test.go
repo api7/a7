@@ -85,10 +85,11 @@ func TestHelp(t *testing.T) {
 	assert.NotContains(t, stdout, "upstream")
 	assert.NotContains(t, stdout, "consumer-group")
 	assert.NotContains(t, stdout, "service-template")
+	assert.NotContains(t, stdout, "plugin-config")
 }
 
 func TestUnsupportedResourceCommandsAreRemoved(t *testing.T) {
-	for _, command := range []string{"upstream", "consumer-group", "service-template"} {
+	for _, command := range []string{"upstream", "consumer-group", "service-template", "plugin-config"} {
 		t.Run(command, func(t *testing.T) {
 			_, _, err := runA7(command, "--help")
 			assert.Error(t, err, "command should not be registered")

@@ -41,7 +41,6 @@ func registerEmptyResources(reg *httpmock.Registry, skip map[string]bool) {
 		"/apisix/admin/consumers",
 		"/apisix/admin/ssls",
 		"/apisix/admin/global_rules",
-		"/apisix/admin/plugin_configs",
 		"/apisix/admin/stream_routes",
 		"/apisix/admin/protos",
 		"/apisix/admin/secret_providers",

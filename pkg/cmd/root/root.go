@@ -16,7 +16,6 @@ import (
 	gatewaygroup "github.com/api7/a7/pkg/cmd/gateway-group"
 	globalrule "github.com/api7/a7/pkg/cmd/global-rule"
 	"github.com/api7/a7/pkg/cmd/plugin"
-	pluginconfig "github.com/api7/a7/pkg/cmd/plugin-config"
 	pluginmetadata "github.com/api7/a7/pkg/cmd/plugin-metadata"
 	"github.com/api7/a7/pkg/cmd/proto"
 	"github.com/api7/a7/pkg/cmd/route"
@@ -88,7 +87,6 @@ func NewCmd(f *cmd.Factory, cfg *config.FileConfig) *cobra.Command {
 	c.AddCommand(service.NewCmd(f))
 	c.AddCommand(globalrule.NewCmd(f))
 	c.AddCommand(streamroute.NewCmd(f))
-	c.AddCommand(pluginconfig.NewCmd(f))
 	c.AddCommand(pluginmetadata.NewCmd(f))
 	c.AddCommand(credential.NewCmd(f))
 	c.AddCommand(secret.NewCmd(f))

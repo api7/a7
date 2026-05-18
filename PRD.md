@@ -152,7 +152,7 @@ All runtime commands require `--gateway-group <id>` (or default from context).
 - `a7 stream-route list|get|create|update|delete|export --gateway-group <id>`
 
 #### Plugin Config
-> **⚠️ NOT SUPPORTED**: Plugin configs are not exposed via the API7 EE Admin API. The `a7 plugin-config` commands exist for APISIX compatibility but will not work against API7 EE.
+> **⚠️ NOT SUPPORTED**: Plugin configs are not exposed via the API7 EE Admin API, so a7 does not expose plugin-config commands.
 
 #### Plugin Metadata
 - `a7 plugin-metadata get|create|update|delete --gateway-group <id>` (no list — keyed by plugin name)
@@ -207,7 +207,7 @@ All runtime commands require `--gateway-group <id>` (or default from context).
 
 ### Phase 3 — CLI Usability ✅ COMPLETE
 1. ✅ `-f/--file` flag: file-based create/update for all resource commands.
-2. ✅ `export` subcommand for all applicable resources (route, service, consumer, ssl, global-rule, stream-route, plugin-config, proto).
+2. ✅ `export` subcommand for all applicable resources (route, service, consumer, ssl, global-rule, stream-route, proto).
 3. ✅ `--force` flag for delete commands (skip confirmation).
 4. ✅ `--label` flag for list/export commands (label-based filtering).
 5. 🔲 `--dry-run` flag for create/update commands.
@@ -229,7 +229,7 @@ All runtime commands require `--gateway-group <id>` (or default from context).
 6. ✅ `docs/documentation-maintenance.md` — Doc update rules and templates.
 7. ✅ `docs/roadmap.md` — Per-PR development plan for Phases 5-9.
 8. ✅ `docs/api7ee-api-spec.md` — API7 EE Admin API reference (16 resources, dual-API).
-9. ✅ `docs/user-guide/` — per-resource user guides (getting-started, configuration, route, service, upstream, consumer, ssl, plugin, global-rule, stream-route, plugin-config, plugin-metadata, credential, secret, proto, declarative-config, gateway-group, debug, bulk-operations).
+9. ✅ `docs/user-guide/` — per-resource user guides (getting-started, configuration, route, service, upstream, consumer, ssl, plugin, global-rule, stream-route, plugin-metadata, credential, secret, proto, declarative-config, gateway-group, debug, bulk-operations).
 
 ### Phase 6 — AI Agent Skills ✅ COMPLETE
 Port and adapt 40 SKILL.md files from a6, organized by category:
@@ -255,7 +255,7 @@ Port and adapt 40 SKILL.md files from a6, organized by category:
 ### Phase 8 — End-to-End Tests ✅ COMPLETE
 1. ✅ `test/e2e/docker-compose.yml` — Docker Compose for API7 EE (Dashboard + DP Manager + Gateway + PostgreSQL).
 2. ✅ `test/e2e/setup_test.go` — TestMain, binary build, admin/control API helpers, shared test utilities.
-3. ✅ Per-resource E2E tests: route, service, consumer, ssl, plugin, global-rule, stream-route, plugin-config, plugin-metadata, credential, secret, proto, context, gateway-group.
+3. ✅ Per-resource E2E tests: route, service, consumer, ssl, plugin, global-rule, stream-route, plugin-metadata, credential, secret, proto, context, gateway-group.
 4. ✅ Declarative config E2E tests: dump, diff, sync, validate (config_test.go + config_sync_test.go).
 5. ✅ Export and label E2E tests (integrated into resource test files).
 6. ✅ Debug E2E tests: trace (JSON/method/headers/host/path) + logs (file mode).
