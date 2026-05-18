@@ -3,6 +3,7 @@ package api
 // StreamRoute represents a stream (L4) route in API7 EE (runtime).
 type StreamRoute struct {
 	ID         string                 `json:"id,omitempty" yaml:"id,omitempty"`
+	Name       string                 `json:"name,omitempty" yaml:"name,omitempty"`
 	Desc       string                 `json:"desc,omitempty" yaml:"desc,omitempty"`
 	RemoteAddr string                 `json:"remote_addr,omitempty" yaml:"remote_addr,omitempty"`
 	ServerAddr string                 `json:"server_addr,omitempty" yaml:"server_addr,omitempty"`

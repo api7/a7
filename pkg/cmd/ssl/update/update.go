@@ -107,6 +107,16 @@ func actionRun(opts *Options) error {
 		return writeSSLResponse(format, opts.IO.Out, body)
 	}
 
+	// API7 EE never returns the existing cert/key on GET, so a flag-based
+	// update cannot reconstruct the full object. Without both, the merged
+	// PUT silently drops the certificate material and the update is lost.
+	// Require them explicitly, or direct the user to the -f path.
+	if opts.Cert == "" || opts.Key == "" {
+		return fmt.Errorf("--cert and --key are both required for flag-based ssl update; " +
+			"API7 EE does not return existing certificate material, so a partial update would be lost. " +
+			"Pass both flags, or use -f with a full SSL definition")
+	}
+
 	cert, err := maybeReadFile(opts.Cert)
 	if err != nil {
 		return err

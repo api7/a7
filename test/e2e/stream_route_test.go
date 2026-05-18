@@ -3,6 +3,7 @@
 package e2e
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 // deleteStreamRouteViaAdmin deletes a stream route via the Admin API.
@@ -139,4 +141,97 @@ func TestStreamRoute_DeleteNonexistent(t *testing.T) {
 
 	_, _, err := runA7WithEnv(env, "stream-route", "delete", "nonexistent-sr-12345", "--force", "-g", gatewayGroup)
 	assert.Error(t, err)
+}
+
+// TestStreamRoute_CreateRequiresName guards against the gap where flag-based
+// `stream-route create` had no --name flag, while API7 EE requires `name`.
+func TestStreamRoute_CreateRequiresName(t *testing.T) {
+	env := setupEnv(t)
+
+	_, stderr, err := runA7WithEnv(env, "stream-route", "create",
+		"--service-id", "any-service-id", "--server-port", "19099", "-g", gatewayGroup)
+	require.Error(t, err, "stream-route create without --name must error")
+	assert.Contains(t, stderr, "name is required")
+}
+
+// createStreamServiceViaCLI creates a `type: stream` service; stream routes
+// can only be attached to stream-typed services in API7 EE.
+func createStreamServiceViaCLI(t testTB, env []string, id string) {
+	t.Helper()
+	svcJSON := fmt.Sprintf(`{
+		"id": %q,
+		"name": "e2e-stream-svc-%s",
+		"type": "stream",
+		"upstream": {
+			"type": "roundrobin",
+			"nodes": [{"host": %q, "port": %d, "weight": 1}]
+		}
+	}`, id, id, upstreamNodeHost(), upstreamNodePort())
+	tmpFile := filepath.Join(t.TempDir(), "stream-service.json")
+	require.NoError(t, os.WriteFile(tmpFile, []byte(svcJSON), 0644))
+	stdout, stderr, err := runA7WithEnv(env, "service", "create", "-f", tmpFile, "-g", gatewayGroup)
+	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+}
+
+// TestStreamRoute_CreateWithFlags exercises the flag-based create path,
+// including the --name flag added to satisfy API7 EE's required field.
+func TestStreamRoute_CreateWithFlags(t *testing.T) {
+	env := setupEnv(t)
+	svcID := "e2e-stream-route-flags-svc"
+	t.Cleanup(func() { deleteServiceViaAdmin(t, svcID) })
+	createStreamServiceViaCLI(t, env, svcID)
+
+	srName := "e2e-stream-route-flags"
+	stdout, stderr, err := runA7WithEnv(env, "stream-route", "create",
+		"--name", srName, "--service-id", svcID, "--server-port", "19098", "-g", gatewayGroup)
+	if err != nil {
+		t.Skipf("stream-route create failed (may not be enabled): %s %s", stdout, stderr)
+	}
+
+	var created map[string]interface{}
+	require.NoError(t, json.Unmarshal([]byte(stdout), &created), "create should return JSON: %s", stdout)
+	assert.Equal(t, srName, created["name"])
+	srID, ok := created["id"].(string)
+	require.True(t, ok && srID != "", "create response should contain an id: %v", created)
+	t.Cleanup(func() { deleteStreamRouteViaAdmin(t, srID) })
+
+	var got map[string]interface{}
+	runA7JSON(t, env, &got, "stream-route", "get", srID, "-g", gatewayGroup, "-o", "json")
+	assert.Equal(t, srName, got["name"])
+	assert.Equal(t, float64(19098), got["server_port"])
+}
+
+// TestStreamRoute_CreateFromFileYAML guards against the regression where the
+// file-based create path wrote json.RawMessage to the exporter, causing -o yaml
+// to render the response as a list of integers. The output must parse as a
+// YAML map with the expected fields.
+func TestStreamRoute_CreateFromFileYAML(t *testing.T) {
+	env := setupEnv(t)
+	svcID := "e2e-stream-route-yaml-svc"
+	t.Cleanup(func() { deleteServiceViaAdmin(t, svcID) })
+	createStreamServiceViaCLI(t, env, svcID)
+
+	srName := "e2e-stream-route-yaml"
+	srJSON := fmt.Sprintf(`{
+		"name": %q,
+		"service_id": %q,
+		"server_port": 19099
+	}`, srName, svcID)
+	tmpFile := filepath.Join(t.TempDir(), "stream-route.json")
+	require.NoError(t, os.WriteFile(tmpFile, []byte(srJSON), 0644))
+
+	stdout, stderr, err := runA7WithEnv(env, "stream-route", "create",
+		"-f", tmpFile, "-g", gatewayGroup, "-o", "yaml")
+	if err != nil {
+		t.Skipf("stream-route create failed (may not be enabled): %s %s", stdout, stderr)
+	}
+
+	var decoded map[string]interface{}
+	require.NoError(t, yaml.Unmarshal([]byte(stdout), &decoded),
+		"file-based create -o yaml must produce a YAML map, got: %s", stdout)
+	assert.Equal(t, srName, decoded["name"])
+
+	if srID, ok := decoded["id"].(string); ok && srID != "" {
+		t.Cleanup(func() { deleteStreamRouteViaAdmin(t, srID) })
+	}
 }

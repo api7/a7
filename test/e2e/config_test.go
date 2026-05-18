@@ -194,6 +194,22 @@ consumer_groups:
 	assert.Contains(t, stderr, "consumer_groups are not supported by current API7 EE")
 }
 
+func TestConfigValidate_RejectsUnsupportedServiceTemplates(t *testing.T) {
+	env := setupEnv(t)
+
+	invalidYAML := `version: "1"
+service_templates:
+  - id: removed-template
+    name: removed-template
+`
+	tmpFile := filepath.Join(t.TempDir(), "unsupported-service-templates.yaml")
+	require.NoError(t, os.WriteFile(tmpFile, []byte(invalidYAML), 0644))
+
+	_, stderr, err := runA7WithEnv(env, "config", "validate", "-f", tmpFile)
+	assert.Error(t, err)
+	assert.Contains(t, stderr, "service_templates are not supported by current API7 EE")
+}
+
 func TestConfigValidate_MissingRouteURI(t *testing.T) {
 	env := setupEnv(t)
 

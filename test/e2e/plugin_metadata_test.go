@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 // deletePluginMetadataViaAdmin deletes plugin metadata via the Admin API.
@@ -69,4 +70,28 @@ func TestPluginMetadata_CRUD(t *testing.T) {
 	require.NoError(t, err, stderr)
 	_, _, err = runA7WithEnv(env, "plugin-metadata", "get", pluginName, "-g", gatewayGroup)
 	assert.Error(t, err)
+}
+
+// TestPluginMetadata_GetYAML guards against a regression where
+// `plugin-metadata get -o yaml` serialized the raw response bytes as a YAML
+// list of integers instead of the actual metadata map.
+func TestPluginMetadata_GetYAML(t *testing.T) {
+	env := setupEnv(t)
+	pluginName := "http-logger"
+	t.Cleanup(func() { deletePluginMetadataViaAdmin(t, pluginName) })
+
+	pmJSON := `{"log_format":{"host":"$host"}}`
+	tmpFile := filepath.Join(t.TempDir(), "plugin-metadata.json")
+	require.NoError(t, os.WriteFile(tmpFile, []byte(pmJSON), 0644))
+	_, stderr, err := runA7WithEnv(env, "plugin-metadata", "create", pluginName, "-f", tmpFile, "-g", gatewayGroup)
+	require.NoError(t, err, stderr)
+
+	stdout, stderr, err := runA7WithEnv(env, "plugin-metadata", "get", pluginName, "-g", gatewayGroup, "-o", "yaml")
+	require.NoError(t, err, stderr)
+
+	var meta map[string]interface{}
+	require.NoError(t, yaml.Unmarshal([]byte(stdout), &meta), "output should be a YAML map, got: %s", stdout)
+	logFormat, ok := meta["log_format"].(map[string]interface{})
+	require.True(t, ok, "expected log_format map in: %s", stdout)
+	assert.Equal(t, "$host", logFormat["host"])
 }

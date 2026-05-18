@@ -74,8 +74,10 @@ func actionRun(opts *Options) error {
 	}
 
 	if opts.Output != "" {
+		// Write the decoded map, not json.RawMessage: the YAML encoder would
+		// otherwise serialize the raw []byte as a list of integers.
 		exporter := cmdutil.NewExporter(opts.Output, opts.IO.Out)
-		return exporter.Write(json.RawMessage(body))
+		return exporter.Write(metadata)
 	}
 
 	metaJSON, _ := json.MarshalIndent(metadata, "", "  ")

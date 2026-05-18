@@ -148,3 +148,48 @@ func TestSSL_DeleteNonexistent(t *testing.T) {
 	_, _, err := runA7WithEnv(env, "ssl", "delete", "nonexistent-ssl-12345", "--force", "-g", gatewayGroup)
 	assert.Error(t, err)
 }
+
+// TestSSL_UpdateFlagsRequireCertAndKey guards against a regression where a
+// flag-based `ssl update` without --cert/--key reported success but silently
+// dropped the change: API7 EE never returns the existing cert/key on GET, so
+// the merged PUT payload lost the certificate material.
+func TestSSL_UpdateFlagsRequireCertAndKey(t *testing.T) {
+	env := setupEnv(t)
+	sslID := "e2e-ssl-update-requires-cert"
+	t.Cleanup(func() { deleteSSLViaAdmin(t, sslID) })
+
+	cert, key := readTestCert(t)
+	sslJSON := fmt.Sprintf(`{"id":%q,"cert":%q,"key":%q,"snis":["require-cert.example.com"]}`, sslID, cert, key)
+	tmpFile := filepath.Join(t.TempDir(), "ssl.json")
+	require.NoError(t, os.WriteFile(tmpFile, []byte(sslJSON), 0644))
+
+	stdout, stderr, err := runA7WithEnv(env, "ssl", "create", "-f", tmpFile, "-g", gatewayGroup)
+	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+
+	// A flag-based update with only --sni must fail loudly rather than
+	// pretend to succeed while dropping the cert/key.
+	_, stderr, err = runA7WithEnv(env, "ssl", "update", sslID,
+		"--sni", "require-cert-updated.example.com", "-g", gatewayGroup)
+	require.Error(t, err, "ssl update without --cert/--key must error")
+	assert.Contains(t, stderr, "--cert and --key")
+
+	// The SNI on the server must be unchanged: original SNI present, the
+	// rejected SNI must not have been written.
+	var ssl map[string]interface{}
+	runA7JSON(t, env, &ssl, "ssl", "get", sslID, "-g", gatewayGroup, "-o", "json")
+	snis := requireJSONArray(t, ssl["snis"], "ssl.snis")
+	assert.Contains(t, snis, "require-cert.example.com")
+	assert.NotContains(t, snis, "require-cert-updated.example.com")
+
+	// Supplying --cert and --key makes the update succeed and persist.
+	modRoot, err := resolveModuleRoot()
+	require.NoError(t, err)
+	stdout, stderr, err = runA7WithEnv(env, "ssl", "update", sslID,
+		"--cert", filepath.Join(modRoot, "test/e2e/testdata/test.crt"),
+		"--key", filepath.Join(modRoot, "test/e2e/testdata/test.key"),
+		"--sni", "require-cert-updated.example.com", "-g", gatewayGroup)
+	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+	runA7JSON(t, env, &ssl, "ssl", "get", sslID, "-g", gatewayGroup, "-o", "json")
+	snis = requireJSONArray(t, ssl["snis"], "ssl.snis")
+	assert.Contains(t, snis, "require-cert-updated.example.com")
+}

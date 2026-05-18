@@ -236,11 +236,18 @@ func ComputeDiff(local, remote api.ConfigFile) (*DiffResult, error) {
 
 func ValidateSupportedSections(cfg api.ConfigFile) error {
 	var unsupported []string
-	if len(cfg.Upstreams) > 0 {
+	// Reject explicitly-empty unsupported sections (e.g. `upstreams: []`)
+	// in addition to non-empty ones. Bare `upstreams:` or `upstreams: null`
+	// unmarshal as nil and slip past this check; that's a separate hardening
+	// (would require yaml.Node / two-pass parsing) tracked elsewhere.
+	if cfg.Upstreams != nil {
 		unsupported = append(unsupported, "upstreams")
 	}
-	if len(cfg.ConsumerGroups) > 0 {
+	if cfg.ConsumerGroups != nil {
 		unsupported = append(unsupported, "consumer_groups")
+	}
+	if cfg.ServiceTemplates != nil {
+		unsupported = append(unsupported, "service_templates")
 	}
 	if len(unsupported) > 0 {
 		return fmt.Errorf("unsupported declarative config sections: %s; define upstreams inline on services and omit API7 EE unsupported resources", strings.Join(unsupported, ", "))

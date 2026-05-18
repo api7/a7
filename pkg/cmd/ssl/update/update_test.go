@@ -76,22 +76,24 @@ func TestMaybeReadFileTreatsMissingBareFilenameAsPath(t *testing.T) {
 	}
 }
 
-func TestUpdateSSL_PreservesCertificateWhenUpdatingSNI(t *testing.T) {
+func TestUpdateSSL_WithCertKeyAndSNI(t *testing.T) {
 	ios, _, out, _ := iostreams.Test()
 	registry := &httpmock.Registry{}
-	registry.Register(http.MethodGet, "/apisix/admin/ssls/ssl1", httpmock.JSONResponse(`{"value":{"id":"ssl1","cert":"old-cert","key":"old-key","snis":["old.example.com"],"type":"server","status":1}}`))
+	// API7 EE never returns the existing cert/key on GET, so a flag-based
+	// update must supply them explicitly.
+	registry.Register(http.MethodGet, "/apisix/admin/ssls/ssl1", httpmock.JSONResponse(`{"value":{"id":"ssl1","snis":["old.example.com"],"type":"server","status":1}}`))
 	registry.RegisterResponder(http.MethodPut, "/apisix/admin/ssls/ssl1", func(req *http.Request) (httpmock.Response, error) {
 		var body api.SSL
 		if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
 			return httpmock.Response{}, fmt.Errorf("decode request: %w", err)
 		}
-		if body.Cert != "old-cert" || body.Key != "old-key" {
-			return httpmock.Response{}, fmt.Errorf("expected cert/key to be preserved, got %#v", body)
+		if !strings.Contains(body.Cert, "NEWCERT") || !strings.Contains(body.Key, "NEWKEY") {
+			return httpmock.Response{}, fmt.Errorf("expected cert/key from flags in payload")
 		}
 		if len(body.SNIs) != 1 || body.SNIs[0] != "new.example.com" {
 			return httpmock.Response{}, fmt.Errorf("expected updated sni, got %#v", body.SNIs)
 		}
-		return httpmock.JSONResponse(`{"value":{"id":"ssl1","cert":"old-cert","key":"old-key","snis":["new.example.com"],"type":"server","status":1}}`), nil
+		return httpmock.JSONResponse(`{"value":{"id":"ssl1","cert":"new-cert","key":"new-key","snis":["new.example.com"],"type":"server","status":1}}`), nil
 	})
 
 	err := actionRun(&Options{
@@ -99,6 +101,8 @@ func TestUpdateSSL_PreservesCertificateWhenUpdatingSNI(t *testing.T) {
 		Client:       func() (*http.Client, error) { return registry.GetClient(), nil },
 		GatewayGroup: "gg1",
 		ID:           "ssl1",
+		Cert:         "-----BEGIN CERTIFICATE-----\nNEWCERT\n-----END CERTIFICATE-----",
+		Key:          "-----BEGIN PRIVATE KEY-----\nNEWKEY\n-----END PRIVATE KEY-----",
 		SNIs:         []string{"new.example.com"},
 		Config: func() (config.Config, error) {
 			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
@@ -114,10 +118,32 @@ func TestUpdateSSL_PreservesCertificateWhenUpdatingSNI(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &output); err != nil {
 		t.Fatalf("failed to parse output: %v", err)
 	}
-	if strings.Contains(out.String(), "old-key") || output.Key != api.RedactedSSLKey {
-		t.Fatalf("expected ssl key to be redacted in output, got %+v", output)
+	if strings.Contains(out.String(), "new-key") || output.Key != api.RedactedSSLKey {
+		t.Fatalf("expected ssl key to be redacted in output")
 	}
 	registry.Verify(t)
+}
+
+// TestUpdateSSL_RequiresCertAndKey guards against a regression where a
+// flag-based update without --cert/--key reported success but silently
+// dropped the change (the merged PUT lost the certificate material).
+func TestUpdateSSL_RequiresCertAndKey(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	registry := &httpmock.Registry{}
+
+	err := actionRun(&Options{
+		IO:           ios,
+		Client:       func() (*http.Client, error) { return registry.GetClient(), nil },
+		GatewayGroup: "gg1",
+		ID:           "ssl1",
+		SNIs:         []string{"new.example.com"},
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "--cert and --key") {
+		t.Fatalf("expected error requiring --cert and --key, got %v", err)
+	}
 }
 
 func TestUpdateSSL_SendsExplicitStatusZero(t *testing.T) {
@@ -130,7 +156,7 @@ func TestUpdateSSL_SendsExplicitStatusZero(t *testing.T) {
 			return httpmock.Response{}, fmt.Errorf("decode request: %w", err)
 		}
 		if payload["status"] != float64(0) {
-			return httpmock.Response{}, fmt.Errorf("expected explicit status 0, got payload %#v", payload)
+			return httpmock.Response{}, fmt.Errorf("expected explicit status 0 in payload")
 		}
 		return httpmock.JSONResponse(`{"value":{"id":"ssl1","cert":"old-cert","key":"old-key","snis":["old.example.com"],"type":"server","status":0}}`), nil
 	})
@@ -140,6 +166,8 @@ func TestUpdateSSL_SendsExplicitStatusZero(t *testing.T) {
 		Client:       func() (*http.Client, error) { return registry.GetClient(), nil },
 		GatewayGroup: "gg1",
 		ID:           "ssl1",
+		Cert:         "-----BEGIN CERTIFICATE-----\nNEWCERT\n-----END CERTIFICATE-----",
+		Key:          "-----BEGIN PRIVATE KEY-----\nNEWKEY\n-----END PRIVATE KEY-----",
 		Status:       0,
 		StatusSet:    true,
 		Config: func() (config.Config, error) {
@@ -162,7 +190,7 @@ func TestUpdateSSL_PreservesExistingStatusZero(t *testing.T) {
 			return httpmock.Response{}, fmt.Errorf("decode request: %w", err)
 		}
 		if payload["status"] != float64(0) {
-			return httpmock.Response{}, fmt.Errorf("expected existing status 0 to be preserved, got payload %#v", payload)
+			return httpmock.Response{}, fmt.Errorf("expected existing status 0 to be preserved in payload")
 		}
 		return httpmock.JSONResponse(`{"value":{"id":"ssl1","cert":"old-cert","key":"old-key","snis":["new.example.com"],"type":"server","status":0}}`), nil
 	})
@@ -172,6 +200,8 @@ func TestUpdateSSL_PreservesExistingStatusZero(t *testing.T) {
 		Client:       func() (*http.Client, error) { return registry.GetClient(), nil },
 		GatewayGroup: "gg1",
 		ID:           "ssl1",
+		Cert:         "-----BEGIN CERTIFICATE-----\nNEWCERT\n-----END CERTIFICATE-----",
+		Key:          "-----BEGIN PRIVATE KEY-----\nNEWKEY\n-----END PRIVATE KEY-----",
 		SNIs:         []string{"new.example.com"},
 		Config: func() (config.Config, error) {
 			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
