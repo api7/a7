@@ -107,6 +107,9 @@ func ValidateConfigFile(cfg api.ConfigFile) []string {
 	if cfg.ConsumerGroups != nil {
 		errs = append(errs, "consumer_groups are not supported by current API7 EE")
 	}
+	if cfg.PluginConfigs != nil {
+		errs = append(errs, "plugin_configs are not supported by current API7 EE")
+	}
 	if cfg.ServiceTemplates != nil {
 		errs = append(errs, "service_templates are not supported by current API7 EE")
 	}
@@ -161,7 +164,6 @@ func ValidateConfigFile(cfg api.ConfigFile) []string {
 
 	errs = append(errs, checkDuplicateIDs(cfg.SSL, func(s api.SSL) string { return s.ID }, "ssl")...)
 	errs = append(errs, checkDuplicateIDs(cfg.GlobalRules, func(g api.GlobalRule) string { return g.ID }, "global_rules")...)
-	errs = append(errs, checkDuplicateIDs(cfg.PluginConfigs, func(p api.PluginConfig) string { return p.ID }, "plugin_configs")...)
 	for i, item := range cfg.StreamRoutes {
 		if strings.TrimSpace(item.ServiceID) == "" {
 			errs = append(errs, fmt.Sprintf("stream_routes[%d]: service_id is required by API7 EE", i))

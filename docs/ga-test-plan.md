@@ -141,7 +141,7 @@ rejected — not present as broken commands.
 | `a7 upstream ...` | command does not exist (unknown command error) |
 | `a7 consumer-group ...` | command does not exist |
 | `a7 service-template ...` | command does not exist |
-| `a7 plugin-config ...` | **after Task #2**: command does not exist |
+| `a7 plugin-config ...` | command does not exist |
 | `a7 stream-route ...` | **works** — full CRUD (verified exposed by the control plane) |
 
 Declarative config — these top-level sections must be **rejected with a clear error**:
@@ -150,7 +150,7 @@ Declarative config — these top-level sections must be **rejected with a clear 
 upstreams: [...]          # -> validation error
 consumer_groups: [...]    # -> validation error
 service_templates: [...]  # -> validation error
-plugin_configs: [...]     # -> validation error (after Task #2)
+plugin_configs: [...]     # -> validation error
 ```
 
 > Caveat: the control plane still accepts `plugin_configs` *inside batch config-validation

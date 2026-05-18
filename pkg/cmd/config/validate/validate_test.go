@@ -308,6 +308,11 @@ func TestConfigValidate_EmptyUnsupportedSections(t *testing.T) {
 			wantErr: "consumer_groups are not supported",
 		},
 		{
+			name:    "plugin_configs",
+			body:    "version: \"1\"\nplugin_configs: []\n",
+			wantErr: "plugin_configs are not supported",
+		},
+		{
 			name:    "service_templates",
 			body:    "version: \"1\"\nservice_templates: []\n",
 			wantErr: "service_templates are not supported",

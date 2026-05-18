@@ -10,10 +10,11 @@ type ConfigFile struct {
 	Consumers      []Consumer      `json:"consumers,omitempty" yaml:"consumers,omitempty"`
 	SSL            []SSL           `json:"ssl,omitempty" yaml:"ssl,omitempty"`
 	GlobalRules    []GlobalRule    `json:"global_rules,omitempty" yaml:"global_rules,omitempty"`
-	PluginConfigs  []PluginConfig  `json:"plugin_configs,omitempty" yaml:"plugin_configs,omitempty"`
 	ConsumerGroups []ConsumerGroup `json:"consumer_groups,omitempty" yaml:"consumer_groups,omitempty"`
-	// ServiceTemplates is captured only so the section can be explicitly
-	// rejected; API7 EE does not support it as a top-level resource.
+	// PluginConfigs and ServiceTemplates are captured only so the sections
+	// can be explicitly rejected; API7 EE does not expose them as top-level
+	// resources.
+	PluginConfigs    []interface{}         `json:"plugin_configs,omitempty" yaml:"plugin_configs,omitempty"`
 	ServiceTemplates []interface{}         `json:"service_templates,omitempty" yaml:"service_templates,omitempty"`
 	StreamRoutes     []StreamRoute         `json:"stream_routes,omitempty" yaml:"stream_routes,omitempty"`
 	Protos           []Proto               `json:"protos,omitempty" yaml:"protos,omitempty"`

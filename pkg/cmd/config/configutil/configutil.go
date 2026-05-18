@@ -40,7 +40,6 @@ type DiffResult struct {
 	Consumers      ResourceDiff `json:"consumers"`
 	SSL            ResourceDiff `json:"ssl"`
 	GlobalRules    ResourceDiff `json:"global_rules"`
-	PluginConfigs  ResourceDiff `json:"plugin_configs"`
 	StreamRoutes   ResourceDiff `json:"stream_routes"`
 	Protos         ResourceDiff `json:"protos"`
 	Secrets        ResourceDiff `json:"secrets"`
@@ -73,7 +72,6 @@ func (r *DiffResult) Sections() []DiffSection {
 	return []DiffSection{
 		{Name: "services", Diff: r.Services},
 		{Name: "consumers", Diff: r.Consumers},
-		{Name: "plugin_configs", Diff: r.PluginConfigs},
 		{Name: "ssl", Diff: r.SSL},
 		{Name: "global_rules", Diff: r.GlobalRules},
 		{Name: "protos", Diff: r.Protos},
@@ -136,10 +134,6 @@ func FetchRemoteConfig(client *api.Client, gatewayGroup string) (*api.ConfigFile
 	if err != nil {
 		return nil, err
 	}
-	pluginConfigs, err := fetchPaginated[api.PluginConfig](client, "/apisix/admin/plugin_configs", query)
-	if err != nil {
-		return nil, err
-	}
 	streamRoutes, err := fetchPaginated[api.StreamRoute](client, "/apisix/admin/stream_routes", query)
 	if err != nil {
 		return nil, err
@@ -165,7 +159,6 @@ func FetchRemoteConfig(client *api.Client, gatewayGroup string) (*api.ConfigFile
 		Consumers:      stripTimestampsFromSlice(consumers),
 		SSL:            stripTimestampsFromSlice(ssl),
 		GlobalRules:    stripTimestampsFromSlice(globalRules),
-		PluginConfigs:  stripTimestampsFromSlice(pluginConfigs),
 		StreamRoutes:   stripTimestampsFromSlice(streamRoutes),
 		Protos:         stripTimestampsFromSlice(protos),
 		Secrets:        stripTimestampsFromSlice(secrets),
@@ -196,7 +189,6 @@ func ComputeDiff(local, remote api.ConfigFile) (*DiffResult, error) {
 		{local.Consumers, remote.Consumers, "username", "consumers"},
 		{local.SSL, remote.SSL, "id", "ssl"},
 		{local.GlobalRules, remote.GlobalRules, "id", "global_rules"},
-		{local.PluginConfigs, remote.PluginConfigs, "id", "plugin_configs"},
 		{local.StreamRoutes, remote.StreamRoutes, "id", "stream_routes"},
 		{local.Protos, remote.Protos, "id", "protos"},
 		{local.Secrets, remote.Secrets, "id", "secrets"},
@@ -226,11 +218,10 @@ func ComputeDiff(local, remote api.ConfigFile) (*DiffResult, error) {
 		Consumers:      diffs[2],
 		SSL:            diffs[3],
 		GlobalRules:    diffs[4],
-		PluginConfigs:  diffs[5],
-		StreamRoutes:   diffs[6],
-		Protos:         diffs[7],
-		Secrets:        diffs[8],
-		PluginMetadata: diffs[9],
+		StreamRoutes:   diffs[5],
+		Protos:         diffs[6],
+		Secrets:        diffs[7],
+		PluginMetadata: diffs[8],
 	}, nil
 }
 
@@ -245,6 +236,9 @@ func ValidateSupportedSections(cfg api.ConfigFile) error {
 	}
 	if cfg.ConsumerGroups != nil {
 		unsupported = append(unsupported, "consumer_groups")
+	}
+	if cfg.PluginConfigs != nil {
+		unsupported = append(unsupported, "plugin_configs")
 	}
 	if cfg.ServiceTemplates != nil {
 		unsupported = append(unsupported, "service_templates")
