@@ -236,9 +236,10 @@ func ComputeDiff(local, remote api.ConfigFile) (*DiffResult, error) {
 
 func ValidateSupportedSections(cfg api.ConfigFile) error {
 	var unsupported []string
-	// Reject any presence of these sections, including explicit empty
-	// (e.g. `upstreams: []`): declaring an unsupported section is itself an
-	// error, even when no resources are listed under it.
+	// Reject explicitly-empty unsupported sections (e.g. `upstreams: []`)
+	// in addition to non-empty ones. Bare `upstreams:` or `upstreams: null`
+	// unmarshal as nil and slip past this check; that's a separate hardening
+	// (would require yaml.Node / two-pass parsing) tracked elsewhere.
 	if cfg.Upstreams != nil {
 		unsupported = append(unsupported, "upstreams")
 	}

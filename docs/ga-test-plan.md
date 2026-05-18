@@ -44,7 +44,7 @@ Confirm before proceeding:
 ## Build
 
 ```bash
-cd ~/Desktop/repos/xisipa/a7
+cd <path-to-a7-repo>
 make build          # -> ./bin/a7
 ./bin/a7 version    # record the version string in the report
 ```
@@ -58,7 +58,7 @@ All manual steps below use `./bin/a7`. The automated suite (Phase A) builds its 
 Establishes a known-good baseline against the local 3.9.12 instance before manual work.
 
 ```bash
-cd ~/Desktop/repos/xisipa/a7
+cd <path-to-a7-repo>
 export A7_ADMIN_URL="https://localhost:7443"
 export A7_TOKEN="a7ee.xxxxxxxx"
 export A7_GATEWAY_GROUP="default"

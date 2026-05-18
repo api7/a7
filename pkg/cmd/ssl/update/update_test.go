@@ -119,7 +119,7 @@ func TestUpdateSSL_WithCertKeyAndSNI(t *testing.T) {
 		t.Fatalf("failed to parse output: %v", err)
 	}
 	if strings.Contains(out.String(), "new-key") || output.Key != api.RedactedSSLKey {
-		t.Fatalf("expected ssl key to be redacted in output, got %+v", output)
+		t.Fatalf("expected ssl key to be redacted in output")
 	}
 	registry.Verify(t)
 }
@@ -156,7 +156,7 @@ func TestUpdateSSL_SendsExplicitStatusZero(t *testing.T) {
 			return httpmock.Response{}, fmt.Errorf("decode request: %w", err)
 		}
 		if payload["status"] != float64(0) {
-			return httpmock.Response{}, fmt.Errorf("expected explicit status 0, got payload %#v", payload)
+			return httpmock.Response{}, fmt.Errorf("expected explicit status 0 in payload")
 		}
 		return httpmock.JSONResponse(`{"value":{"id":"ssl1","cert":"old-cert","key":"old-key","snis":["old.example.com"],"type":"server","status":0}}`), nil
 	})
@@ -190,7 +190,7 @@ func TestUpdateSSL_PreservesExistingStatusZero(t *testing.T) {
 			return httpmock.Response{}, fmt.Errorf("decode request: %w", err)
 		}
 		if payload["status"] != float64(0) {
-			return httpmock.Response{}, fmt.Errorf("expected existing status 0 to be preserved, got payload %#v", payload)
+			return httpmock.Response{}, fmt.Errorf("expected existing status 0 to be preserved in payload")
 		}
 		return httpmock.JSONResponse(`{"value":{"id":"ssl1","cert":"old-cert","key":"old-key","snis":["new.example.com"],"type":"server","status":0}}`), nil
 	})
