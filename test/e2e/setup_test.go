@@ -134,17 +134,20 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
-	// Resolve the actual gateway group UUID. API7 EE uses UUID-style IDs,
-	// not human-readable names like "default".
-	if gatewayGroup == "default" || gatewayGroup == "" {
-		ggID, err := resolveFirstGatewayGroupID()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to resolve gateway group ID: %v\n", err)
-			os.Exit(1)
-		}
-		gatewayGroup = ggID
-		fmt.Fprintf(os.Stderr, "Resolved gateway group ID: %s\n", gatewayGroup)
+	// API7 EE uses UUID-style ids for runtime API calls but env vars carry
+	// names; resolve name -> id. An explicit name is honored literally; only
+	// the empty/"default" case falls back to "first writable group".
+	wanted := gatewayGroup
+	if wanted == "default" || wanted == "" {
+		wanted = "default"
 	}
+	ggID, err := resolveGatewayGroupID(wanted)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to resolve gateway group: %v\n", err)
+		os.Exit(1)
+	}
+	gatewayGroup = ggID
+	fmt.Fprintf(os.Stderr, "Resolved gateway group %q -> %s\n", wanted, gatewayGroup)
 
 	os.Exit(m.Run())
 }
@@ -403,7 +406,12 @@ func createTestRouteWithServiceViaCLI(t testTB, env []string, routeID, serviceID
 	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
 }
 
-func resolveFirstGatewayGroupID() (string, error) {
+// resolveGatewayGroupID looks up a gateway group by exact name; if wanted is
+// empty it falls back to the first non-ingress group. Ingress-controller
+// gateway groups (Type == "api7_ingress_controller") reject POST/PUT/PATCH/
+// DELETE for any auth mode other than admin_key, so picking one as the test
+// target silently breaks every mutating test in CI.
+func resolveGatewayGroupID(wanted string) (string, error) {
 	req, err := http.NewRequest(http.MethodGet, adminURL+"/api/gateway_groups", nil)
 	if err != nil {
 		return "", err
@@ -426,6 +434,7 @@ func resolveFirstGatewayGroupID() (string, error) {
 		List []struct {
 			ID   string `json:"id"`
 			Name string `json:"name"`
+			Type string `json:"type"`
 		} `json:"list"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
@@ -434,5 +443,24 @@ func resolveFirstGatewayGroupID() (string, error) {
 	if len(result.List) == 0 {
 		return "", fmt.Errorf("no gateway groups found")
 	}
-	return result.List[0].ID, nil
+
+	if wanted != "" {
+		for _, g := range result.List {
+			if g.Name == wanted {
+				return g.ID, nil
+			}
+		}
+		names := make([]string, 0, len(result.List))
+		for _, g := range result.List {
+			names = append(names, g.Name)
+		}
+		return "", fmt.Errorf("gateway group %q not found; available: %v", wanted, names)
+	}
+
+	for _, g := range result.List {
+		if g.Type != "api7_ingress_controller" {
+			return g.ID, nil
+		}
+	}
+	return "", fmt.Errorf("no non-ingress gateway group found; ingress-controller groups reject writes without admin_key auth")
 }
