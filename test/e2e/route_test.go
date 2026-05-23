@@ -3,6 +3,7 @@
 package e2e
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -382,4 +383,46 @@ func TestRoute_TrafficForwarding(t *testing.T) {
 		t.Skip("route did not propagate to the local gateway within timeout; skipping traffic forwarding assertion")
 	}
 	assert.Equal(t, 200, status)
+}
+
+// TestRoute_DescFlagCRUD guards the regression where `route create` and
+// `route update` exposed no `--desc` flag despite the README documenting one.
+// Covers create-with-desc, update-with-new-desc, and update-with-empty-desc
+// (which clears the field).
+func TestRoute_DescFlagCRUD(t *testing.T) {
+	env := setupEnv(t)
+	svcID := "e2e-route-desc-svc"
+	routeID := "e2e-route-desc"
+	t.Cleanup(func() {
+		deleteRouteViaAdmin(t, routeID)
+		deleteServiceViaAdmin(t, svcID)
+	})
+	createTestServiceViaCLI(t, env, svcID)
+
+	stdout, stderr, err := runA7WithEnv(env, "route", "create",
+		"--name", routeID, "--path", "/"+routeID, "--service-id", svcID,
+		"--desc", "initial desc", "-g", gatewayGroup, "-o", "json")
+	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+	var created map[string]interface{}
+	require.NoError(t, json.Unmarshal([]byte(stdout), &created))
+	assert.Equal(t, "initial desc", created["desc"], "create --desc should land in response")
+	rtID, ok := created["id"].(string)
+	require.True(t, ok && rtID != "", "create response should contain an id: %v", created)
+	t.Cleanup(func() { deleteRouteViaAdmin(t, rtID) })
+
+	stdout, stderr, err = runA7WithEnv(env, "route", "update", rtID,
+		"--desc", "updated desc", "-g", gatewayGroup, "-o", "json")
+	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+	var updated map[string]interface{}
+	require.NoError(t, json.Unmarshal([]byte(stdout), &updated))
+	assert.Equal(t, "updated desc", updated["desc"], "update --desc should land in response")
+
+	stdout, stderr, err = runA7WithEnv(env, "route", "update", rtID,
+		"--desc", "", "-g", gatewayGroup, "-o", "json")
+	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+	var cleared map[string]interface{}
+	require.NoError(t, json.Unmarshal([]byte(stdout), &cleared))
+	if d, present := cleared["desc"]; present {
+		assert.Equal(t, "", d, "passing --desc \"\" should clear the description")
+	}
 }

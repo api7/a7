@@ -24,6 +24,7 @@ type Options struct {
 	File         string
 
 	Name      string
+	Desc      string
 	URI       string
 	Paths     []string
 	Methods   []string
@@ -47,6 +48,7 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 	}
 
 	c.Flags().StringVar(&opts.Name, "name", "", "Route name")
+	c.Flags().StringVar(&opts.Desc, "desc", "", "Route description")
 	c.Flags().StringVarP(&opts.File, "file", "f", "", "Path to JSON/YAML file with resource definition")
 	c.Flags().StringVar(&opts.URI, "uri", "", "Route URI (single path, APISIX compat)")
 	c.Flags().StringSliceVar(&opts.Paths, "path", nil, "Route path (repeatable, API7 EE format)")
@@ -136,6 +138,7 @@ func actionRun(opts *Options) error {
 
 	bodyReq := api.Route{
 		Name:      opts.Name,
+		Desc:      opts.Desc,
 		Paths:     paths,
 		Methods:   opts.Methods,
 		Host:      opts.Host,
