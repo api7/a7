@@ -393,10 +393,7 @@ func TestRoute_DescFlagCRUD(t *testing.T) {
 	env := setupEnv(t)
 	svcID := "e2e-route-desc-svc"
 	routeID := "e2e-route-desc"
-	t.Cleanup(func() {
-		deleteRouteViaAdmin(t, routeID)
-		deleteServiceViaAdmin(t, svcID)
-	})
+	t.Cleanup(func() { deleteServiceViaAdmin(t, svcID) })
 	createTestServiceViaCLI(t, env, svcID)
 
 	stdout, stderr, err := runA7WithEnv(env, "route", "create",
@@ -422,7 +419,22 @@ func TestRoute_DescFlagCRUD(t *testing.T) {
 	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
 	var cleared map[string]interface{}
 	require.NoError(t, json.Unmarshal([]byte(stdout), &cleared))
-	if d, present := cleared["desc"]; present {
-		assert.Equal(t, "", d, "passing --desc \"\" should clear the description")
+	assertDescCleared(t, cleared, "update --desc \"\" should clear the description in response")
+
+	// Verify the clear persisted server-side, not just in the update response.
+	var persisted map[string]interface{}
+	runA7JSON(t, env, &persisted, "route", "get", rtID, "-g", gatewayGroup, "-o", "json")
+	assertDescCleared(t, persisted, "cleared desc should not be persisted")
+}
+
+// assertDescCleared treats absent, nil, and "" all as a successfully-cleared
+// desc — the API may serialize a cleared field as `null`, omit it entirely
+// (json `omitempty`), or echo an empty string.
+func assertDescCleared(t testTB, obj map[string]interface{}, msg string) {
+	t.Helper()
+	d, present := obj["desc"]
+	if !present || d == nil {
+		return
 	}
+	assert.Equal(t, "", d, msg)
 }
