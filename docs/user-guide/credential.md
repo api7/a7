@@ -56,20 +56,40 @@ a7 credential get key-1 --consumer jack -g default
 
 ### `a7 credential create`
 
-Creates a new credential for a consumer from a JSON or YAML file.
+Creates a new credential for a consumer.
+
+**Usage:** `a7 credential create [id] --consumer <user> -g <gateway-group>`
+
+The positional `[id]` is optional. When supplied (either as the positional or as `id:` inside a `--file` payload), the CLI sends `PUT /apisix/admin/consumers/<user>/credentials/<id>` and the credential is created with that exact id. When omitted, the CLI sends `POST` and the server assigns a UUID. If both the positional and the file specify an id, the positional wins.
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--consumer` | | | Consumer username (required) |
 | `--gateway-group` | `-g` | | Target gateway group (required) |
-| `--file` | `-f` | | Path to credential config file (required) |
-| `--output` | `-o` | `yaml` | Output format (`json`, `yaml`) |
+| `--file` | `-f` | | Path to credential config file (JSON or YAML) |
+| `--name` | | | Credential display name (separate from the id) |
+| `--desc` | | | Credential description |
+| `--plugins-json` | | | Plugins as a JSON string |
+| `--labels` | | | Labels in `key=value` format (repeatable) |
+| `--output` | `-o` | `json` | Output format (`json`, `yaml`) |
 
 **Examples:**
 
-Create a credential from YAML:
+Create a credential from YAML (id taken from the file's `id:` field, or auto-assigned if absent):
 ```bash
 a7 credential create --consumer jack -g default -f key-auth.yaml
+```
+
+Create a credential with a client-chosen id and a display name:
+```bash
+a7 credential create my-key --consumer jack -g default --name "Jack's API key" \
+  --plugins-json '{"key-auth":{"key":"secret-token-val"}}'
+```
+
+Let the server assign the id:
+```bash
+a7 credential create --consumer jack -g default --name "Jack's API key" \
+  --plugins-json '{"key-auth":{"key":"secret-token-val"}}'
 ```
 
 ### `a7 credential update`

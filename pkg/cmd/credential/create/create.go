@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -25,6 +26,7 @@ type Options struct {
 	File         string
 	ID           string
 
+	Name        string
 	Desc        string
 	PluginsJSON string
 	Labels      []string
@@ -34,7 +36,7 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 	opts := &Options{IO: f.IOStreams, Client: f.HttpClient, Config: f.Config}
 	c := &cobra.Command{
 		Use:   "create [id]",
-		Short: "Create a credential",
+		Short: "Create a credential (id is server-generated if omitted)",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.Output, _ = c.Flags().GetString("output")
@@ -49,6 +51,7 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 
 	c.Flags().StringVar(&opts.Consumer, "consumer", "", "Consumer username")
 	c.Flags().StringVarP(&opts.File, "file", "f", "", "Path to JSON/YAML file with resource definition")
+	c.Flags().StringVar(&opts.Name, "name", "", "Credential display name")
 	c.Flags().StringVar(&opts.Desc, "desc", "", "Credential description")
 	c.Flags().StringVar(&opts.PluginsJSON, "plugins-json", "", "Plugins JSON string")
 	c.Flags().StringSliceVar(&opts.Labels, "labels", nil, "Labels in key=value format")
@@ -73,24 +76,39 @@ func actionRun(opts *Options) error {
 	if ggID == "" {
 		return fmt.Errorf("gateway group is required; use --gateway-group flag or set a default in context config")
 	}
+
 	if opts.File != "" {
 		payload, err := cmdutil.ReadResourceFile(opts.File, opts.IO.In)
 		if err != nil {
 			return err
 		}
 
-		if opts.ID != "" {
-			payload["name"] = opts.ID
-			delete(payload, "id")
-		} else if _, ok := payload["name"]; ok {
-			delete(payload, "id")
-		} else if id, ok := payload["id"]; ok {
-			payload["name"] = id
-			delete(payload, "id")
+		// Validate the file's id (if present) regardless of whether the
+		// positional overrides it: a bogus value in the file is a user error
+		// worth surfacing.
+		fileID, hasFileID, err := stringField(payload, "id")
+		if err != nil {
+			return err
 		}
 
-		name, hasName, err := credentialNameFromPayload(payload)
-		if err != nil {
+		// Positional [id] overrides any id in the file payload.
+		id := strings.TrimSpace(opts.ID)
+		if id == "" && hasFileID {
+			id = fileID
+		}
+		// The id, if any, is carried in the URL path on PUT. Drop it from the body
+		// so the request body stays clean.
+		delete(payload, "id")
+
+		if opts.Name != "" {
+			payload["name"] = strings.TrimSpace(opts.Name)
+		}
+		// API7 EE requires a non-empty `name` on credentials. When the caller
+		// gave us an id but no explicit name, mirror the id into the name.
+		if _, hasName := payload["name"]; !hasName && id != "" {
+			payload["name"] = id
+		}
+		if _, _, err := stringField(payload, "name"); err != nil {
 			return err
 		}
 
@@ -98,29 +116,8 @@ func actionRun(opts *Options) error {
 		if err != nil {
 			return err
 		}
-
-		path := "/apisix/admin/consumers/" + opts.Consumer + "/credentials?gateway_group_id=" + ggID
 		client := api.NewClient(httpClient, cfg.BaseURL())
-		var body []byte
-		if hasName {
-			body, err = client.Put(fmt.Sprintf("/apisix/admin/consumers/%s/credentials/%s?gateway_group_id=%s", opts.Consumer, name, ggID), payload)
-		} else {
-			body, err = client.Post(path, payload)
-		}
-		if err != nil {
-			return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
-		}
-
-		format := opts.Output
-		if format == "" {
-			format = "json"
-		}
-		return cmdutil.NewExporter(format, opts.IO.Out).WriteAPIResponse(body)
-	}
-
-	httpClient, err := opts.Client()
-	if err != nil {
-		return err
+		return submit(client, opts, ggID, id, payload)
 	}
 
 	pl := make(map[string]interface{})
@@ -139,7 +136,14 @@ func actionRun(opts *Options) error {
 		labels[parts[0]] = parts[1]
 	}
 
-	bodyReq := api.Credential{Name: opts.ID, Desc: opts.Desc}
+	id := strings.TrimSpace(opts.ID)
+	name := strings.TrimSpace(opts.Name)
+	if name == "" && id != "" {
+		// API7 EE requires a non-empty `name`. Mirror the id when the caller
+		// did not pass --name explicitly.
+		name = id
+	}
+	bodyReq := api.Credential{Name: name, Desc: opts.Desc}
 	if len(pl) > 0 {
 		bodyReq.Plugins = pl
 	}
@@ -147,33 +151,54 @@ func actionRun(opts *Options) error {
 		bodyReq.Labels = labels
 	}
 
-	path := "/apisix/admin/consumers/" + opts.Consumer + "/credentials?gateway_group_id=" + ggID
+	httpClient, err := opts.Client()
+	if err != nil {
+		return err
+	}
 	client := api.NewClient(httpClient, cfg.BaseURL())
-	body, err := client.Post(path, bodyReq)
+	return submit(client, opts, ggID, id, bodyReq)
+}
+
+func submit(client *api.Client, opts *Options, ggID, id string, body interface{}) error {
+	var (
+		raw []byte
+		err error
+	)
+	consumer := url.PathEscape(opts.Consumer)
+	group := url.QueryEscape(ggID)
+	if id != "" {
+		raw, err = client.Put(fmt.Sprintf("/apisix/admin/consumers/%s/credentials/%s?gateway_group_id=%s", consumer, url.PathEscape(id), group), body)
+	} else {
+		raw, err = client.Post(fmt.Sprintf("/apisix/admin/consumers/%s/credentials?gateway_group_id=%s", consumer, group), body)
+	}
 	if err != nil {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
-	}
-
-	var created api.Credential
-	if err := json.Unmarshal(body, &created); err != nil {
-		return fmt.Errorf("failed to decode response: %w", err)
 	}
 
 	format := opts.Output
 	if format == "" {
 		format = "json"
 	}
-	return cmdutil.NewExporter(format, opts.IO.Out).Write(created)
+	return cmdutil.NewExporter(format, opts.IO.Out).WriteAPIResponse(raw)
 }
 
-func credentialNameFromPayload(payload map[string]interface{}) (string, bool, error) {
-	rawName, ok := payload["name"]
+// stringField pulls a string field out of a parsed file payload. It returns
+// the trimmed value, a bool indicating whether the key was present, or an
+// error if the key was present but not a non-empty string (after trimming).
+// The trimmed value is written back to the payload when present.
+func stringField(payload map[string]interface{}, key string) (string, bool, error) {
+	raw, ok := payload[key]
 	if !ok {
 		return "", false, nil
 	}
-	name, ok := rawName.(string)
-	if !ok || strings.TrimSpace(name) == "" {
-		return "", false, fmt.Errorf("credential name must be a non-empty string")
+	str, ok := raw.(string)
+	if !ok {
+		return "", true, fmt.Errorf("credential %s must be a non-empty string", key)
 	}
-	return name, true, nil
+	trimmed := strings.TrimSpace(str)
+	if trimmed == "" {
+		return "", true, fmt.Errorf("credential %s must be a non-empty string", key)
+	}
+	payload[key] = trimmed
+	return trimmed, true, nil
 }
