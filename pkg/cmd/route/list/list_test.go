@@ -474,7 +474,6 @@ func TestListRoutes_PaginatesServiceIDPath(t *testing.T) {
 		t.Fatalf("actionRun failed: %v", err)
 	}
 
-	// Output is JSON; count [{ occurrences as a proxy for route count.
 	if got := registry.CallCount(http.MethodGet, "/apisix/admin/routes"); got != 2 {
 		t.Errorf("expected 2 paginated calls to /routes, got %d", got)
 	}
