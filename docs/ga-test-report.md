@@ -105,7 +105,7 @@ A declarative file with a top-level `service_templates:` section validated as "C
 
 ## Summary
 
-Re-run after the Run 1 fixes (PR #31) and the `plugin-config` removal (PR #34) merged to master. **All 6 targeted regression checks hold.** Each of the 13 core resources round-trips. **4 new findings surfaced (3 bugs + 1 cosmetic)** — none block GA, but the 3 bugs each warrant a sub-issue and a test-before-fix.
+Re-run after the Run 1 fixes (PR #31) and the `plugin-config` removal (PR #34) merged to master. **All 6 targeted regression checks hold.** Each of the 13 core resources round-trips. **5 new findings surfaced (3 bugs + 1 cosmetic + 1 UX)** — none block GA, but the 3 bugs each warrant a sub-issue and a test-before-fix.
 
 ## Regression checks (all pass)
 
