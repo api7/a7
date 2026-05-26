@@ -89,7 +89,7 @@ All runtime resources require `gateway_group_id` query parameter.
 - **Fields**: `id`, `name`, `upstream`, `plugins`.
 
 ### 3. Consumer (/apisix/admin/consumers)
-- **Methods**: `GET`, `GET /:username`, `PUT` (idempotent create/update), `DELETE /:username`
+- **Methods**: `GET`, `GET /:username`, `PUT /:username` (idempotent create/update), `DELETE /:username`
 - **Note**: Identified by `username`.
 
 ### 4. SSL (/apisix/admin/ssls)
@@ -130,8 +130,8 @@ All runtime resources require `gateway_group_id` query parameter.
 | SSL | `/apisix/admin` | `id` | Gateway Group |
 | Global Rule | `/apisix/admin` | `id` | Gateway Group |
 | Stream Route | `/apisix/admin` | `id` | Gateway Group |
-| Plugin Metadata | `/apisix/admin` | `plugin_name`| Gateway Group |
+| Plugin Metadata | `/apisix/admin` | `plugin_name` | Gateway Group |
 | Credential | `/apisix/admin` | `id` | Consumer |
-| Secret | `/apisix/admin` | `manager/id`| Gateway Group |
+| Secret | `/apisix/admin` | `manager/id` | Gateway Group |
 | Proto | `/apisix/admin` | `id` | Gateway Group |
 | Plugin | `/apisix/admin` | `name` | Gateway Group |
