@@ -179,7 +179,7 @@ func actionRun(opts *Options) error {
 func writeSSLResponse(format string, out io.Writer, body []byte) error {
 	var item api.SSL
 	if err := json.Unmarshal(body, &item); err != nil {
-		return cmdutil.NewExporter(format, out).Write(json.RawMessage(body))
+		return cmdutil.NewExporter(format, out).WriteAPIResponse(body)
 	}
 	return cmdutil.NewExporter(format, out).Write(api.RedactSSL(item))
 }

@@ -103,7 +103,7 @@ func actionRun(opts *Options) error {
 		if format == "" {
 			format = "json"
 		}
-		return cmdutil.NewExporter(format, opts.IO.Out).Write(json.RawMessage(body))
+		return cmdutil.NewExporter(format, opts.IO.Out).WriteAPIResponse(body)
 	}
 	if opts.URI == "" && len(opts.Paths) == 0 {
 		return fmt.Errorf("--path or --uri is required")
