@@ -76,10 +76,6 @@ API7 EE uses **JSON Patch** (RFC 6902) for `PATCH` operations. The request body 
 Manage logical groupings of gateway instances.
 - **Methods**: `GET` (list), `GET /:id`, `POST` (create), `PUT /:id` (update), `DELETE /:id`
 
-### 2. Service Template
-> **Removed from current a7 support.** Current API7 EE workflows should manage
-> runtime services directly and define upstreams inline on services.
-
 ## Runtime Resources (/apisix/admin)
 
 All runtime resources require `gateway_group_id` query parameter.
@@ -88,67 +84,54 @@ All runtime resources require `gateway_group_id` query parameter.
 - **Methods**: `GET` (list), `GET /:id`, `POST` (create), `PUT /:id` (create/update), `PATCH /:id`, `DELETE /:id`
 - **Fields**: `id`, `name`, `paths`, `methods`, `host`, `hosts`, `plugins`, `service_id`, `status`.
 
-### 2. Upstream (/apisix/admin/upstreams)
-> **⚠️ NOT EXPOSED in API7 EE.** Standalone upstreams do not have REST API endpoints. Upstreams exist only as inline objects within services and routes. This endpoint returns "resource not found".
-
-### 3. Service (/apisix/admin/services)
+### 2. Service (/apisix/admin/services)
 - **Methods**: `GET`, `GET /:id`, `POST`, `PUT /:id`, `PATCH /:id`, `DELETE /:id`
 - **Fields**: `id`, `name`, `upstream`, `plugins`.
 
-### 4. Consumer (/apisix/admin/consumers)
+### 3. Consumer (/apisix/admin/consumers)
 - **Methods**: `GET`, `GET /:username`, `PUT` (idempotent create/update), `DELETE /:username`
 - **Note**: Identified by `username`.
 
-### 5. SSL (/apisix/admin/ssls)
+### 4. SSL (/apisix/admin/ssls)
 - **Methods**: `GET`, `GET /:id`, `POST`, `PUT /:id`, `PATCH /:id`, `DELETE /:id`
 - **Fields**: `cert`, `key`, `snis`, `status`.
 
-### 6. Global Rule (/apisix/admin/global_rules)
+### 5. Global Rule (/apisix/admin/global_rules)
 - **Methods**: `GET`, `GET /:id`, `PUT /:id`, `DELETE /:id`
 
-### 7. Stream Route (/apisix/admin/stream_routes)
+### 6. Stream Route (/apisix/admin/stream_routes)
 - **Methods**: `GET`, `GET /:id`, `POST`, `DELETE /:id`
 
-### 8. Plugin Config (/apisix/admin/plugin_configs)
-> **⚠️ NOT EXPOSED in API7 EE.** Plugin configs do not have REST API endpoints in API7 EE.
-
-### 9. Plugin Metadata (/apisix/admin/plugin_metadata)
+### 7. Plugin Metadata (/apisix/admin/plugin_metadata)
 - **Methods**: `GET /:plugin_name`, `PUT /:plugin_name`, `DELETE /:plugin_name`
 
-### 10. Consumer Group (/apisix/admin/consumer_groups)
-> **⚠️ NOT EXPOSED in API7 EE.** Consumer groups do not have REST API endpoints in API7 EE.
-
-### 11. Credential (/apisix/admin/consumers/:username/credentials)
+### 8. Credential (/apisix/admin/consumers/:username/credentials)
 - **Methods**: `GET`, `GET /:id`, `PUT /:id`, `DELETE /:id`
 
-### 12. Secret (/apisix/admin/secrets)
+### 9. Secret (/apisix/admin/secrets)
 - **Methods**: `GET`, `GET /:manager/:id`, `PUT /:manager/:id`, `DELETE /:manager/:id`
 
-### 13. Proto (/apisix/admin/protos)
+### 10. Proto (/apisix/admin/protos)
 - **Methods**: `GET`, `GET /:id`, `POST`, `DELETE /:id`
 
-### 14. Plugin (/apisix/admin/plugins)
+### 11. Plugin (/apisix/admin/plugins)
 - **Methods**: 
   - `GET /apisix/admin/plugins/list`: List plugin names.
   - `GET /apisix/admin/plugins/:name`: Get plugin schema.
 
 ## Summary of Resource Types
 
-| Resource | Prefix | Identifier | Scope | Status |
-|----------|--------|------------|-------|--------|
-| Gateway Group | `/api` | `id` | Global | ✅ |
-| Service Template | `/api` | `id` | Global | ⚠️ Removed from a7 |
-| Route | `/apisix/admin` | `id` | Gateway Group | ✅ |
-| Upstream | `/apisix/admin` | `id` | Gateway Group | ⚠️ Not exposed |
-| Service | `/apisix/admin` | `id` | Gateway Group | ✅ |
-| Consumer | `/apisix/admin` | `username` | Gateway Group | ✅ |
-| SSL | `/apisix/admin` | `id` | Gateway Group | ✅ |
-| Global Rule | `/apisix/admin` | `id` | Gateway Group | ✅ |
-| Stream Route | `/apisix/admin` | `id` | Gateway Group | ✅ |
-| Plugin Config | `/apisix/admin` | `id` | Gateway Group | ⚠️ Not exposed |
-| Plugin Metadata | `/apisix/admin` | `plugin_name`| Gateway Group | ✅ |
-| Consumer Group | `/apisix/admin` | `id` | Gateway Group | ⚠️ Not exposed |
-| Credential | `/apisix/admin` | `id` | Consumer | ✅ |
-| Secret | `/apisix/admin` | `manager/id`| Gateway Group | ✅ |
-| Proto | `/apisix/admin` | `id` | Gateway Group | ✅ |
-| Plugin | `/apisix/admin` | `name` | Gateway Group | ✅ |
+| Resource | Prefix | Identifier | Scope |
+|----------|--------|------------|-------|
+| Gateway Group | `/api` | `id` | Global |
+| Route | `/apisix/admin` | `id` | Gateway Group |
+| Service | `/apisix/admin` | `id` | Gateway Group |
+| Consumer | `/apisix/admin` | `username` | Gateway Group |
+| SSL | `/apisix/admin` | `id` | Gateway Group |
+| Global Rule | `/apisix/admin` | `id` | Gateway Group |
+| Stream Route | `/apisix/admin` | `id` | Gateway Group |
+| Plugin Metadata | `/apisix/admin` | `plugin_name`| Gateway Group |
+| Credential | `/apisix/admin` | `id` | Consumer |
+| Secret | `/apisix/admin` | `manager/id`| Gateway Group |
+| Proto | `/apisix/admin` | `id` | Gateway Group |
+| Plugin | `/apisix/admin` | `name` | Gateway Group |
