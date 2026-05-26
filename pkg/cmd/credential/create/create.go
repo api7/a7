@@ -100,6 +100,11 @@ func actionRun(opts *Options) error {
 		if opts.Name != "" {
 			payload["name"] = opts.Name
 		}
+		// API7 EE requires a non-empty `name` on credentials. When the caller
+		// gave us an id but no explicit name, mirror the id into the name.
+		if _, hasName := payload["name"]; !hasName && id != "" {
+			payload["name"] = id
+		}
 
 		httpClient, err := opts.Client()
 		if err != nil {
@@ -125,7 +130,13 @@ func actionRun(opts *Options) error {
 		labels[parts[0]] = parts[1]
 	}
 
-	bodyReq := api.Credential{Name: opts.Name, Desc: opts.Desc}
+	name := opts.Name
+	if name == "" && opts.ID != "" {
+		// API7 EE requires a non-empty `name`. Mirror the id when the caller
+		// did not pass --name explicitly.
+		name = opts.ID
+	}
+	bodyReq := api.Credential{Name: name, Desc: opts.Desc}
 	if len(pl) > 0 {
 		bodyReq.Plugins = pl
 	}

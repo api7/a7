@@ -88,6 +88,59 @@ func TestCreateCredential_PositionalForwardsAsIDViaPUT(t *testing.T) {
 	registry.Verify(t)
 }
 
+func TestCreateCredential_PositionalAutoDerivesName(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	registry := &httpmock.Registry{}
+	registry.RegisterResponder(http.MethodPut, "/apisix/admin/consumers/alice/credentials/cred1", func(req *http.Request) (httpmock.Response, error) {
+		var payload map[string]any
+		if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+			return httpmock.Response{}, fmt.Errorf("decode request body: %w", err)
+		}
+		if payload["name"] != "cred1" {
+			return httpmock.Response{}, fmt.Errorf("expected name to default to id when --name omitted, got: %#v", payload)
+		}
+		return httpmock.JSONResponse(`{"id":"cred1","name":"cred1"}`), nil
+	})
+
+	opts := &Options{IO: ios, Client: func() (*http.Client, error) { return registry.GetClient(), nil }, Config: func() (config.Config, error) {
+		return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
+	}, Consumer: "alice", GatewayGroup: "gg1", ID: "cred1", PluginsJSON: `{"key-auth":{"key":"k"}}`}
+
+	if err := actionRun(opts); err != nil {
+		t.Fatalf("actionRun failed: %v", err)
+	}
+	registry.Verify(t)
+}
+
+func TestCreateCredential_FileIDAutoDerivesName(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	tmpFile := t.TempDir() + "/credential.json"
+	if err := os.WriteFile(tmpFile, []byte(`{"id":"cred-file","plugins":{"key-auth":{"key":"k"}}}`), 0o644); err != nil {
+		t.Fatalf("write credential file: %v", err)
+	}
+
+	registry := &httpmock.Registry{}
+	registry.RegisterResponder(http.MethodPut, "/apisix/admin/consumers/alice/credentials/cred-file", func(req *http.Request) (httpmock.Response, error) {
+		var payload map[string]any
+		if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+			return httpmock.Response{}, fmt.Errorf("decode request body: %w", err)
+		}
+		if payload["name"] != "cred-file" {
+			return httpmock.Response{}, fmt.Errorf("expected name to default to id when file omits name, got: %#v", payload)
+		}
+		return httpmock.JSONResponse(`{"id":"cred-file","name":"cred-file"}`), nil
+	})
+
+	opts := &Options{IO: ios, Client: func() (*http.Client, error) { return registry.GetClient(), nil }, Config: func() (config.Config, error) {
+		return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
+	}, Consumer: "alice", GatewayGroup: "gg1", File: tmpFile}
+
+	if err := actionRun(opts); err != nil {
+		t.Fatalf("actionRun failed: %v", err)
+	}
+	registry.Verify(t)
+}
+
 func TestCreateCredential_NameFlagPOSTs(t *testing.T) {
 	ios, _, out, _ := iostreams.Test()
 	registry := &httpmock.Registry{}
