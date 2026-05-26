@@ -31,7 +31,7 @@ Gets detailed information about a specific global rule by its ID.
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--gateway-group` | `-g` | | Target gateway group name (required) |
-| `--output` | `-o` | `yaml` | Output format (json, yaml) |
+| `--output` | `-o` | `table` | Output format (table, json, yaml) |
 
 **Examples:**
 
@@ -52,9 +52,10 @@ global-rule update` to modify an existing rule.
 | `--gateway-group` | `-g` | | Target gateway group name (required) |
 | `--file` | `-f` | | Path to the global rule configuration file |
 | `--plugins-json` | | | Plugins as JSON map |
-| `--output` | `-o` | `yaml` | Output format (json, yaml) |
+| `--output` | `-o` | `json` | Output format (json, yaml) |
 
-One of `--file` or `--plugins-json` must be provided.
+One of `--file` or `--plugins-json` must be provided. If both are passed,
+`--file` takes precedence and `--plugins-json` is ignored.
 
 **Examples:**
 
@@ -86,7 +87,7 @@ Updates an existing global rule using a configuration file or JSON Patch.
 | `--gateway-group` | `-g` | | Target gateway group name (required) |
 | `--file` | `-f` | | Path to the global rule configuration file or JSON Patch file |
 | `--patch` | `-p` | | JSON Patch string (RFC 6902) |
-| `--output` | `-o` | `yaml` | Output format (json, yaml) |
+| `--output` | `-o` | `json` | Output format (json, yaml) |
 
 **Examples:**
 
