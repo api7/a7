@@ -122,11 +122,11 @@ Re-run after the Run 1 fixes (PR #31) and the `plugin-config` removal (PR #34) m
 
 | # | Severity | Resource | Finding | Disposition |
 |---|---|---|---|---|
-| R2-1 | 🟡 Bug | route | README documents `a7 route update <id> --desc "..."` but neither `route create` nor `route update` exposes a `--desc` flag. Description is only settable through `-f`. | Sub-issue + E2E |
-| R2-2 | 🟡 UX | route | `a7 route list -g default` errors with `--service-id is required by API7 EE`. The e2e helper iterates services to aggregate routes; the CLI doesn't. | Sub-issue (post-GA candidate) |
-| R2-3 | 🟡 Bug | credential | `a7 credential create smoke-cred-X --consumer Y ...` returned a server-assigned UUID, ignoring the positional id. (Run 1 noted this as "intended" via `TestCredential_CreateWithPositionalID` — needs re-confirmation; if intended, drop the misleading `[id]` from the help.) | Sub-issue + decision |
-| R2-4 | 🟡 Bug | global-rule | `a7 global-rule create --id X --plugins-json '{"cors":...}'` ignores `--id`; resource is created at `id=cors`. Run 1 noted "value is ignored by EE" as a minor; treat as a real bug: the CLI shouldn't accept a flag it will silently override. | Sub-issue + E2E |
-| R2-5 | 🟢 Cosmetic | stream-route | `-o yaml` renders `created_at: 1.779521636e+09` in scientific notation. Should be plain integer. | Note only |
+| R2-1 | 🟡 Bug | route | README documents `a7 route update <id> --desc "..."` but neither `route create` nor `route update` exposes a `--desc` flag. Description is only settable through `-f`. | ✅ Fixed in PR #39 / closes #35 |
+| R2-2 | 🟡 UX | route | `a7 route list -g default` errors with `--service-id is required by API7 EE`. The e2e helper iterates services to aggregate routes; the CLI doesn't. | #42 (post-GA candidate) |
+| R2-3 | 🟡 Bug | credential | `a7 credential create smoke-cred-X --consumer Y ...` returned a server-assigned UUID, ignoring the positional id. (Run 1 noted this as "intended" via `TestCredential_CreateWithPositionalID` — needs re-confirmation; if intended, drop the misleading `[id]` from the help.) | #36 |
+| R2-4 | 🟡 Bug | global-rule | `a7 global-rule create --id X --plugins-json '{"cors":...}'` ignores `--id`; resource is created at `id=cors`. Run 1 noted "value is ignored by EE" as a minor; treat as a real bug: the CLI shouldn't accept a flag it will silently override. | #37 |
+| R2-5 | 🟢 Cosmetic | stream-route | `-o yaml` renders `created_at: 1.779521636e+09` in scientific notation. Should be plain integer. | Note only, untracked |
 
 ## Exit criteria (Run 2)
 
@@ -136,4 +136,4 @@ Re-run after the Run 1 fixes (PR #31) and the `plugin-config` removal (PR #34) m
 | All Run 1 fixes hold against current master | ✅ 6/6 regression checks pass |
 | Phase C unsupported commands gone (including `plugin-config`) | ✅ all 4 return `unknown command` |
 | Phase D `config dump/validate` work on a clean instance | ✅ (no Run 2 dirty-state diff test, but Run 1 covered diff/sync convergence) |
-| Each new bug gets a tracked sub-issue with test-before-fix protocol | ⏳ pending sub-issue creation
+| Each new bug gets a tracked sub-issue with test-before-fix protocol | ✅ #35 (fixed via PR #39), #36, #37, #42 all filed |
