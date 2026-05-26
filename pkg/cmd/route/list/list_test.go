@@ -273,7 +273,7 @@ func TestListRoutes_AcrossServices_JSON(t *testing.T) {
 	}
 
 	var routes []api.Route
-	if err := json.Unmarshal([]byte(out.String()), &routes); err != nil {
+	if err := json.Unmarshal(out.Bytes(), &routes); err != nil {
 		t.Fatalf("failed to parse JSON output: %v", err)
 	}
 	if len(routes) != 1 || routes[0].ID != "r-a" || routes[0].ServiceID != "svc-a" {
