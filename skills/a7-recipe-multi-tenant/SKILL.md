@@ -61,7 +61,6 @@ Each group can have its own global policies:
 ```bash
 a7 global-rule create -g standard-tier -f - <<'EOF'
 {
-  "id": "standard-global-throttle",
   "plugins": {
     "limit-count": {
       "count": 5000,

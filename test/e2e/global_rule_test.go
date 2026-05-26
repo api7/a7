@@ -39,16 +39,15 @@ func TestGlobalRule_ListJSON(t *testing.T) {
 
 func TestGlobalRule_CRUD(t *testing.T) {
 	env := setupEnv(t)
-	// API7 EE requires global rule ID to match a plugin name in its plugins map.
+	// API7 EE derives the global rule id from its single plugin name.
 	grID := "prometheus"
 	t.Cleanup(func() { deleteGlobalRuleViaAdmin(t, grID) })
 
-	grJSON := fmt.Sprintf(`{
-		"id": %q,
+	grJSON := `{
 		"plugins": {
 			"prometheus": {}
 		}
-	}`, grID)
+	}`
 
 	tmpFile := filepath.Join(t.TempDir(), "global-rule.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(grJSON), 0644))
@@ -106,18 +105,17 @@ func TestGlobalRule_DeleteNonexistent(t *testing.T) {
 // a7 global-rule create -f - <<'EOF'
 func TestGlobalRule_SkillExample(t *testing.T) {
 	env := setupEnv(t)
-	// API7 EE requires global rule ID to match a plugin name.
+	// API7 EE derives the global rule id from its single plugin name.
 	grID := "ip-restriction"
 	t.Cleanup(func() { deleteGlobalRuleViaAdmin(t, grID) })
 
-	grJSON := fmt.Sprintf(`{
-		"id": %q,
+	grJSON := `{
 		"plugins": {
 			"ip-restriction": {
 				"whitelist": ["10.0.0.0/8"]
 			}
 		}
-	}`, grID)
+	}`
 
 	tmpFile := filepath.Join(t.TempDir(), "gr.json")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(grJSON), 0644))
