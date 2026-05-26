@@ -87,3 +87,53 @@ A declarative file with a top-level `service_templates:` section validated as "C
 ## Follow-ups
 
 - **Task #2** (remove the `plugin-config` standalone command) is still outstanding. Once done, Phase C also expects the declarative `plugin_configs` top-level section to be rejected — the `service_templates` rejection added here is the template for that change.
+
+---
+
+# Run 2 (post-#31, post-#34)
+
+## Environment
+
+| Item | Value |
+|---|---|
+| Date | 2026-05-23 |
+| API7 EE version | **3.9.12** (`/api/version` → `v3.9.12`) |
+| `a7 version` | `ac31b9d` (master after PR #34 merged) |
+| Admin URL | `https://localhost:7443` |
+| Gateway group | `default` |
+| Deviations | Data-plane traffic tests not run (out of scope per plan). |
+
+## Summary
+
+Re-run after the Run 1 fixes (PR #31) and the `plugin-config` removal (PR #34) merged to master. **All 6 targeted regression checks hold.** Each of the 13 core resources round-trips. **5 new findings surfaced (3 bugs + 1 cosmetic + 1 UX)** — none block GA, but the 3 bugs each warrant a sub-issue and a test-before-fix.
+
+## Regression checks (all pass)
+
+| Check | Source | Result |
+|---|---|---|
+| `ssl update` without `--cert/--key` → clean error | PR #31 BUG-1 | ✅ |
+| `plugin-metadata get -o yaml` → YAML map | PR #31 BUG-2 | ✅ |
+| `plugin get -o yaml` → YAML (not JSON) | PR #31 BUG-3 | ✅ |
+| `stream-route create` without `--name` → error; `-f -o yaml` → YAML map | PR #31 BUG-4 + review fixup | ✅ |
+| `config validate` rejects all 4 unsupported sections (incl. empty `[]`) | PR #31 BUG-5 + PR #34 | ✅ |
+| `a7 plugin-config` / `upstream` / `consumer-group` / `service-template` → `unknown command` | PR #34 | ✅ |
+
+## New findings
+
+| # | Severity | Resource | Finding | Disposition |
+|---|---|---|---|---|
+| R2-1 | 🟡 Bug | route | README documents `a7 route update <id> --desc "..."` but neither `route create` nor `route update` exposes a `--desc` flag. Description is only settable through `-f`. | ✅ Fixed in PR #39 / closes #35 |
+| R2-2 | 🟡 UX | route | `a7 route list -g default` errors with `--service-id is required by API7 EE`. The e2e helper iterates services to aggregate routes; the CLI doesn't. | #42 (post-GA candidate) |
+| R2-3 | 🟡 Bug | credential | `a7 credential create smoke-cred-X --consumer Y ...` returned a server-assigned UUID, ignoring the positional id. (Run 1 noted this as "intended" via `TestCredential_CreateWithPositionalID` — needs re-confirmation; if intended, drop the misleading `[id]` from the help.) | #36 |
+| R2-4 | 🟡 Bug | global-rule | `a7 global-rule create --id X --plugins-json '{"cors":...}'` ignores `--id`; resource is created at `id=cors`. Run 1 noted "value is ignored by EE" as a minor; treat as a real bug: the CLI shouldn't accept a flag it will silently override. | #37 |
+| R2-5 | 🟢 Cosmetic | stream-route | `-o yaml` renders `created_at: 1.779521636e+09` in scientific notation. Should be plain integer. | Note only, untracked |
+
+## Exit criteria (Run 2)
+
+| Criterion | Status |
+|---|---|
+| API7 EE version pinned to 3.9.12 in writing | ✅ |
+| All Run 1 fixes hold against current master | ✅ 6/6 regression checks pass |
+| Phase C unsupported commands gone (including `plugin-config`) | ✅ all 4 return `unknown command` |
+| Phase D `config dump/validate` work on a clean instance | ✅ (no Run 2 dirty-state diff test, but Run 1 covered diff/sync convergence) |
+| Each new bug gets a tracked sub-issue with test-before-fix protocol | ✅ #35 (fixed via PR #39), #36, #37, #42 all filed |
