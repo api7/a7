@@ -2,6 +2,7 @@ package list
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -375,4 +376,106 @@ func TestListRoutes_GatewayGroupFromFlag(t *testing.T) {
 	}
 
 	registry.Verify(t)
+}
+
+// TestListRoutes_LabelDoesNotFilterServices verifies that --label is applied
+// only to /routes requests, not to the /services discovery query. Without
+// this isolation, services that don't carry the route's label would be
+// excluded from enumeration and any matching routes they own would be lost.
+func TestListRoutes_LabelDoesNotFilterServices(t *testing.T) {
+	ios, _, out, _ := iostreams.Test()
+	registry := &httpmock.Registry{}
+
+	registry.RegisterResponder(http.MethodGet, "/apisix/admin/services", func(r *http.Request) (httpmock.Response, error) {
+		if got := r.URL.Query().Get("label"); got != "" {
+			t.Errorf("/services should not receive label query, got label=%q", got)
+		}
+		return httpmock.JSONResponse(`{
+			"total": 1,
+			"list": [{"id": "svc-unlabelled", "name": "service-without-label"}]
+		}`), nil
+	})
+
+	registry.RegisterResponder(http.MethodGet, "/apisix/admin/routes", func(r *http.Request) (httpmock.Response, error) {
+		if got := r.URL.Query().Get("label"); got != "env" {
+			t.Errorf("/routes should receive label=env, got label=%q", got)
+		}
+		return httpmock.JSONResponse(`{
+			"total": 1,
+			"list": [
+				{"id": "r1", "name": "labelled-route", "service_id": "svc-unlabelled", "uri": "/x", "methods": ["GET"], "status": 1, "labels": {"env": "prod"}}
+			]
+		}`), nil
+	})
+
+	opts := &Options{
+		IO:     ios,
+		Client: func() (*http.Client, error) { return registry.GetClient(), nil },
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
+		},
+		GatewayGroup: "gg1",
+		Label:        "env=prod",
+	}
+
+	if err := actionRun(opts); err != nil {
+		t.Fatalf("actionRun failed: %v", err)
+	}
+
+	if !strings.Contains(out.String(), "r1") {
+		t.Errorf("expected route r1 in output\noutput:\n%s", out.String())
+	}
+}
+
+// TestListRoutes_PaginatesServiceIDPath verifies the --service-id branch
+// follows pagination instead of stopping after the first page.
+func TestListRoutes_PaginatesServiceIDPath(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	registry := &httpmock.Registry{}
+
+	// Build two pages of 500 + 100 routes (total=600).
+	makePage := func(start, count int) string {
+		var b strings.Builder
+		b.WriteString(`{"total": 600, "list": [`)
+		for i := 0; i < count; i++ {
+			if i > 0 {
+				b.WriteString(",")
+			}
+			fmt.Fprintf(&b, `{"id": "r-%d", "name": "route", "service_id": "svc1", "uri": "/x", "methods": ["GET"], "status": 1}`, start+i)
+		}
+		b.WriteString(`]}`)
+		return b.String()
+	}
+
+	registry.RegisterResponder(http.MethodGet, "/apisix/admin/routes", func(r *http.Request) (httpmock.Response, error) {
+		switch r.URL.Query().Get("page") {
+		case "1":
+			return httpmock.JSONResponse(makePage(0, 500)), nil
+		case "2":
+			return httpmock.JSONResponse(makePage(500, 100)), nil
+		default:
+			t.Errorf("unexpected page %q", r.URL.Query().Get("page"))
+			return httpmock.JSONResponse(`{"total": 0, "list": []}`), nil
+		}
+	})
+
+	opts := &Options{
+		IO:     ios,
+		Client: func() (*http.Client, error) { return registry.GetClient(), nil },
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
+		},
+		Output:       "json",
+		GatewayGroup: "gg1",
+		ServiceID:    "svc1",
+	}
+
+	if err := actionRun(opts); err != nil {
+		t.Fatalf("actionRun failed: %v", err)
+	}
+
+	// Output is JSON; count [{ occurrences as a proxy for route count.
+	if got := registry.CallCount(http.MethodGet, "/apisix/admin/routes"); got != 2 {
+		t.Errorf("expected 2 paginated calls to /routes, got %d", got)
+	}
 }

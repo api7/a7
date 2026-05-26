@@ -1,7 +1,6 @@
 package list
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -70,11 +69,8 @@ func actionRun(opts *Options) error {
 
 	labelKey, labelValue := cmdutil.ParseLabel(opts.Label)
 	baseQuery := map[string]string{"gateway_group_id": ggID}
-	if labelKey != "" {
-		baseQuery["label"] = labelKey
-	}
 
-	routes, err := fetchRoutes(client, baseQuery, opts.ServiceID)
+	routes, err := fetchRoutes(client, baseQuery, opts.ServiceID, labelKey)
 	if err != nil {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
 	}
@@ -110,31 +106,31 @@ func actionRun(opts *Options) error {
 	return tp.Render()
 }
 
-// fetchRoutes returns the route slice for the request. With a service ID, it
-// issues a single filtered call; without one, it lists every service in the
-// gateway group and aggregates their routes (API7 EE requires `service_id`
-// on this endpoint under access-token auth).
-func fetchRoutes(client *api.Client, baseQuery map[string]string, serviceID string) ([]api.Route, error) {
+// fetchRoutes returns the paginated route slice for the request. With a
+// service ID, it pages through a single filtered query; without one, it lists
+// every service in the gateway group and aggregates their routes (API7 EE
+// requires `service_id` on this endpoint under access-token auth).
+//
+// labelKey is applied only to the /routes calls. /services discovery stays
+// label-free so that services without the label are still enumerated and
+// their matching routes returned.
+func fetchRoutes(client *api.Client, baseQuery map[string]string, serviceID, labelKey string) ([]api.Route, error) {
+	routeQuery := make(map[string]string, len(baseQuery)+2)
+	for k, v := range baseQuery {
+		routeQuery[k] = v
+	}
+	if labelKey != "" {
+		routeQuery["label"] = labelKey
+	}
+
 	if serviceID != "" {
-		q := make(map[string]string, len(baseQuery)+1)
-		for k, v := range baseQuery {
-			q[k] = v
-		}
-		q["service_id"] = serviceID
-		body, err := client.Get("/apisix/admin/routes", q)
-		if err != nil {
-			return nil, err
-		}
-		var resp api.ListResponse[api.Route]
-		if err := json.Unmarshal(body, &resp); err != nil {
-			return nil, fmt.Errorf("failed to decode response: %w", err)
-		}
-		return resp.List, nil
+		routeQuery["service_id"] = serviceID
+		return listutil.FetchPaginated[api.Route](client, "/apisix/admin/routes", routeQuery)
 	}
 
 	services, err := listutil.FetchPaginated[api.Service](client, "/apisix/admin/services", baseQuery)
 	if err != nil {
 		return nil, err
 	}
-	return listutil.FetchRoutesForServices(client, services, baseQuery)
+	return listutil.FetchRoutesForServices(client, services, routeQuery)
 }
