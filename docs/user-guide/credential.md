@@ -45,7 +45,7 @@ Gets a specific credential by ID for a consumer.
 |------|-------|---------|-------------|
 | `--consumer` | | | Consumer username (required) |
 | `--gateway-group` | `-g` | | Target gateway group (required) |
-| `--output` | `-o` | `yaml` | Output format (`json`, `yaml`) |
+| `--output` | `-o` | `table` | Output format (`table`, `json`, `yaml`) |
 
 **Examples:**
 
@@ -63,7 +63,7 @@ Creates a new credential for a consumer from a JSON or YAML file.
 | `--consumer` | | | Consumer username (required) |
 | `--gateway-group` | `-g` | | Target gateway group (required) |
 | `--file` | `-f` | | Path to credential config file (required) |
-| `--output` | `-o` | `yaml` | Output format (`json`, `yaml`) |
+| `--output` | `-o` | `json` | Output format (`json`, `yaml`) |
 
 **Examples:**
 
@@ -81,7 +81,7 @@ Updates an existing credential by ID using a JSON or YAML file. API7 EE uses JSO
 | `--consumer` | | | Consumer username (required) |
 | `--gateway-group` | `-g` | | Target gateway group (required) |
 | `--file` | `-f` | | Path to credential config file (required) |
-| `--output` | `-o` | `yaml` | Output format (`json`, `yaml`) |
+| `--output` | `-o` | `json` | Output format (`json`, `yaml`) |
 
 **Examples:**
 

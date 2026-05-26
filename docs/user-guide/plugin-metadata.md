@@ -18,7 +18,7 @@ Gets metadata for a specific plugin by name.
 |------|-------|---------|-------------|
 | `--gateway-group` | `-g` | | Target gateway group name (required) |
 | `--token` | `-t` | | API token (can be set via A7_TOKEN) |
-| `--output` | `-o` | `yaml` | Output format (json, yaml) |
+| `--output` | `-o` | `table` | Output format (table, json, yaml) |
 
 **Examples:**
 
@@ -41,7 +41,7 @@ Creates or sets plugin metadata for a plugin from a JSON or YAML file.
 | `--gateway-group` | `-g` | | Target gateway group name (required) |
 | `--file` | `-f` | | Path to the plugin metadata file (required) |
 | `--token` | `-t` | | API token |
-| `--output` | `-o` | `yaml` | Output format (json, yaml) |
+| `--output` | `-o` | `json` | Output format (json, yaml) |
 
 **Examples:**
 
@@ -64,7 +64,7 @@ Updates existing plugin metadata for a plugin using a JSON or YAML file.
 | `--gateway-group` | `-g` | | Target gateway group name (required) |
 | `--file` | `-f` | | Path to the plugin metadata file (required) |
 | `--token` | `-t` | | API token |
-| `--output` | `-o` | `yaml` | Output format (json, yaml) |
+| `--output` | `-o` | `json` | Output format (json, yaml) |
 
 **Examples:**
 

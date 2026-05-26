@@ -42,7 +42,7 @@ Gets a secret manager configuration by its compound ID.
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--gateway-group` | `-g` | | Target gateway group name (required) |
-| `--output` | `-o` | `yaml` | Output format (json, yaml) |
+| `--output` | `-o` | `table` | Output format (table, json, yaml) |
 
 **Examples:**
 
@@ -63,7 +63,7 @@ reserved for the API7 EE API token.
 | `--gateway-group` | `-g` | | Target gateway group name (required) |
 | `--file` | `-f` | | Path to the secret configuration file (required unless using flag mode) |
 | `--provider-token` | | | Secret provider token for flag mode |
-| `--output` | `-o` | `yaml` | Output format (json, yaml) |
+| `--output` | `-o` | `json` | Output format (json, yaml) |
 
 **Examples:**
 
@@ -90,7 +90,7 @@ Updates an existing secret manager by compound ID. As with create, use
 | `--gateway-group` | `-g` | | Target gateway group name (required) |
 | `--file` | `-f` | | Path to the secret configuration file (required unless using flag mode) |
 | `--provider-token` | | | Secret provider token for flag mode |
-| `--output` | `-o` | `yaml` | Output format (json, yaml) |
+| `--output` | `-o` | `json` | Output format (json, yaml) |
 
 **Examples:**
 

@@ -33,7 +33,7 @@ Gets detailed information about a specific gateway group by its ID or name.
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--output` | `-o` | `yaml` | Output format (`json`, `yaml`) |
+| `--output` | `-o` | `table` | Output format (`table`, `json`, `yaml`) |
 
 **Examples:**
 
