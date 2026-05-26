@@ -1,7 +1,6 @@
 package create
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -93,7 +92,7 @@ func actionRun(opts *Options) error {
 		if output == "" {
 			output = "json"
 		}
-		return cmdutil.NewExporter(output, opts.IO.Out).Write(json.RawMessage(body))
+		return cmdutil.NewExporter(output, opts.IO.Out).WriteAPIResponse(body)
 	}
 	if opts.Username == "" {
 		return fmt.Errorf("--username is required")

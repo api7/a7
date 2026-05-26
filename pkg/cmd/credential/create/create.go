@@ -115,7 +115,7 @@ func actionRun(opts *Options) error {
 		if format == "" {
 			format = "json"
 		}
-		return cmdutil.NewExporter(format, opts.IO.Out).Write(json.RawMessage(body))
+		return cmdutil.NewExporter(format, opts.IO.Out).WriteAPIResponse(body)
 	}
 
 	httpClient, err := opts.Client()
