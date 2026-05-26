@@ -28,7 +28,7 @@ All four phases executed. **5 real bugs found, all fixed with E2E + unit coverag
 | B | service | PASS | — | — | create (file+flags), get, list, update, export. Map-form upstream nodes correctly rejected (400). |
 | B | route | PASS | — | — | create (file+flags), get, list, update, export, delete. `get`/`delete` take id only; `update` uses `--uri`. |
 | B | consumer | PASS | — | — | CRUD + export. MINOR: file `description:` key silently dropped (accepted key is `desc`). |
-| B | credential | PASS | — | — | CRUD via server-returned id. MINOR: `create [id]` positional is treated as `name` (id is server-generated). |
+| B | credential | PASS | — | — | CRUD via server-returned id. `create [id]` positional is now forwarded as the credential id via `PUT` (issue #36); a separate `--name` flag sets the display name. |
 | B | ssl | **FIXED** | **BUG-1** | `TestSSL_UpdateFlagsRequireCertAndKey` | flag-based `ssl update` silently lost partial updates. |
 | B | secret | PASS | — | — | CRUD (file+flags); id format is `provider/id`. |
 | B | global-rule | PASS | — | — | CRUD (file+flags), export; id must equal the plugin name. MINOR: flag `--id` is required but its value is ignored by EE. |
@@ -67,7 +67,7 @@ A declarative file with a top-level `service_templates:` section validated as "C
 ## Minor observations (not fixed — low severity / by-design)
 
 - **consumer**: `-f` file with a `description:` key is silently ignored; the accepted key is `desc`.
-- **credential**: `create [id]` help text is misleading — the positional arg becomes the `name`; the `id` is server-generated. This is codified by `TestCredential_CreateWithPositionalID`, so it is current intended behavior.
+- **credential**: `create [id]` now forwards the positional as the credential id via `PUT /apisix/admin/consumers/<u>/credentials/<id>` (issue #36). The display name has moved to a dedicated `--name` flag.
 - **global-rule**: flag-based `create` requires `--id`, but API7 EE forces the id to equal the single plugin key, so the `--id` value is effectively ignored. File-based create errors clearly on a mismatch.
 - **proto**: `--desc` and a `desc:` file field are silently dropped.
 - **stream-route / EE behavior**: API7 EE rejects stream routes bound to a service it has classified as HTTP. Binding to a `type: stream` service works reliably. `a7` surfaces the EE error cleanly; this is EE-side behavior, not an `a7` bug.
@@ -124,7 +124,7 @@ Re-run after the Run 1 fixes (PR #31) and the `plugin-config` removal (PR #34) m
 |---|---|---|---|---|
 | R2-1 | 🟡 Bug | route | README documents `a7 route update <id> --desc "..."` but neither `route create` nor `route update` exposes a `--desc` flag. Description is only settable through `-f`. | ✅ Fixed in PR #39 / closes #35 |
 | R2-2 | 🟡 UX | route | `a7 route list -g default` errors with `--service-id is required by API7 EE`. The e2e helper iterates services to aggregate routes; the CLI doesn't. | #42 (post-GA candidate) |
-| R2-3 | 🟡 Bug | credential | `a7 credential create smoke-cred-X --consumer Y ...` returned a server-assigned UUID, ignoring the positional id. (Run 1 noted this as "intended" via `TestCredential_CreateWithPositionalID` — needs re-confirmation; if intended, drop the misleading `[id]` from the help.) | #36 |
+| R2-3 | 🟡 Bug | credential | `a7 credential create smoke-cred-X --consumer Y ...` returned a server-assigned UUID, ignoring the positional id. | ✅ Fixed: positional now forwarded as id via `PUT`, `--name` added for display name (closes #36) |
 | R2-4 | 🟡 Bug | global-rule | `a7 global-rule create --id X --plugins-json '{"cors":...}'` ignores `--id`; resource is created at `id=cors`. Run 1 noted "value is ignored by EE" as a minor; treat as a real bug: the CLI shouldn't accept a flag it will silently override. | #37 |
 | R2-5 | 🟢 Cosmetic | stream-route | `-o yaml` renders `created_at: 1.779521636e+09` in scientific notation. Should be plain integer. | Note only, untracked |
 
