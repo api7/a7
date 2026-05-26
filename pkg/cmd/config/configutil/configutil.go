@@ -12,6 +12,7 @@ import (
 
 	"github.com/api7/a7/pkg/api"
 	"github.com/api7/a7/pkg/cmdutil"
+	"github.com/api7/a7/pkg/listutil"
 )
 
 type ResourceItem struct {
@@ -111,38 +112,38 @@ func FetchRemoteConfig(client *api.Client, gatewayGroup string) (*api.ConfigFile
 		query["gateway_group_id"] = gatewayGroup
 	}
 
-	services, err := fetchPaginated[api.Service](client, "/apisix/admin/services", query)
+	services, err := listutil.FetchPaginated[api.Service](client, "/apisix/admin/services", query)
 	if err != nil {
 		return nil, err
 	}
 
 	// API7 EE requires service_id when listing routes with access tokens.
 	// Fetch routes per service and aggregate.
-	routes, err := fetchRoutesForServices(client, services, query)
+	routes, err := listutil.FetchRoutesForServices(client, services, query)
 	if err != nil {
 		return nil, err
 	}
-	consumers, err := fetchPaginated[api.Consumer](client, "/apisix/admin/consumers", query)
+	consumers, err := listutil.FetchPaginated[api.Consumer](client, "/apisix/admin/consumers", query)
 	if err != nil {
 		return nil, err
 	}
-	ssl, err := fetchPaginated[api.SSL](client, "/apisix/admin/ssls", query)
+	ssl, err := listutil.FetchPaginated[api.SSL](client, "/apisix/admin/ssls", query)
 	if err != nil {
 		return nil, err
 	}
-	globalRules, err := fetchPaginated[api.GlobalRule](client, "/apisix/admin/global_rules", query)
+	globalRules, err := listutil.FetchPaginated[api.GlobalRule](client, "/apisix/admin/global_rules", query)
 	if err != nil {
 		return nil, err
 	}
-	streamRoutes, err := fetchPaginated[api.StreamRoute](client, "/apisix/admin/stream_routes", query)
+	streamRoutes, err := listutil.FetchPaginated[api.StreamRoute](client, "/apisix/admin/stream_routes", query)
 	if err != nil {
 		return nil, err
 	}
-	protos, err := fetchPaginated[api.Proto](client, "/apisix/admin/protos", query)
+	protos, err := listutil.FetchPaginated[api.Proto](client, "/apisix/admin/protos", query)
 	if err != nil {
 		return nil, err
 	}
-	secrets, err := fetchPaginated[api.Secret](client, "/apisix/admin/secret_providers", query)
+	secrets, err := listutil.FetchPaginated[api.Secret](client, "/apisix/admin/secret_providers", query)
 	if err != nil {
 		return nil, err
 	}
@@ -403,79 +404,6 @@ func toMapSlice(items interface{}) ([]map[string]interface{}, error) {
 		return []map[string]interface{}{}, nil
 	}
 	return out, nil
-}
-
-// fetchPaginated fetches all items from a paginated API7 EE list endpoint.
-// API7 EE returns ListResponse[T] with .List []T directly (no ListItem wrapper).
-func fetchPaginated[T any](client *api.Client, path string, extraQuery map[string]string) ([]T, error) {
-	page := 1
-	pageSize := 500
-	var items []T
-
-	for {
-		query := map[string]string{
-			"page":      fmt.Sprintf("%d", page),
-			"page_size": fmt.Sprintf("%d", pageSize),
-		}
-		for k, v := range extraQuery {
-			query[k] = v
-		}
-
-		body, err := client.Get(path, query)
-		if err != nil {
-			if cmdutil.IsOptionalResourceError(err) {
-				return nil, nil
-			}
-			return nil, err
-		}
-
-		var resp api.ListResponse[T]
-		if err := json.Unmarshal(body, &resp); err != nil {
-			return nil, fmt.Errorf("failed to parse response: %w", err)
-		}
-
-		items = append(items, resp.List...)
-		if len(resp.List) == 0 || len(items) >= resp.Total {
-			break
-		}
-		page++
-	}
-
-	return items, nil
-}
-
-func fetchRoutesForServices(client *api.Client, services []api.Service, baseQuery map[string]string) ([]api.Route, error) {
-	seen := make(map[string]bool)
-	var allRoutes []api.Route
-	for _, svc := range services {
-		if svc.ID == "" {
-			continue
-		}
-		q := make(map[string]string, len(baseQuery)+1)
-		for k, v := range baseQuery {
-			q[k] = v
-		}
-		q["service_id"] = svc.ID
-		routes, err := fetchPaginated[api.Route](client, "/apisix/admin/routes", q)
-		if err != nil {
-			if cmdutil.IsOptionalResourceError(err) {
-				continue
-			}
-			return nil, err
-		}
-		for _, r := range routes {
-			key := r.ID
-			if key == "" {
-				allRoutes = append(allRoutes, r)
-				continue
-			}
-			if !seen[key] {
-				seen[key] = true
-				allRoutes = append(allRoutes, r)
-			}
-		}
-	}
-	return allRoutes, nil
 }
 
 func fetchPluginMetadata(client *api.Client, query map[string]string) ([]api.PluginMetadataEntry, error) {
