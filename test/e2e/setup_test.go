@@ -114,6 +114,7 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
+	fmt.Fprintln(os.Stderr, "Building a7 binary ...")
 	buildCmd := exec.Command("go", "build", "-o", binaryPath, "./cmd/a7")
 	buildCmd.Dir = modRoot
 	buildCmd.Stdout = os.Stdout
@@ -126,6 +127,7 @@ func TestMain(m *testing.M) {
 	// Wait for API7 EE Dashboard API to become healthy.
 	// Try the /api/status endpoint first, fall back to /api/gateway_groups.
 	healthURL := adminURL + "/api/gateway_groups"
+	fmt.Fprintln(os.Stderr, "Waiting for API7 EE dashboard at "+adminURL+" ...")
 	if err := waitForHealthy(healthURL, 120*time.Second); err != nil {
 		fmt.Fprintf(os.Stderr, "API7 EE not ready: %v\n", err)
 		os.Exit(1)
@@ -134,6 +136,7 @@ func TestMain(m *testing.M) {
 	// API7 EE uses UUID-style ids for runtime API calls. Resolve name -> id.
 	// An explicit name (incl. "default") is honored literally; only an
 	// unset/empty A7_GATEWAY_GROUP falls back to "first non-ingress group".
+	fmt.Fprintln(os.Stderr, "Resolving gateway group ...")
 	wanted := os.Getenv("A7_GATEWAY_GROUP")
 	ggID, err := resolveGatewayGroupID(wanted)
 	if err != nil {

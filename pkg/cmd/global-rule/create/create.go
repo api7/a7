@@ -86,7 +86,7 @@ func actionRun(opts *Options) error {
 		if format == "" {
 			format = "json"
 		}
-		return cmdutil.NewExporter(format, opts.IO.Out).Write(json.RawMessage(body))
+		return cmdutil.NewExporter(format, opts.IO.Out).WriteAPIResponse(body)
 	}
 
 	plugins := make(map[string]interface{})
