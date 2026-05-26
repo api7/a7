@@ -6,8 +6,9 @@
 //
 //   - A7_ADMIN_URL: API7 EE Dashboard/control-plane URL (required)
 //   - A7_TOKEN: API7 EE access token (required)
-//   - A7_GATEWAY_GROUP: Gateway group name (default: "default"; resolved to the
-//     real UUID when unset or set to "default")
+//   - A7_GATEWAY_GROUP: Gateway group name. Resolved to the real UUID by
+//     name lookup. When unset/empty, the resolver falls back to the first
+//     non-ingress-controller gateway group.
 //   - A7_GATEWAY_URL: Gateway data-plane URL (optional — only needed for live
 //     gateway/data-plane coverage)
 //   - HTTPBIN_URL: httpbin URL (optional — only needed for live traffic
@@ -45,7 +46,7 @@ var (
 	gatewayURL           string // API7 EE Gateway URL (HTTP)
 	httpbinURL           string
 	adminToken           string // API7 EE access token (a7ee prefix)
-	gatewayGroup         = "default"
+	gatewayGroup         string
 
 	// httpClient with TLS skip verify for self-signed certs.
 	insecureClient = &http.Client{
@@ -84,10 +85,6 @@ func TestMain(m *testing.M) {
 	gatewayURL = envOrDefault("A7_GATEWAY_URL", "")
 	httpbinURL = envOrDefault("HTTPBIN_URL", "")
 	adminToken = envOrDefault("A7_TOKEN", "")
-
-	if g := os.Getenv("A7_GATEWAY_GROUP"); g != "" {
-		gatewayGroup = g
-	}
 
 	if adminURL == "" {
 		fmt.Fprintln(os.Stderr, "A7_ADMIN_URL environment variable is required for E2E tests")
@@ -134,16 +131,20 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
-	// Resolve the actual gateway group UUID. API7 EE uses UUID-style IDs,
-	// not human-readable names like "default".
-	if gatewayGroup == "default" || gatewayGroup == "" {
-		ggID, err := resolveFirstGatewayGroupID()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to resolve gateway group ID: %v\n", err)
-			os.Exit(1)
-		}
-		gatewayGroup = ggID
-		fmt.Fprintf(os.Stderr, "Resolved gateway group ID: %s\n", gatewayGroup)
+	// API7 EE uses UUID-style ids for runtime API calls. Resolve name -> id.
+	// An explicit name (incl. "default") is honored literally; only an
+	// unset/empty A7_GATEWAY_GROUP falls back to "first non-ingress group".
+	wanted := os.Getenv("A7_GATEWAY_GROUP")
+	ggID, err := resolveGatewayGroupID(wanted)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to resolve gateway group: %v\n", err)
+		os.Exit(1)
+	}
+	gatewayGroup = ggID
+	if wanted != "" {
+		fmt.Fprintf(os.Stderr, "Resolved gateway group %q -> %s\n", wanted, gatewayGroup)
+	} else {
+		fmt.Fprintf(os.Stderr, "Resolved gateway group (first non-ingress) -> %s\n", gatewayGroup)
 	}
 
 	os.Exit(m.Run())
@@ -403,7 +404,12 @@ func createTestRouteWithServiceViaCLI(t testTB, env []string, routeID, serviceID
 	require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
 }
 
-func resolveFirstGatewayGroupID() (string, error) {
+// resolveGatewayGroupID looks up a gateway group by exact name; if wanted is
+// empty it falls back to the first non-ingress group. Ingress-controller
+// gateway groups (Type == "api7_ingress_controller") reject POST/PUT/PATCH/
+// DELETE for any auth mode other than admin_key, so picking one as the test
+// target silently breaks every mutating test in CI.
+func resolveGatewayGroupID(wanted string) (string, error) {
 	req, err := http.NewRequest(http.MethodGet, adminURL+"/api/gateway_groups", nil)
 	if err != nil {
 		return "", err
@@ -426,6 +432,7 @@ func resolveFirstGatewayGroupID() (string, error) {
 		List []struct {
 			ID   string `json:"id"`
 			Name string `json:"name"`
+			Type string `json:"type"`
 		} `json:"list"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
@@ -434,5 +441,24 @@ func resolveFirstGatewayGroupID() (string, error) {
 	if len(result.List) == 0 {
 		return "", fmt.Errorf("no gateway groups found")
 	}
-	return result.List[0].ID, nil
+
+	if wanted != "" {
+		for _, g := range result.List {
+			if g.Name == wanted {
+				return g.ID, nil
+			}
+		}
+		names := make([]string, 0, len(result.List))
+		for _, g := range result.List {
+			names = append(names, g.Name)
+		}
+		return "", fmt.Errorf("gateway group %q not found; available: %v", wanted, names)
+	}
+
+	for _, g := range result.List {
+		if g.Type != "api7_ingress_controller" {
+			return g.ID, nil
+		}
+	}
+	return "", fmt.Errorf("no non-ingress gateway group found; ingress-controller groups reject writes without admin_key auth")
 }

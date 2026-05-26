@@ -238,3 +238,42 @@ func TestCreateRoute_FromYAMLFile(t *testing.T) {
 	}
 	registry.Verify(t)
 }
+
+// TestCreateRoute_DescFlag guards the regression where flag-based `route create`
+// had no `--desc` flag despite the README documenting one. The description must
+// reach the API request body.
+func TestCreateRoute_DescFlag(t *testing.T) {
+	ios, _, out, _ := iostreams.Test()
+	registry := &httpmock.Registry{}
+	registry.RegisterResponder(http.MethodPost, "/apisix/admin/routes", func(r *http.Request) (httpmock.Response, error) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			return httpmock.Response{}, err
+		}
+		if !strings.Contains(string(body), `"desc":"my description"`) {
+			t.Fatalf("expected --desc to land in request body, got: %s", string(body))
+		}
+		return httpmock.JSONResponse(`{"id":"r-desc","name":"demo","desc":"my description","service_id":"svc1"}`), nil
+	})
+
+	opts := &Options{
+		IO:     ios,
+		Client: func() (*http.Client, error) { return registry.GetClient(), nil },
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
+		},
+		GatewayGroup: "gg1",
+		URI:          "/demo",
+		Name:         "demo",
+		Desc:         "my description",
+		ServiceID:    "svc1",
+	}
+
+	if err := actionRun(opts); err != nil {
+		t.Fatalf("actionRun failed: %v", err)
+	}
+	if !strings.Contains(out.String(), "my description") {
+		t.Fatalf("expected desc in output, got: %s", out.String())
+	}
+	registry.Verify(t)
+}

@@ -130,3 +130,77 @@ func TestUpdateRoute_FromFile(t *testing.T) {
 	}
 	registry.Verify(t)
 }
+
+// TestUpdateRoute_DescFlag guards the regression where `route update` had no
+// `--desc` flag despite the README documenting one. The new description must
+// reach the PUT body.
+func TestUpdateRoute_DescFlag(t *testing.T) {
+	ios, _, out, _ := iostreams.Test()
+	registry := &httpmock.Registry{}
+	registry.Register(http.MethodGet, "/apisix/admin/routes/r1", httpmock.JSONResponse(`{"id":"r1","name":"old-name","desc":"old desc","paths":["/demo"],"service_id":"svc1","status":1}`))
+	registry.RegisterResponder(http.MethodPut, "/apisix/admin/routes/r1", func(req *http.Request) (httpmock.Response, error) {
+		var payload map[string]interface{}
+		if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+			return httpmock.Response{}, fmt.Errorf("decode request body: %w", err)
+		}
+		if payload["desc"] != "updated desc" {
+			return httpmock.Response{}, fmt.Errorf("expected updated desc in payload, got desc=%v", payload["desc"])
+		}
+		return httpmock.JSONResponse(`{"id":"r1","name":"old-name","desc":"updated desc","paths":["/demo"],"service_id":"svc1","status":1}`), nil
+	})
+
+	opts := &Options{
+		IO:     ios,
+		Client: func() (*http.Client, error) { return registry.GetClient(), nil },
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
+		},
+		ID:           "r1",
+		GatewayGroup: "gg1",
+		Desc:         "updated desc",
+		DescSet:      true,
+	}
+	if err := actionRun(opts); err != nil {
+		t.Fatalf("actionRun failed: %v", err)
+	}
+	if !strings.Contains(out.String(), "updated desc") {
+		t.Fatalf("expected updated desc in output: %s", out.String())
+	}
+	registry.Verify(t)
+}
+
+// TestUpdateRoute_DescFlagCanClear verifies that passing --desc "" explicitly
+// clears the existing description (rather than being treated as "unset").
+func TestUpdateRoute_DescFlagCanClear(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	registry := &httpmock.Registry{}
+	registry.Register(http.MethodGet, "/apisix/admin/routes/r1", httpmock.JSONResponse(`{"id":"r1","name":"old-name","desc":"old desc","paths":["/demo"],"service_id":"svc1","status":1}`))
+	registry.RegisterResponder(http.MethodPut, "/apisix/admin/routes/r1", func(req *http.Request) (httpmock.Response, error) {
+		var payload map[string]interface{}
+		if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+			return httpmock.Response{}, fmt.Errorf("decode request body: %w", err)
+		}
+		// With api.Route's `omitempty` desc tag, clearing should drop the field
+		// from the payload entirely; an empty string would also be acceptable.
+		if d, present := payload["desc"]; present && d != "" {
+			return httpmock.Response{}, fmt.Errorf("expected desc to be cleared, got desc=%v", d)
+		}
+		return httpmock.JSONResponse(`{"id":"r1","name":"old-name","paths":["/demo"],"service_id":"svc1","status":1}`), nil
+	})
+
+	opts := &Options{
+		IO:     ios,
+		Client: func() (*http.Client, error) { return registry.GetClient(), nil },
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
+		},
+		ID:           "r1",
+		GatewayGroup: "gg1",
+		Desc:         "",
+		DescSet:      true,
+	}
+	if err := actionRun(opts); err != nil {
+		t.Fatalf("actionRun failed: %v", err)
+	}
+	registry.Verify(t)
+}

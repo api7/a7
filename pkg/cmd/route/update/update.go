@@ -25,6 +25,8 @@ type Options struct {
 	ID           string
 
 	Name        string
+	Desc        string
+	DescSet     bool
 	URI         string
 	Methods     []string
 	Host        string
@@ -48,11 +50,13 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 			opts.GatewayGroup, _ = c.Flags().GetString("gateway-group")
 			opts.StatusSet = c.Flags().Changed("status")
 			opts.PrioritySet = c.Flags().Changed("priority")
+			opts.DescSet = c.Flags().Changed("desc")
 			return actionRun(opts)
 		},
 	}
 
 	c.Flags().StringVar(&opts.Name, "name", "", "Route name")
+	c.Flags().StringVar(&opts.Desc, "desc", "", "Route description (pass empty string to clear)")
 	c.Flags().StringVar(&opts.URI, "uri", "", "Route URI")
 	c.Flags().StringSliceVar(&opts.Methods, "methods", nil, "Allowed HTTP methods")
 	c.Flags().StringVar(&opts.Host, "host", "", "Route host")
@@ -122,6 +126,10 @@ func actionRun(opts *Options) error {
 
 	if opts.Name != "" {
 		bodyReq.Name = opts.Name
+	}
+	// DescSet lets the user explicitly clear the description with --desc "".
+	if opts.DescSet {
+		bodyReq.Desc = opts.Desc
 	}
 	if opts.URI != "" {
 		bodyReq.URI = ""
