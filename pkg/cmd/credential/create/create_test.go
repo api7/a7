@@ -57,7 +57,7 @@ func TestCreateCredential_JSONOutput(t *testing.T) {
 	registry.Verify(t)
 }
 
-func TestCreateCredential_PositionalIDSetsName(t *testing.T) {
+func TestCreateCredential_PositionalSetsName(t *testing.T) {
 	ios, _, out, _ := iostreams.Test()
 	registry := &httpmock.Registry{}
 	registry.RegisterResponder(http.MethodPost, "/apisix/admin/consumers/alice/credentials", func(req *http.Request) (httpmock.Response, error) {
@@ -66,17 +66,17 @@ func TestCreateCredential_PositionalIDSetsName(t *testing.T) {
 			return httpmock.Response{}, fmt.Errorf("decode request body: %w", err)
 		}
 		if payload["name"] != "cred1" {
-			return httpmock.Response{}, fmt.Errorf("expected positional id to map to name, got payload: %#v", payload)
+			return httpmock.Response{}, fmt.Errorf("expected positional to map to name, got payload: %#v", payload)
 		}
 		if _, ok := payload["id"]; ok {
-			return httpmock.Response{}, fmt.Errorf("expected positional id to be normalized to name only, got payload: %#v", payload)
+			return httpmock.Response{}, fmt.Errorf("expected positional to be normalized to name only, got payload: %#v", payload)
 		}
 		return httpmock.JSONResponse(`{"id":"generated","name":"cred1"}`), nil
 	})
 
 	opts := &Options{IO: ios, Client: func() (*http.Client, error) { return registry.GetClient(), nil }, Config: func() (config.Config, error) {
 		return &mockConfig{baseURL: "http://api.local", gatewayGroup: "gg1"}, nil
-	}, Consumer: "alice", GatewayGroup: "gg1", ID: "cred1", PluginsJSON: `{"key-auth":{"key":"k"}}`}
+	}, Consumer: "alice", GatewayGroup: "gg1", Name: "cred1", PluginsJSON: `{"key-auth":{"key":"k"}}`}
 
 	if err := actionRun(opts); err != nil {
 		t.Fatalf("actionRun failed: %v", err)

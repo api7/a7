@@ -56,14 +56,19 @@ a7 credential get key-1 --consumer jack -g default
 
 ### `a7 credential create`
 
-Creates a new credential for a consumer from a JSON or YAML file.
+Creates a new credential for a consumer. The credential `id` is always server-generated; the optional positional `[name]` (or the `name` field in a file payload) is stored as the credential's display name.
+
+**Usage:** `a7 credential create [name] --consumer <user> -g <gateway-group>`
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--consumer` | | | Consumer username (required) |
 | `--gateway-group` | `-g` | | Target gateway group (required) |
-| `--file` | `-f` | | Path to credential config file (required) |
-| `--output` | `-o` | `yaml` | Output format (`json`, `yaml`) |
+| `--file` | `-f` | | Path to credential config file (JSON or YAML) |
+| `--desc` | | | Credential description |
+| `--plugins-json` | | | Plugins as a JSON string |
+| `--labels` | | | Labels in `key=value` format (repeatable) |
+| `--output` | `-o` | `json` | Output format (`json`, `yaml`) |
 
 **Examples:**
 
@@ -71,6 +76,14 @@ Create a credential from YAML:
 ```bash
 a7 credential create --consumer jack -g default -f key-auth.yaml
 ```
+
+Create a credential inline, naming it `my-key`:
+```bash
+a7 credential create my-key --consumer jack -g default \
+  --plugins-json '{"key-auth":{"key":"secret-token-val"}}'
+```
+
+> Note: the returned `id` is assigned by API7 EE and will not match the positional `[name]`. Use the returned `id` for subsequent `get`, `update`, and `delete` calls.
 
 ### `a7 credential update`
 

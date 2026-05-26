@@ -23,7 +23,7 @@ type Options struct {
 	GatewayGroup string
 	Consumer     string
 	File         string
-	ID           string
+	Name         string
 
 	Desc        string
 	PluginsJSON string
@@ -33,15 +33,15 @@ type Options struct {
 func NewCmd(f *cmd.Factory) *cobra.Command {
 	opts := &Options{IO: f.IOStreams, Client: f.HttpClient, Config: f.Config}
 	c := &cobra.Command{
-		Use:   "create [id]",
-		Short: "Create a credential",
+		Use:   "create [name]",
+		Short: "Create a credential (id is server-generated)",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.Output, _ = c.Flags().GetString("output")
 			opts.GatewayGroup, _ = c.Flags().GetString("gateway-group")
 			opts.Consumer, _ = c.Flags().GetString("consumer")
 			if len(args) > 0 {
-				opts.ID = args[0]
+				opts.Name = args[0]
 			}
 			return actionRun(opts)
 		},
@@ -79,8 +79,8 @@ func actionRun(opts *Options) error {
 			return err
 		}
 
-		if opts.ID != "" {
-			payload["name"] = opts.ID
+		if opts.Name != "" {
+			payload["name"] = opts.Name
 			delete(payload, "id")
 		} else if _, ok := payload["name"]; ok {
 			delete(payload, "id")
@@ -139,7 +139,7 @@ func actionRun(opts *Options) error {
 		labels[parts[0]] = parts[1]
 	}
 
-	bodyReq := api.Credential{Name: opts.ID, Desc: opts.Desc}
+	bodyReq := api.Credential{Name: opts.Name, Desc: opts.Desc}
 	if len(pl) > 0 {
 		bodyReq.Plugins = pl
 	}
