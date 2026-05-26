@@ -31,7 +31,7 @@ Gets detailed information about a specific consumer by its username.
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--gateway-group` | `-g` | | Target gateway group name (required) |
-| `--output` | `-o` | `yaml` | Output format (json, yaml) |
+| `--output` | `-o` | `table` | Output format (table, json, yaml) |
 
 **Examples:**
 
@@ -48,7 +48,7 @@ Creates a new consumer from a JSON or YAML file.
 |------|-------|---------|-------------|
 | `--gateway-group` | `-g` | | Target gateway group name (required) |
 | `--file` | `-f` | | Path to the consumer configuration file (required) |
-| `--output` | `-o` | `yaml` | Output format (json, yaml) |
+| `--output` | `-o` | `json` | Output format (json, yaml) |
 
 **Examples:**
 
@@ -79,7 +79,7 @@ Updates an existing consumer using a configuration file or JSON Patch.
 | `--gateway-group` | `-g` | | Target gateway group name (required) |
 | `--file` | `-f` | | Path to the consumer configuration file or JSON Patch file |
 | `--patch` | `-p` | | JSON Patch string (RFC 6902) |
-| `--output` | `-o` | `yaml` | Output format (json, yaml) |
+| `--output` | `-o` | `json` | Output format (json, yaml) |
 
 **Examples:**
 

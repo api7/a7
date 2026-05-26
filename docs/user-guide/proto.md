@@ -31,7 +31,7 @@ Gets detailed information about a proto definition by its ID.
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--gateway-group` | `-g` | | Target gateway group name (required) |
-| `--output` | `-o` | `yaml` | Output format (json, yaml) |
+| `--output` | `-o` | `table` | Output format (table, json, yaml) |
 
 **Examples:**
 
@@ -48,7 +48,7 @@ Creates a proto definition from a JSON or YAML file.
 |------|-------|---------|-------------|
 | `--gateway-group` | `-g` | | Target gateway group name (required) |
 | `--file` | `-f` | | Path to the proto configuration file (required) |
-| `--output` | `-o` | `table` | Output format (table, json, yaml) |
+| `--output` | `-o` | `json` | Output format (json, yaml) |
 
 **Examples:**
 
@@ -75,7 +75,7 @@ Updates an existing proto definition using a configuration file or JSON Patch.
 | `--gateway-group` | `-g` | | Target gateway group name (required) |
 | `--file` | `-f` | | Path to the proto configuration file or JSON Patch file |
 | `--patch` | `-p` | | JSON Patch string (RFC 6902) |
-| `--output` | `-o` | `table` | Output format (table, json, yaml) |
+| `--output` | `-o` | `json` | Output format (json, yaml) |
 
 **Examples:**
 
