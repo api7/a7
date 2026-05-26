@@ -125,12 +125,12 @@ func fetchRoutes(client *api.Client, baseQuery map[string]string, serviceID, lab
 
 	if serviceID != "" {
 		routeQuery["service_id"] = serviceID
-		return listutil.FetchPaginated[api.Route](client, "/apisix/admin/routes", routeQuery)
+		return listutil.FetchPaginated[api.Route](client, "/apisix/admin/routes", routeQuery, false)
 	}
 
-	services, err := listutil.FetchPaginated[api.Service](client, "/apisix/admin/services", baseQuery)
+	services, err := listutil.FetchPaginated[api.Service](client, "/apisix/admin/services", baseQuery, false)
 	if err != nil {
 		return nil, err
 	}
-	return listutil.FetchRoutesForServices(client, services, routeQuery)
+	return listutil.FetchRoutesForServices(client, services, routeQuery, false)
 }

@@ -112,38 +112,38 @@ func FetchRemoteConfig(client *api.Client, gatewayGroup string) (*api.ConfigFile
 		query["gateway_group_id"] = gatewayGroup
 	}
 
-	services, err := listutil.FetchPaginated[api.Service](client, "/apisix/admin/services", query)
+	services, err := listutil.FetchPaginated[api.Service](client, "/apisix/admin/services", query, false)
 	if err != nil {
 		return nil, err
 	}
 
 	// API7 EE requires service_id when listing routes with access tokens.
 	// Fetch routes per service and aggregate.
-	routes, err := listutil.FetchRoutesForServices(client, services, query)
+	routes, err := listutil.FetchRoutesForServices(client, services, query, false)
 	if err != nil {
 		return nil, err
 	}
-	consumers, err := listutil.FetchPaginated[api.Consumer](client, "/apisix/admin/consumers", query)
+	consumers, err := listutil.FetchPaginated[api.Consumer](client, "/apisix/admin/consumers", query, false)
 	if err != nil {
 		return nil, err
 	}
-	ssl, err := listutil.FetchPaginated[api.SSL](client, "/apisix/admin/ssls", query)
+	ssl, err := listutil.FetchPaginated[api.SSL](client, "/apisix/admin/ssls", query, false)
 	if err != nil {
 		return nil, err
 	}
-	globalRules, err := listutil.FetchPaginated[api.GlobalRule](client, "/apisix/admin/global_rules", query)
+	globalRules, err := listutil.FetchPaginated[api.GlobalRule](client, "/apisix/admin/global_rules", query, false)
 	if err != nil {
 		return nil, err
 	}
-	streamRoutes, err := listutil.FetchPaginated[api.StreamRoute](client, "/apisix/admin/stream_routes", query)
+	streamRoutes, err := listutil.FetchPaginated[api.StreamRoute](client, "/apisix/admin/stream_routes", query, true)
 	if err != nil {
 		return nil, err
 	}
-	protos, err := listutil.FetchPaginated[api.Proto](client, "/apisix/admin/protos", query)
+	protos, err := listutil.FetchPaginated[api.Proto](client, "/apisix/admin/protos", query, true)
 	if err != nil {
 		return nil, err
 	}
-	secrets, err := listutil.FetchPaginated[api.Secret](client, "/apisix/admin/secret_providers", query)
+	secrets, err := listutil.FetchPaginated[api.Secret](client, "/apisix/admin/secret_providers", query, true)
 	if err != nil {
 		return nil, err
 	}
