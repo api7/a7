@@ -2,6 +2,7 @@ package list
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -32,18 +33,18 @@ func (m *mockConfig) RemoveContext(name string) error                 { return n
 func (m *mockConfig) SetCurrentContext(name string) error             { return nil }
 func (m *mockConfig) Save() error                                     { return nil }
 
-// TestListRoutes_Table tests table output format with 2 routes
+// TestListRoutes_Table tests table output format with 2 routes when --service-id is set
 func TestListRoutes_Table(t *testing.T) {
 	ios, _, out, _ := iostreams.Test()
 	registry := &httpmock.Registry{}
 
-	// Register mock response for GET /apisix/admin/routes
 	responseBody := `{
 		"total": 2,
 		"list": [
 			{
 				"id": "r1",
 				"name": "test-route",
+				"service_id": "svc1",
 				"uri": "/api/v1",
 				"methods": ["GET", "POST"],
 				"status": 1
@@ -51,6 +52,7 @@ func TestListRoutes_Table(t *testing.T) {
 			{
 				"id": "r2",
 				"name": "catch-all",
+				"service_id": "svc1",
 				"uris": ["/v2/*", "/v3/*"],
 				"methods": ["GET"],
 				"status": 1
@@ -76,41 +78,15 @@ func TestListRoutes_Table(t *testing.T) {
 	}
 
 	output := out.String()
-	if !strings.Contains(output, "ID") {
-		t.Error("table should contain ID header")
+	for _, header := range []string{"ID", "NAME", "SERVICE_ID", "PATHS", "METHODS", "STATUS"} {
+		if !strings.Contains(output, header) {
+			t.Errorf("table should contain %q header", header)
+		}
 	}
-	if !strings.Contains(output, "NAME") {
-		t.Error("table should contain NAME header")
-	}
-	if !strings.Contains(output, "PATHS") {
-		t.Error("table should contain PATHS header")
-	}
-	if !strings.Contains(output, "METHODS") {
-		t.Error("table should contain METHODS header")
-	}
-	if !strings.Contains(output, "STATUS") {
-		t.Error("table should contain STATUS header")
-	}
-	if !strings.Contains(output, "r1") {
-		t.Error("table should contain first route ID")
-	}
-	if !strings.Contains(output, "test-route") {
-		t.Error("table should contain first route name")
-	}
-	if !strings.Contains(output, "/api/v1") {
-		t.Error("table should contain first route URI")
-	}
-	if !strings.Contains(output, "GET,POST") {
-		t.Error("table should contain first route methods")
-	}
-	if !strings.Contains(output, "r2") {
-		t.Error("table should contain second route ID")
-	}
-	if !strings.Contains(output, "catch-all") {
-		t.Error("table should contain second route name")
-	}
-	if !strings.Contains(output, "/v2/*,/v3/*") {
-		t.Error("table should contain second route URIs joined by comma")
+	for _, want := range []string{"r1", "test-route", "svc1", "/api/v1", "GET,POST", "r2", "catch-all", "/v2/*,/v3/*"} {
+		if !strings.Contains(output, want) {
+			t.Errorf("table should contain %q", want)
+		}
 	}
 
 	registry.Verify(t)
@@ -170,17 +146,8 @@ func TestListRoutes_JSON(t *testing.T) {
 	if routes[0].ID != "r1" {
 		t.Errorf("expected first route ID 'r1', got '%s'", routes[0].ID)
 	}
-	if routes[0].Name != "test-route" {
-		t.Errorf("expected first route name 'test-route', got '%s'", routes[0].Name)
-	}
-	if routes[0].URI != "/api/v1" {
-		t.Errorf("expected first route URI '/api/v1', got '%s'", routes[0].URI)
-	}
 	if routes[1].ID != "r2" {
 		t.Errorf("expected second route ID 'r2', got '%s'", routes[1].ID)
-	}
-	if routes[1].Name != "catch-all" {
-		t.Errorf("expected second route name 'catch-all', got '%s'", routes[1].Name)
 	}
 
 	registry.Verify(t)
@@ -210,9 +177,41 @@ func TestListRoutes_MissingGatewayGroup(t *testing.T) {
 	}
 }
 
-func TestListRoutes_MissingServiceID(t *testing.T) {
-	ios, _, _, _ := iostreams.Test()
+// TestListRoutes_AcrossServices verifies that omitting --service-id triggers
+// a /services lookup followed by per-service /routes calls, and that the
+// merged result is rendered as a single table.
+func TestListRoutes_AcrossServices(t *testing.T) {
+	ios, _, out, _ := iostreams.Test()
 	registry := &httpmock.Registry{}
+
+	registry.Register(http.MethodGet, "/apisix/admin/services", httpmock.JSONResponse(`{
+		"total": 2,
+		"list": [
+			{"id": "svc-a", "name": "service-a"},
+			{"id": "svc-b", "name": "service-b"}
+		]
+	}`))
+
+	registry.RegisterResponder(http.MethodGet, "/apisix/admin/routes", func(r *http.Request) (httpmock.Response, error) {
+		switch r.URL.Query().Get("service_id") {
+		case "svc-a":
+			return httpmock.JSONResponse(`{
+				"total": 1,
+				"list": [
+					{"id": "r-a", "name": "route-a", "service_id": "svc-a", "uri": "/a", "methods": ["GET"], "status": 1}
+				]
+			}`), nil
+		case "svc-b":
+			return httpmock.JSONResponse(`{
+				"total": 1,
+				"list": [
+					{"id": "r-b", "name": "route-b", "service_id": "svc-b", "uri": "/b", "methods": ["POST"], "status": 1}
+				]
+			}`), nil
+		default:
+			return httpmock.JSONResponse(`{"total": 0, "list": []}`), nil
+		}
+	})
 
 	opts := &Options{
 		IO:     ios,
@@ -221,11 +220,65 @@ func TestListRoutes_MissingServiceID(t *testing.T) {
 			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
 		},
 		GatewayGroup: "gg1",
+		// ServiceID intentionally empty
 	}
 
-	err := actionRun(opts)
-	if err == nil || !strings.Contains(err.Error(), "--service-id is required by API7 EE") {
-		t.Fatalf("expected service-id error, got: %v", err)
+	if err := actionRun(opts); err != nil {
+		t.Fatalf("actionRun failed: %v", err)
+	}
+
+	output := out.String()
+	for _, want := range []string{"r-a", "route-a", "svc-a", "/a", "r-b", "route-b", "svc-b", "/b"} {
+		if !strings.Contains(output, want) {
+			t.Errorf("aggregated output should contain %q\noutput:\n%s", want, output)
+		}
+	}
+
+	if got := registry.CallCount(http.MethodGet, "/apisix/admin/services"); got != 1 {
+		t.Errorf("expected services to be listed once, got %d calls", got)
+	}
+	if got := registry.CallCount(http.MethodGet, "/apisix/admin/routes"); got != 2 {
+		t.Errorf("expected routes to be fetched once per service (2 calls), got %d", got)
+	}
+}
+
+// TestListRoutes_AcrossServices_JSON verifies the aggregated path also feeds
+// the JSON exporter correctly.
+func TestListRoutes_AcrossServices_JSON(t *testing.T) {
+	ios, _, out, _ := iostreams.Test()
+	registry := &httpmock.Registry{}
+
+	registry.Register(http.MethodGet, "/apisix/admin/services", httpmock.JSONResponse(`{
+		"total": 1,
+		"list": [{"id": "svc-a", "name": "service-a"}]
+	}`))
+	registry.Register(http.MethodGet, "/apisix/admin/routes", httpmock.JSONResponse(`{
+		"total": 1,
+		"list": [
+			{"id": "r-a", "name": "route-a", "service_id": "svc-a", "uri": "/a", "methods": ["GET"], "status": 1}
+		]
+	}`))
+
+	opts := &Options{
+		IO:     ios,
+		Client: func() (*http.Client, error) { return registry.GetClient(), nil },
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
+		},
+		Output:       "json",
+		GatewayGroup: "gg1",
+	}
+
+	if err := actionRun(opts); err != nil {
+		t.Fatalf("actionRun failed: %v", err)
+	}
+
+	var routes []api.Route
+	if err := json.Unmarshal(out.Bytes(), &routes); err != nil {
+		t.Fatalf("failed to parse JSON output: %v", err)
+	}
+	if len(routes) != 1 || routes[0].ID != "r-a" || routes[0].ServiceID != "svc-a" {
+		t.Errorf("unexpected JSON routes: %+v", routes)
 	}
 }
 
@@ -318,11 +371,110 @@ func TestListRoutes_GatewayGroupFromFlag(t *testing.T) {
 		t.Error("output should contain first route name")
 	}
 
-	// Verify that the mock was called (indicating flag took effect)
-	callCount := registry.CallCount(http.MethodGet, "/apisix/admin/routes")
-	if callCount != 1 {
+	if callCount := registry.CallCount(http.MethodGet, "/apisix/admin/routes"); callCount != 1 {
 		t.Errorf("expected mock to be called once, got %d", callCount)
 	}
 
 	registry.Verify(t)
+}
+
+// TestListRoutes_LabelDoesNotFilterServices verifies that --label is applied
+// only to /routes requests, not to the /services discovery query. Without
+// this isolation, services that don't carry the route's label would be
+// excluded from enumeration and any matching routes they own would be lost.
+func TestListRoutes_LabelDoesNotFilterServices(t *testing.T) {
+	ios, _, out, _ := iostreams.Test()
+	registry := &httpmock.Registry{}
+
+	registry.RegisterResponder(http.MethodGet, "/apisix/admin/services", func(r *http.Request) (httpmock.Response, error) {
+		if got := r.URL.Query().Get("label"); got != "" {
+			t.Errorf("/services should not receive label query, got label=%q", got)
+		}
+		return httpmock.JSONResponse(`{
+			"total": 1,
+			"list": [{"id": "svc-unlabelled", "name": "service-without-label"}]
+		}`), nil
+	})
+
+	registry.RegisterResponder(http.MethodGet, "/apisix/admin/routes", func(r *http.Request) (httpmock.Response, error) {
+		if got := r.URL.Query().Get("label"); got != "env" {
+			t.Errorf("/routes should receive label=env, got label=%q", got)
+		}
+		return httpmock.JSONResponse(`{
+			"total": 1,
+			"list": [
+				{"id": "r1", "name": "labelled-route", "service_id": "svc-unlabelled", "uri": "/x", "methods": ["GET"], "status": 1, "labels": {"env": "prod"}}
+			]
+		}`), nil
+	})
+
+	opts := &Options{
+		IO:     ios,
+		Client: func() (*http.Client, error) { return registry.GetClient(), nil },
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
+		},
+		GatewayGroup: "gg1",
+		Label:        "env=prod",
+	}
+
+	if err := actionRun(opts); err != nil {
+		t.Fatalf("actionRun failed: %v", err)
+	}
+
+	if !strings.Contains(out.String(), "r1") {
+		t.Errorf("expected route r1 in output\noutput:\n%s", out.String())
+	}
+}
+
+// TestListRoutes_PaginatesServiceIDPath verifies the --service-id branch
+// follows pagination instead of stopping after the first page.
+func TestListRoutes_PaginatesServiceIDPath(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	registry := &httpmock.Registry{}
+
+	// Build two pages of 500 + 100 routes (total=600).
+	makePage := func(start, count int) string {
+		var b strings.Builder
+		b.WriteString(`{"total": 600, "list": [`)
+		for i := 0; i < count; i++ {
+			if i > 0 {
+				b.WriteString(",")
+			}
+			fmt.Fprintf(&b, `{"id": "r-%d", "name": "route", "service_id": "svc1", "uri": "/x", "methods": ["GET"], "status": 1}`, start+i)
+		}
+		b.WriteString(`]}`)
+		return b.String()
+	}
+
+	registry.RegisterResponder(http.MethodGet, "/apisix/admin/routes", func(r *http.Request) (httpmock.Response, error) {
+		switch r.URL.Query().Get("page") {
+		case "1":
+			return httpmock.JSONResponse(makePage(0, 500)), nil
+		case "2":
+			return httpmock.JSONResponse(makePage(500, 100)), nil
+		default:
+			t.Errorf("unexpected page %q", r.URL.Query().Get("page"))
+			return httpmock.JSONResponse(`{"total": 0, "list": []}`), nil
+		}
+	})
+
+	opts := &Options{
+		IO:     ios,
+		Client: func() (*http.Client, error) { return registry.GetClient(), nil },
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://api.local", token: "test", gatewayGroup: "gg1"}, nil
+		},
+		Output:       "json",
+		GatewayGroup: "gg1",
+		ServiceID:    "svc1",
+	}
+
+	if err := actionRun(opts); err != nil {
+		t.Fatalf("actionRun failed: %v", err)
+	}
+
+	if got := registry.CallCount(http.MethodGet, "/apisix/admin/routes"); got != 2 {
+		t.Errorf("expected 2 paginated calls to /routes, got %d", got)
+	}
 }

@@ -73,6 +73,34 @@ func TestRoute_ListJSON(t *testing.T) {
 	assert.Contains(t, stdout, routeID)
 }
 
+// TestRoute_ListAcrossServices verifies that `route list` without
+// --service-id aggregates routes across every service in the gateway group.
+// API7 EE's /apisix/admin/routes endpoint rejects unscoped listing under
+// access-token auth, so the CLI lists services first and merges per-service
+// route fetches client-side.
+func TestRoute_ListAcrossServices(t *testing.T) {
+	env := setupEnv(t)
+	svcAID := "e2e-service-route-list-across-a"
+	svcBID := "e2e-service-route-list-across-b"
+	routeAID := "e2e-route-list-across-a"
+	routeBID := "e2e-route-list-across-b"
+	t.Cleanup(func() {
+		deleteRouteViaAdmin(t, routeAID)
+		deleteRouteViaAdmin(t, routeBID)
+		deleteServiceViaAdmin(t, svcAID)
+		deleteServiceViaAdmin(t, svcBID)
+	})
+	createTestServiceViaCLI(t, env, svcAID)
+	createTestServiceViaCLI(t, env, svcBID)
+	createTestRouteWithServiceViaCLI(t, env, routeAID, svcAID)
+	createTestRouteWithServiceViaCLI(t, env, routeBID, svcBID)
+
+	stdout, stderr, err := runA7WithEnv(env, "route", "list", "-g", gatewayGroup)
+	require.NoError(t, err, stderr)
+	assert.Contains(t, stdout, routeAID)
+	assert.Contains(t, stdout, routeBID)
+}
+
 func TestRoute_CRUD(t *testing.T) {
 	env := setupEnv(t)
 	svcID := "e2e-service-route-crud"

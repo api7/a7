@@ -8,20 +8,25 @@ The `a7 route` command allows you to manage API7 Enterprise Edition (API7 EE) ro
 
 ### `a7 route list`
 
-Lists routes in the specified gateway group. API7 EE may require
-`--service-id` to list routes; omit it only if your environment supports
-unscoped route listing.
+Lists routes in the specified gateway group. By default, every route across
+every service in the gateway group is returned; pass `--service-id` to
+narrow the result to a single service.
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--gateway-group` | `-g` | | Target gateway group name (required) |
 | `--label` | | | Filter routes by label |
-| `--service-id` | | | Filter routes by service ID |
+| `--service-id` | | | Filter routes to a single service |
 | `--output` | `-o` | `table` | Output format (table, json, yaml) |
 
 **Examples:**
 
-List routes for a service in the "default" gateway group:
+List every route in the "default" gateway group:
+```bash
+a7 route list -g default
+```
+
+List routes for a single service:
 ```bash
 a7 route list -g default --service-id example-service
 ```

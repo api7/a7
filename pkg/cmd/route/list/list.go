@@ -1,7 +1,6 @@
 package list
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	cmd "github.com/api7/a7/pkg/cmd"
 	"github.com/api7/a7/pkg/cmdutil"
 	"github.com/api7/a7/pkg/iostreams"
+	"github.com/api7/a7/pkg/listutil"
 	"github.com/api7/a7/pkg/tableprinter"
 )
 
@@ -42,7 +42,7 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 		},
 	}
 	c.Flags().StringVar(&opts.Label, "label", "", "Filter by label (key=value)")
-	c.Flags().StringVar(&opts.ServiceID, "service-id", "", "Filter by service ID (required by API7 EE)")
+	c.Flags().StringVar(&opts.ServiceID, "service-id", "", "Filter to routes belonging to a single service; omit to list all routes in the gateway group")
 	return c
 }
 
@@ -66,43 +66,33 @@ func actionRun(opts *Options) error {
 	}
 
 	client := api.NewClient(httpClient, cfg.BaseURL())
-	if opts.ServiceID == "" {
-		return fmt.Errorf("--service-id is required by API7 EE")
-	}
-	query := map[string]string{"gateway_group_id": ggID}
-	query["service_id"] = opts.ServiceID
+
 	labelKey, labelValue := cmdutil.ParseLabel(opts.Label)
-	if labelKey != "" {
-		query["label"] = labelKey
-	}
-	body, err := client.Get("/apisix/admin/routes", query)
+	baseQuery := map[string]string{"gateway_group_id": ggID}
+
+	routes, err := fetchRoutes(client, baseQuery, opts.ServiceID, labelKey)
 	if err != nil {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
 	}
 
-	var resp api.ListResponse[api.Route]
-	if err := json.Unmarshal(body, &resp); err != nil {
-		return fmt.Errorf("failed to decode response: %w", err)
-	}
-
 	if labelValue != "" {
-		filtered := make([]api.Route, 0)
-		for _, item := range resp.List {
+		filtered := make([]api.Route, 0, len(routes))
+		for _, item := range routes {
 			if item.Labels != nil && item.Labels[labelKey] == labelValue {
 				filtered = append(filtered, item)
 			}
 		}
-		resp.List = filtered
+		routes = filtered
 	}
 
 	if opts.Output != "" {
 		exporter := cmdutil.NewExporter(opts.Output, opts.IO.Out)
-		return exporter.Write(resp.List)
+		return exporter.Write(routes)
 	}
 
 	tp := tableprinter.New(opts.IO.Out)
-	tp.SetHeaders("ID", "NAME", "PATHS", "METHODS", "STATUS")
-	for _, item := range resp.List {
+	tp.SetHeaders("ID", "NAME", "SERVICE_ID", "PATHS", "METHODS", "STATUS")
+	for _, item := range routes {
 		paths := strings.Join(item.Paths, ",")
 		if paths == "" {
 			paths = item.URI
@@ -110,8 +100,37 @@ func actionRun(opts *Options) error {
 				paths = strings.Join(item.URIs, ",")
 			}
 		}
-		tp.AddRow(item.ID, item.Name, paths, strings.Join(item.Methods, ","), fmt.Sprintf("%d", item.Status))
+		tp.AddRow(item.ID, item.Name, item.ServiceID, paths, strings.Join(item.Methods, ","), fmt.Sprintf("%d", item.Status))
 	}
 
 	return tp.Render()
+}
+
+// fetchRoutes returns the paginated route slice for the request. With a
+// service ID, it pages through a single filtered query; without one, it lists
+// every service in the gateway group and aggregates their routes (API7 EE
+// requires `service_id` on this endpoint under access-token auth).
+//
+// labelKey is applied only to the /routes calls. /services discovery stays
+// label-free so that services without the label are still enumerated and
+// their matching routes returned.
+func fetchRoutes(client *api.Client, baseQuery map[string]string, serviceID, labelKey string) ([]api.Route, error) {
+	routeQuery := make(map[string]string, len(baseQuery)+2)
+	for k, v := range baseQuery {
+		routeQuery[k] = v
+	}
+	if labelKey != "" {
+		routeQuery["label"] = labelKey
+	}
+
+	if serviceID != "" {
+		routeQuery["service_id"] = serviceID
+		return listutil.FetchPaginated[api.Route](client, "/apisix/admin/routes", routeQuery)
+	}
+
+	services, err := listutil.FetchPaginated[api.Service](client, "/apisix/admin/services", baseQuery)
+	if err != nil {
+		return nil, err
+	}
+	return listutil.FetchRoutesForServices(client, services, routeQuery)
 }
