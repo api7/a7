@@ -100,7 +100,59 @@ func ReadConfigFile(file string) (api.ConfigFile, error) {
 		}
 	}
 
+	if err := markPresentUnsupportedSections(trimmed, &cfg); err != nil {
+		return api.ConfigFile{}, err
+	}
+
 	return cfg, nil
+}
+
+// markPresentUnsupportedSections does a key-presence pass over the raw input
+// and flips unsupported-section slice fields from nil to an empty (but non-nil)
+// slice when the key was declared. This lets the downstream `!= nil` checks in
+// ValidateSupportedSections / ValidateConfigFile reject bare (`upstreams:`) and
+// null (`upstreams: null`) forms, not just explicit `upstreams: []`.
+func markPresentUnsupportedSections(trimmed []byte, cfg *api.ConfigFile) error {
+	if len(trimmed) == 0 {
+		return nil
+	}
+
+	keys := map[string]bool{}
+	switch trimmed[0] {
+	case '[':
+		// Top-level JSON/YAML array can't carry section keys.
+		return nil
+	case '{':
+		var raw map[string]json.RawMessage
+		if err := json.Unmarshal(trimmed, &raw); err != nil {
+			return fmt.Errorf("failed to parse JSON file: %w", err)
+		}
+		for k := range raw {
+			keys[k] = true
+		}
+	default:
+		var raw map[string]yaml.Node
+		if err := yaml.Unmarshal(trimmed, &raw); err != nil {
+			return fmt.Errorf("failed to parse YAML file: %w", err)
+		}
+		for k := range raw {
+			keys[k] = true
+		}
+	}
+
+	if keys["upstreams"] && cfg.Upstreams == nil {
+		cfg.Upstreams = []api.Upstream{}
+	}
+	if keys["consumer_groups"] && cfg.ConsumerGroups == nil {
+		cfg.ConsumerGroups = []api.ConsumerGroup{}
+	}
+	if keys["plugin_configs"] && cfg.PluginConfigs == nil {
+		cfg.PluginConfigs = []interface{}{}
+	}
+	if keys["service_templates"] && cfg.ServiceTemplates == nil {
+		cfg.ServiceTemplates = []interface{}{}
+	}
+	return nil
 }
 
 // FetchRemoteConfig fetches all runtime resources from API7 EE
@@ -227,10 +279,9 @@ func ComputeDiff(local, remote api.ConfigFile) (*DiffResult, error) {
 
 func ValidateSupportedSections(cfg api.ConfigFile) error {
 	var unsupported []string
-	// Reject explicitly-empty unsupported sections (e.g. `upstreams: []`)
-	// in addition to non-empty ones. Bare `upstreams:` or `upstreams: null`
-	// unmarshal as nil and slip past this check; that's a separate hardening
-	// (would require yaml.Node / two-pass parsing) tracked elsewhere.
+	// Bare (`upstreams:`) and null (`upstreams: null`) forms are normalized to
+	// non-nil empty slices in ReadConfigFile via markPresentUnsupportedSections,
+	// so this typed nil-check rejects all three shapes ([], bare, null).
 	if cfg.Upstreams != nil {
 		unsupported = append(unsupported, "upstreams")
 	}

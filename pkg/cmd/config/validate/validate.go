@@ -1,20 +1,17 @@
 package validate
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"regexp"
 	"strings"
 
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 
 	"github.com/api7/a7/internal/config"
 	"github.com/api7/a7/pkg/api"
 	cmd "github.com/api7/a7/pkg/cmd"
+	"github.com/api7/a7/pkg/cmd/config/configutil"
 	"github.com/api7/a7/pkg/cmdutil"
 	"github.com/api7/a7/pkg/iostreams"
 )
@@ -54,21 +51,9 @@ func NewCmdValidate(f *cmd.Factory) *cobra.Command {
 }
 
 func validateRun(opts *Options) error {
-	data, err := readFile(opts.File)
+	cfg, err := configutil.ReadConfigFile(opts.File)
 	if err != nil {
 		return err
-	}
-
-	var cfg api.ConfigFile
-	trimmed := bytes.TrimSpace(data)
-	if len(trimmed) > 0 && (trimmed[0] == '{' || trimmed[0] == '[') {
-		if err := json.Unmarshal(trimmed, &cfg); err != nil {
-			return fmt.Errorf("failed to parse JSON file: %w", err)
-		}
-	} else {
-		if err := yaml.Unmarshal(trimmed, &cfg); err != nil {
-			return fmt.Errorf("failed to parse YAML file: %w", err)
-		}
 	}
 
 	errs := ValidateConfigFile(cfg)
@@ -80,14 +65,6 @@ func validateRun(opts *Options) error {
 	return nil
 }
 
-func readFile(path string) ([]byte, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file: %w", err)
-	}
-	return data, nil
-}
-
 func ValidateConfigFile(cfg api.ConfigFile) []string {
 	var errs []string
 
@@ -97,10 +74,9 @@ func ValidateConfigFile(cfg api.ConfigFile) []string {
 		errs = append(errs, "version must be \"1\"")
 	}
 
-	// Reject explicitly-empty unsupported sections (e.g. `upstreams: []`)
-	// in addition to non-empty ones. Bare `upstreams:` or `upstreams: null`
-	// unmarshal as nil and slip past this check; that's a separate hardening
-	// (would require yaml.Node / two-pass parsing) tracked elsewhere.
+	// Bare (`upstreams:`) and null (`upstreams: null`) forms are normalized to
+	// non-nil empty slices in configutil.ReadConfigFile, so this typed nil-check
+	// rejects all three shapes ([], bare, null).
 	if cfg.Upstreams != nil {
 		errs = append(errs, "upstreams are not supported as top-level API7 EE resources; define upstream inline on services instead")
 	}

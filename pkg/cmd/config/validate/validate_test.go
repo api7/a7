@@ -288,9 +288,10 @@ func TestConfigValidate_MissingFileFlag(t *testing.T) {
 }
 
 // TestConfigValidate_EmptyUnsupportedSections asserts that declaring an
-// unsupported top-level section (upstreams, consumer_groups, service_templates)
-// is rejected even when the section is explicitly empty. Presence alone is
-// enough — the user is asserting an unsupported resource type.
+// unsupported top-level section (upstreams, consumer_groups, plugin_configs,
+// service_templates) is rejected for every "empty" shape the user might write:
+// explicit `[]`, bare (`upstreams:` with no value), and `null`. Presence of
+// the key alone is enough — the user is asserting an unsupported resource type.
 func TestConfigValidate_EmptyUnsupportedSections(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -298,24 +299,74 @@ func TestConfigValidate_EmptyUnsupportedSections(t *testing.T) {
 		wantErr string
 	}{
 		{
-			name:    "upstreams",
+			name:    "upstreams_empty_list",
 			body:    "version: \"1\"\nupstreams: []\n",
 			wantErr: "upstreams are not supported",
 		},
 		{
-			name:    "consumer_groups",
+			name:    "upstreams_bare",
+			body:    "version: \"1\"\nupstreams:\n",
+			wantErr: "upstreams are not supported",
+		},
+		{
+			name:    "upstreams_null",
+			body:    "version: \"1\"\nupstreams: null\n",
+			wantErr: "upstreams are not supported",
+		},
+		{
+			name:    "consumer_groups_empty_list",
 			body:    "version: \"1\"\nconsumer_groups: []\n",
 			wantErr: "consumer_groups are not supported",
 		},
 		{
-			name:    "plugin_configs",
+			name:    "consumer_groups_bare",
+			body:    "version: \"1\"\nconsumer_groups:\n",
+			wantErr: "consumer_groups are not supported",
+		},
+		{
+			name:    "consumer_groups_null",
+			body:    "version: \"1\"\nconsumer_groups: null\n",
+			wantErr: "consumer_groups are not supported",
+		},
+		{
+			name:    "plugin_configs_empty_list",
 			body:    "version: \"1\"\nplugin_configs: []\n",
 			wantErr: "plugin_configs are not supported",
 		},
 		{
-			name:    "service_templates",
+			name:    "plugin_configs_bare",
+			body:    "version: \"1\"\nplugin_configs:\n",
+			wantErr: "plugin_configs are not supported",
+		},
+		{
+			name:    "plugin_configs_null",
+			body:    "version: \"1\"\nplugin_configs: null\n",
+			wantErr: "plugin_configs are not supported",
+		},
+		{
+			name:    "service_templates_empty_list",
 			body:    "version: \"1\"\nservice_templates: []\n",
 			wantErr: "service_templates are not supported",
+		},
+		{
+			name:    "service_templates_bare",
+			body:    "version: \"1\"\nservice_templates:\n",
+			wantErr: "service_templates are not supported",
+		},
+		{
+			name:    "service_templates_null",
+			body:    "version: \"1\"\nservice_templates: null\n",
+			wantErr: "service_templates are not supported",
+		},
+		{
+			name:    "json_upstreams_null",
+			body:    `{"version": "1", "upstreams": null}`,
+			wantErr: "upstreams are not supported",
+		},
+		{
+			name:    "json_consumer_groups_null",
+			body:    `{"version": "1", "consumer_groups": null}`,
+			wantErr: "consumer_groups are not supported",
 		},
 	}
 	for _, tc := range cases {
