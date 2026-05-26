@@ -42,13 +42,19 @@ a7 global-rule get 1 -g default
 
 ### `a7 global-rule create`
 
-Creates a new global rule from a JSON or YAML file.
+Creates a new global rule. Each global rule wraps exactly one plugin, and the
+rule's `id` is derived from the plugin name (e.g. a rule for the `cors` plugin
+gets `id: "cors"`). Setting `id` in the payload is rejected; use `a7
+global-rule update` to modify an existing rule.
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--gateway-group` | `-g` | | Target gateway group name (required) |
-| `--file` | `-f` | | Path to the global rule configuration file (required) |
+| `--file` | `-f` | | Path to the global rule configuration file |
+| `--plugins-json` | | | Plugins as JSON map |
 | `--output` | `-o` | `yaml` | Output format (json, yaml) |
+
+One of `--file` or `--plugins-json` must be provided.
 
 **Examples:**
 
@@ -57,10 +63,14 @@ Create a global rule from a JSON file:
 a7 global-rule create -g default -f global-rule.json
 ```
 
+Create a global rule inline:
+```bash
+a7 global-rule create -g default --plugins-json '{"prometheus":{}}'
+```
+
 **Sample `global-rule.json`:**
 ```json
 {
-  "id": "prometheus-rule",
   "plugins": {
     "prometheus": {}
   }
@@ -124,8 +134,7 @@ Key fields in the global rule configuration (sent to `/apisix/admin/global_rules
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | string | Unique identifier for the global rule |
-| `plugins` | object | Plugin configurations for the global rule |
+| `plugins` | object | Plugin configuration. Must contain exactly one plugin; the plugin's key becomes the rule's `id`. |
 
 ## Examples
 
@@ -135,7 +144,6 @@ Apply the Prometheus plugin globally to all requests in the gateway group.
 
 ```json
 {
-  "id": "global-prometheus",
   "plugins": {
     "prometheus": {}
   }
