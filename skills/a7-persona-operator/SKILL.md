@@ -162,7 +162,6 @@ a7 route list -g api-internal --output wide
 ```bash
 a7 global-rule create -g sensitive-apps -f - <<'EOF'
 {
-  "id": "restrict-to-vpc",
   "plugins": {
     "ip-restriction": {
       "whitelist": ["10.0.0.0/16", "172.16.0.0/12"]
@@ -178,7 +177,6 @@ EOF
 # Apply a global rule to enforce OpenID Connect for all routes in a group
 a7 global-rule create -g public-facing -f - <<'EOF'
 {
-  "id": "enforce-oidc",
   "plugins": {
     "openid-connect": {
       "client_id": "...",

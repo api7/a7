@@ -22,7 +22,6 @@ type Options struct {
 	GatewayGroup string
 	File         string
 
-	ID          string
 	PluginsJSON string
 }
 
@@ -30,7 +29,7 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 	opts := &Options{IO: f.IOStreams, Client: f.HttpClient, Config: f.Config}
 	c := &cobra.Command{
 		Use:   "create",
-		Short: "Create a global rule",
+		Short: "Create a global rule (id is derived from the plugin name)",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.Output, _ = c.Flags().GetString("output")
@@ -39,7 +38,6 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 		},
 	}
 
-	c.Flags().StringVar(&opts.ID, "id", "", "Global rule ID")
 	c.Flags().StringVarP(&opts.File, "file", "f", "", "Path to JSON/YAML file with resource definition")
 	c.Flags().StringVar(&opts.PluginsJSON, "plugins-json", "", "Plugins as JSON map")
 
@@ -59,24 +57,27 @@ func actionRun(opts *Options) error {
 	if ggID == "" {
 		return fmt.Errorf("gateway group is required; use --gateway-group flag or set a default in context config")
 	}
+
+	if opts.File == "" && opts.PluginsJSON == "" {
+		return fmt.Errorf("one of --file or --plugins-json is required")
+	}
+
+	httpClient, err := opts.Client()
+	if err != nil {
+		return err
+	}
+	client := api.NewClient(httpClient, cfg.BaseURL())
+
 	if opts.File != "" {
 		payload, err := cmdutil.ReadResourceFile(opts.File, opts.IO.In)
 		if err != nil {
 			return err
 		}
-
-		httpClient, err := opts.Client()
-		if err != nil {
-			return err
+		if _, ok := payload["id"]; ok {
+			return fmt.Errorf(`"id" must not be set in create payload; the id is derived from the plugin name. Use "a7 global-rule update" to modify an existing rule`)
 		}
 
-		client := api.NewClient(httpClient, cfg.BaseURL())
-		var body []byte
-		if id, ok := payload["id"]; ok {
-			body, err = client.Put(fmt.Sprintf("/apisix/admin/global_rules/%v?gateway_group_id=%s", id, ggID), payload)
-		} else {
-			body, err = client.Post("/apisix/admin/global_rules?gateway_group_id="+ggID, payload)
-		}
+		body, err := client.Post("/apisix/admin/global_rules?gateway_group_id="+ggID, payload)
 		if err != nil {
 			return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
 		}
@@ -87,28 +88,14 @@ func actionRun(opts *Options) error {
 		}
 		return cmdutil.NewExporter(format, opts.IO.Out).WriteAPIResponse(body)
 	}
-	if opts.ID == "" {
-		return fmt.Errorf("--id is required")
-	}
-
-	httpClient, err := opts.Client()
-	if err != nil {
-		return err
-	}
 
 	plugins := make(map[string]interface{})
-	if opts.PluginsJSON != "" {
-		if err := json.Unmarshal([]byte(opts.PluginsJSON), &plugins); err != nil {
-			return fmt.Errorf("invalid --plugins-json: %w", err)
-		}
+	if err := json.Unmarshal([]byte(opts.PluginsJSON), &plugins); err != nil {
+		return fmt.Errorf("invalid --plugins-json: %w", err)
 	}
 
-	bodyReq := api.GlobalRule{
-		ID:      opts.ID,
-		Plugins: plugins,
-	}
+	bodyReq := api.GlobalRule{Plugins: plugins}
 
-	client := api.NewClient(httpClient, cfg.BaseURL())
 	body, err := client.Post("/apisix/admin/global_rules?gateway_group_id="+ggID, bodyReq)
 	if err != nil {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
