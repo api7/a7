@@ -6,8 +6,9 @@
 //
 //   - A7_ADMIN_URL: API7 EE Dashboard/control-plane URL (required)
 //   - A7_TOKEN: API7 EE access token (required)
-//   - A7_GATEWAY_GROUP: Gateway group name (default: "default"; resolved to the
-//     real UUID when unset or set to "default")
+//   - A7_GATEWAY_GROUP: Gateway group name. Resolved to the real UUID by
+//     name lookup. When unset/empty, the resolver falls back to the first
+//     non-ingress-controller gateway group.
 //   - A7_GATEWAY_URL: Gateway data-plane URL (optional — only needed for live
 //     gateway/data-plane coverage)
 //   - HTTPBIN_URL: httpbin URL (optional — only needed for live traffic
@@ -45,7 +46,7 @@ var (
 	gatewayURL           string // API7 EE Gateway URL (HTTP)
 	httpbinURL           string
 	adminToken           string // API7 EE access token (a7ee prefix)
-	gatewayGroup         = "default"
+	gatewayGroup         string
 
 	// httpClient with TLS skip verify for self-signed certs.
 	insecureClient = &http.Client{
@@ -84,10 +85,6 @@ func TestMain(m *testing.M) {
 	gatewayURL = envOrDefault("A7_GATEWAY_URL", "")
 	httpbinURL = envOrDefault("HTTPBIN_URL", "")
 	adminToken = envOrDefault("A7_TOKEN", "")
-
-	if g := os.Getenv("A7_GATEWAY_GROUP"); g != "" {
-		gatewayGroup = g
-	}
 
 	if adminURL == "" {
 		fmt.Fprintln(os.Stderr, "A7_ADMIN_URL environment variable is required for E2E tests")
@@ -134,20 +131,21 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
-	// API7 EE uses UUID-style ids for runtime API calls but env vars carry
-	// names; resolve name -> id. An explicit name is honored literally; only
-	// the empty/"default" case falls back to "first writable group".
-	wanted := gatewayGroup
-	if wanted == "default" || wanted == "" {
-		wanted = "default"
-	}
+	// API7 EE uses UUID-style ids for runtime API calls. Resolve name -> id.
+	// An explicit name (incl. "default") is honored literally; only an
+	// unset/empty A7_GATEWAY_GROUP falls back to "first non-ingress group".
+	wanted := os.Getenv("A7_GATEWAY_GROUP")
 	ggID, err := resolveGatewayGroupID(wanted)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to resolve gateway group: %v\n", err)
 		os.Exit(1)
 	}
 	gatewayGroup = ggID
-	fmt.Fprintf(os.Stderr, "Resolved gateway group %q -> %s\n", wanted, gatewayGroup)
+	if wanted != "" {
+		fmt.Fprintf(os.Stderr, "Resolved gateway group %q -> %s\n", wanted, gatewayGroup)
+	} else {
+		fmt.Fprintf(os.Stderr, "Resolved gateway group (first non-ingress) -> %s\n", gatewayGroup)
+	}
 
 	os.Exit(m.Run())
 }
