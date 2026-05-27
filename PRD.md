@@ -4,8 +4,8 @@
 - **Project Name**: a7 (repository: api7/a7)
 - **Purpose**: A command-line tool that wraps the API7 Enterprise Edition Admin API, providing a convenient terminal interface for managing API7 EE resources including both control-plane and data-plane operations.
 - **Target Users**: DevOps engineers, API developers, platform teams, and SREs responsible for managing API7 Enterprise gateways.
-- **Design Philosophy**: AI-first development. Modeled after the [a6 CLI](https://github.com/moonming/a6) (for Apache APISIX), extended for Enterprise-specific capabilities. GA scope is **management-plane stability**: imperative CRUD for supported API7 EE resources, gateway-group scoping, and declarative config. Enterprise modules (RBAC, developer portal, audit logs, custom plugins, access-token management) are deferred post-GA.
-- **Reference Implementation**: [a6 CLI](https://github.com/moonming/a6). a6 features map to a7 where the API7 EE API supports them; items without an EE equivalent are noted as "not supported" or "deferred" below.
+- **Design Philosophy**: AI-first development. Modeled after the [a6 CLI](https://github.com/moonming/a6) (for Apache APISIX), extended for Enterprise-specific capabilities (gateway groups, RBAC, service templates, developer portal, etc.).
+- **Reference Implementation**: [a6 CLI](https://github.com/moonming/a6) — all features in a6 should have equivalents in a7, adapted for API7 EE's dual-API architecture.
 
 ## Problem Statement
 - API7 Enterprise Edition has a comprehensive REST API but lacks an imperative CLI for ad-hoc operations.
@@ -15,20 +15,20 @@
 
 ## Goals and Non-Goals
 
-### Goals (GA Scope)
-- Provide full CRUD for the **supported** API7 EE runtime resources (route, service, consumer, credential, ssl, global-rule, stream-route, plugin-metadata, secret, proto) plus gateway-group on the control plane. 3 APISIX resources (standalone upstream, consumer group, plugin config) are not exposed in API7 EE and a7 does not ship commands for them.
-- Authenticate via **access token** (X-API-KEY with `a7ee` prefix). Session login is deferred (see below).
-- Implement **gateway group** scoping for all runtime operations.
+### Goals
+- Provide full CRUD operations for all API7 EE resources (both control-plane `/api/*` and APISIX admin `/apisix/admin/*` endpoints). Note: 3 APISIX resources (standalone upstream, consumer group, plugin config) are not exposed in API7 EE.
+- Support **multiple authentication modes**: access tokens (X-API-KEY with `a7ee` prefix) and session-based login.
+- Implement **gateway group** scoping for all runtime operations (enterprise-specific concept).
 - Implement context/profile management for switching between multiple API7 EE instances.
 - Support rich terminal output (tables for TTY, JSON/YAML for pipes).
-- Support **file-based resource creation and update** (`-f/--file`) for all supported resource types.
+- Support **file-based resource creation and update** (`-f/--file`) for all resource types.
 - Support **resource export** to YAML/JSON with label filtering for all applicable resources.
 - Provide **declarative configuration** operations (sync, dump, diff, validate) absorbing ADC-like functionality.
 - Provide **debug commands** for real-time log streaming and request tracing.
 - Provide shell completions (bash, zsh, fish, PowerShell).
-- Provide **AI agent skills** (SKILL.md files) describing only supported workflows.
-- Provide comprehensive **documentation**: ADRs, coding standards, golden example, testing strategy, user guides, GA test plan / report.
-- Provide **end-to-end tests** with Docker-based API7 EE test environment, covering full CRUD round-trips through the CLI.
+- Provide **AI agent skills** (SKILL.md files) for AI coding agents to work effectively with API7 EE.
+- Provide comprehensive **documentation**: ADRs, coding standards, golden example, testing strategy, user guides.
+- Provide **end-to-end tests** with Docker-based API7 EE test environment.
 - Maintain an extensible command architecture following a6 patterns (Factory + IOStreams + API Client).
 
 ### Non-Goals
@@ -56,8 +56,8 @@
 3. **Profile/Context config**: stored in `~/.config/a7/config.yaml`
 
 ### Token Types Supported
-- **Access Token** (prefix `a7ee`): Full control-plane + APISIX admin API access, user-scoped. **GA-supported.**
-- **Session Login** (`a7 auth login --username <user> --password <pass>`): cookie-based session auth. **Deferred (post-GA).**
+- **Access Token** (prefix `a7ee`): Full control-plane + APISIX admin API access, user-scoped.
+- **Session Login**: `a7 auth login --username <user> --password <pass>` for cookie-based session auth.
 
 ### Security
 - Prevent sensitive data from appearing in shell history by supporting key input from files or stdin.
@@ -91,13 +91,31 @@ a7 <resource> <action> [args] [flags]
 
 ### Resource Commands — Control Plane (`/api/*`)
 
+#### Service Templates (design-time)
+Service templates are not part of current a7 support. Manage runtime services
+directly and define upstreams inline on services or routes.
+
 #### Gateway Groups
 - `a7 gateway-group list|get|create|update|delete`
 
-#### Service Templates
-> **Not supported in GA**: Manage runtime services directly and define upstreams inline on services or routes.
+#### Tokens (access tokens)
+- `a7 token list|get|create|delete|regenerate`
 
-> The following control-plane modules are **deferred (post-GA)**: access-token management, RBAC (users / roles / permission policies), developer portal (applications, developers), custom plugins, system settings, audit logs. See the "Deferred (Post-GA)" section below.
+#### Users & RBAC
+- `a7 user list|get|create|update|delete`
+- `a7 role list|get|create|update|delete`
+- `a7 permission-policy list|get|create|update|delete`
+
+#### Developer Portal
+- `a7 portal application list|get|create|update|delete`
+- `a7 portal developer list|get|create|delete`
+
+#### Custom Plugins
+- `a7 custom-plugin list|get|create|update|delete`
+
+#### System
+- `a7 system settings [get|update]`
+- `a7 audit-log list`
 
 ### Resource Commands — Published / Runtime (`/apisix/admin/*`)
 
@@ -147,13 +165,13 @@ All runtime commands require `--gateway-group <id>` (or default from context).
 
 ### Utility Commands
 - `a7 context create|use|list|delete|current` — Manage contexts for multiple API7 EE instances.
+- `a7 auth login|logout` — Session-based authentication.
 - `a7 config sync|dump|diff|validate` — Declarative configuration operations.
 - `a7 debug logs` — Stream real-time API7 EE error logs.
 - `a7 debug trace` — Trace request flow through the gateway.
 - `a7 completion bash|zsh|fish|powershell` — Shell completion scripts.
 - `a7 version` — Display version information.
 - `a7 update` — Self-update binary.
-- `a7 auth login|logout`: Session-based authentication. **Deferred (post-GA).**
 
 ## Implementation Phases
 
@@ -209,7 +227,7 @@ All runtime commands require `--gateway-group <id>` (or default from context).
 4. ✅ `docs/testing-strategy.md` — Unit test and E2E test patterns.
 5. ✅ `docs/skills.md` — AI agent skill format specification.
 6. ✅ `docs/documentation-maintenance.md` — Doc update rules and templates.
-7. ✅ `docs/roadmap.md`: Phase status and deferred (post-GA) work.
+7. ✅ `docs/roadmap.md` — Per-PR development plan for Phases 5-9.
 8. ✅ `docs/api7ee-api-spec.md` — API7 EE Admin API reference (16 resources, dual-API).
 9. ✅ `docs/user-guide/` — per-resource user guides (getting-started, configuration, route, service, upstream, consumer, ssl, plugin, global-rule, stream-route, plugin-metadata, credential, secret, proto, declarative-config, gateway-group, debug, bulk-operations).
 
@@ -246,20 +264,16 @@ Port and adapt 40 SKILL.md files from a6, organized by category:
 9. ✅ Makefile targets: `docker-up`, `docker-down`, `test-e2e`.
 10. ✅ All 40 skill examples covered in resource-specific tests.
 
-## Deferred (Post-GA)
-
-These items are **not in GA scope**. They are recorded here so the design intent is preserved, but they are not commitments for the GA release; revisit only after GA management-plane stability is locked in.
-
+### Phase 9 — Enterprise-Specific Features 🔲 FUTURE
 1. 🔲 Token management (create/list/delete/regenerate).
 2. 🔲 RBAC management: user, role, permission-policy.
 3. 🔲 Developer Portal: application, developer, subscription.
 4. 🔲 Custom plugin management.
 5. 🔲 Audit log querying.
-6. 🔲 System settings (get/update).
-7. 🔲 `a7 auth login/logout` (session-based authentication).
-8. 🔲 Interactive mode (fuzzy selection).
-9. 🔲 Extension/plugin system.
-10. 🔲 Bulk operations.
+6. 🔲 `a7 auth login/logout` — Session-based authentication.
+7. 🔲 Interactive mode (fuzzy selection).
+8. 🔲 Extension/plugin system.
+9. 🔲 Bulk operations.
 
 ## UX Requirements
 - **TTY Detection**: Default to tables in interactive terminals and JSON when piped.
@@ -318,6 +332,6 @@ The following table tracks feature parity between a7 and [a6](https://github.com
 | Debug (logs + trace) | ✅ | ✅ | Phase 7 |
 | Self-update | ✅ | ✅ | Phase 7 |
 | E2E tests | ✅ | ✅ | Phase 8 |
-| Bulk operations | ✅ | 🔲 | Deferred (post-GA) |
-| Interactive mode | ✅ | 🔲 | Deferred (post-GA) |
-| Extension system | ✅ | 🔲 | Deferred (post-GA) |
+| Bulk operations | ✅ | 🔲 | Phase 9 |
+| Interactive mode | ✅ | 🔲 | Phase 9 |
+| Extension system | ✅ | 🔲 | Phase 9 |
