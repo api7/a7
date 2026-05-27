@@ -20,10 +20,9 @@ const defaultPageSize = 500
 // When allowOptional is true, the helper converts API errors that mark a
 // resource as unavailable (400/404, see cmdutil.IsOptionalResourceError) into
 // (nil, nil). This is only appropriate for endpoints that genuinely may not be
-// in use on the target gateway (stream_routes, protos, secret_providers,
-// plugin_metadata). All other callers must pass false so transient failures
-// or contract changes surface as errors instead of silently shrinking the
-// result.
+// in use on the target gateway (stream_routes, protos, secret_providers).
+// All other callers must pass false so transient failures or contract changes
+// surface as errors instead of silently shrinking the result.
 func FetchPaginated[T any](client *api.Client, path string, extraQuery map[string]string, allowOptional bool) ([]T, error) {
 	page := 1
 	var items []T

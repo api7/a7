@@ -32,6 +32,7 @@ func TestFetchPaginated_StrictPropagates404(t *testing.T) {
 	if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusNotFound {
 		t.Errorf("expected *api.APIError with status 404, got %T: %v", err, err)
 	}
+	reg.Verify(t)
 }
 
 // TestFetchPaginated_StrictPropagates400 confirms 400 is also propagated when
@@ -46,6 +47,7 @@ func TestFetchPaginated_StrictPropagates400(t *testing.T) {
 	if _, err := FetchPaginated[api.Consumer](client, "/apisix/admin/consumers", nil, false); err == nil {
 		t.Fatal("expected error to propagate when allowOptional=false")
 	}
+	reg.Verify(t)
 }
 
 // TestFetchPaginated_OptionalSwallows404 confirms the opt-in lenient path
@@ -64,6 +66,7 @@ func TestFetchPaginated_OptionalSwallows404(t *testing.T) {
 	if items != nil {
 		t.Errorf("expected nil items, got %v", items)
 	}
+	reg.Verify(t)
 }
 
 // TestFetchPaginated_OptionalSwallows400 mirrors the 404 case: stream mode
@@ -81,6 +84,7 @@ func TestFetchPaginated_OptionalSwallows400(t *testing.T) {
 	if items != nil {
 		t.Errorf("expected nil items, got %v", items)
 	}
+	reg.Verify(t)
 }
 
 // TestFetchPaginated_OptionalStillPropagatesOther5xx confirms allowOptional
@@ -93,6 +97,7 @@ func TestFetchPaginated_OptionalStillPropagatesOther5xx(t *testing.T) {
 	if _, err := FetchPaginated[api.Proto](client, "/apisix/admin/protos", nil, true); err == nil {
 		t.Fatal("expected 500 to propagate even with allowOptional=true")
 	}
+	reg.Verify(t)
 }
 
 // TestFetchRoutesForServices_StrictPropagatesPerServiceError confirms that a
@@ -123,6 +128,7 @@ func TestFetchRoutesForServices_StrictPropagatesPerServiceError(t *testing.T) {
 	if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusNotFound {
 		t.Errorf("expected *api.APIError with status 404, got %T: %v", err, err)
 	}
+	reg.Verify(t)
 }
 
 // TestFetchRoutesForServices_OptionalSkipsPerServiceError documents that the
@@ -149,4 +155,5 @@ func TestFetchRoutesForServices_OptionalSkipsPerServiceError(t *testing.T) {
 	if len(routes) != 1 || routes[0].ID != "r-a" {
 		t.Errorf("expected only svc-a's routes, got %+v", routes)
 	}
+	reg.Verify(t)
 }
