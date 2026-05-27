@@ -26,7 +26,8 @@ type Options struct {
 	Client func() (*http.Client, error)
 	Config func() (config.Config, error)
 
-	File string
+	File   string
+	Output string
 }
 
 func NewCmdValidate(f *cmd.Factory) *cobra.Command {
@@ -44,6 +45,7 @@ func NewCmdValidate(f *cmd.Factory) *cobra.Command {
 			if opts.File == "" {
 				return &cmdutil.FlagError{Err: fmt.Errorf("required flag \"file\" not set")}
 			}
+			opts.Output, _ = c.Flags().GetString("output")
 			return validateRun(opts)
 		},
 	}
@@ -51,6 +53,14 @@ func NewCmdValidate(f *cmd.Factory) *cobra.Command {
 	c.Flags().StringVarP(&opts.File, "file", "f", "", "Path to declarative config file (required)")
 
 	return c
+}
+
+// validateResult is emitted on the success path when -o json or -o yaml is
+// requested. Keeping it small and stable means downstream automation can pipe
+// `a7 config validate -o json | jq '.valid'` without parsing English.
+type validateResult struct {
+	Valid   bool   `json:"valid" yaml:"valid"`
+	Message string `json:"message,omitempty" yaml:"message,omitempty"`
 }
 
 func validateRun(opts *Options) error {
@@ -76,6 +86,13 @@ func validateRun(opts *Options) error {
 		return fmt.Errorf("config validation failed:\n- %s", strings.Join(errs, "\n- "))
 	}
 
+	switch opts.Output {
+	case "json", "yaml":
+		return cmdutil.NewExporter(opts.Output, opts.IO.Out).Write(validateResult{
+			Valid:   true,
+			Message: "Config is valid",
+		})
+	}
 	fmt.Fprintln(opts.IO.Out, "Config is valid")
 	return nil
 }

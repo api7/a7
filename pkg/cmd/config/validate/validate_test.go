@@ -1,11 +1,13 @@
 package validate
 
 import (
+	"encoding/json"
 	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -13,6 +15,18 @@ import (
 	cmd "github.com/api7/a7/pkg/cmd"
 	"github.com/api7/a7/pkg/iostreams"
 )
+
+// newCmdWithOutputFlag returns NewCmdValidate wrapped under a parent cobra.Command
+// that registers the global --output persistent flag, matching how the root
+// command in pkg/cmd/root/root.go wires things up. Unit tests need this so
+// `c.SetArgs("-o", "json")` resolves the inherited flag.
+func newCmdWithOutputFlag(t *testing.T, ios *iostreams.IOStreams) *cobra.Command {
+	t.Helper()
+	root := &cobra.Command{Use: "a7"}
+	root.PersistentFlags().StringP("output", "o", "", "Output format: json, yaml (default: table)")
+	root.AddCommand(NewCmdValidate(factoryWithIO(ios)))
+	return root
+}
 
 type mockConfig struct {
 	baseURL string
@@ -285,6 +299,61 @@ func TestConfigValidate_MissingFileFlag(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "required flag \"file\" not set")
+}
+
+// TestConfigValidate_SuccessOutputJSON asserts that `-o json` on the success
+// path emits a parseable JSON object rather than the human-readable string.
+// Regression for the case where the CLI ignored -o on success and broke
+// scripted callers piping into `jq`.
+func TestConfigValidate_SuccessOutputJSON(t *testing.T) {
+	ios, _, stdout, _ := iostreams.Test()
+
+	filePath := filepath.Join(t.TempDir(), "config.yaml")
+	require.NoError(t, os.WriteFile(filePath, []byte("version: \"1\"\nservices: []\n"), 0o644))
+
+	root := newCmdWithOutputFlag(t, ios)
+	root.SetArgs([]string{"validate", "-f", filePath, "-o", "json"})
+	require.NoError(t, root.Execute())
+
+	var result struct {
+		Valid   bool   `json:"valid"`
+		Message string `json:"message"`
+	}
+	require.NoError(t, json.Unmarshal(stdout.Bytes(), &result), "stdout must be valid JSON, got: %s", stdout.String())
+	assert.True(t, result.Valid)
+	assert.Equal(t, "Config is valid", result.Message)
+}
+
+// TestConfigValidate_SuccessOutputYAML asserts the parallel YAML path.
+func TestConfigValidate_SuccessOutputYAML(t *testing.T) {
+	ios, _, stdout, _ := iostreams.Test()
+
+	filePath := filepath.Join(t.TempDir(), "config.yaml")
+	require.NoError(t, os.WriteFile(filePath, []byte("version: \"1\"\nservices: []\n"), 0o644))
+
+	root := newCmdWithOutputFlag(t, ios)
+	root.SetArgs([]string{"validate", "-f", filePath, "-o", "yaml"})
+	require.NoError(t, root.Execute())
+
+	out := stdout.String()
+	assert.Contains(t, out, "valid: true")
+	assert.Contains(t, out, "message: Config is valid")
+}
+
+// TestConfigValidate_SuccessDefaultOutput keeps the existing
+// "Config is valid" behavior for table / unset output, so users running the
+// command interactively still see the friendly message.
+func TestConfigValidate_SuccessDefaultOutput(t *testing.T) {
+	ios, _, stdout, _ := iostreams.Test()
+
+	filePath := filepath.Join(t.TempDir(), "config.yaml")
+	require.NoError(t, os.WriteFile(filePath, []byte("version: \"1\"\nservices: []\n"), 0o644))
+
+	root := newCmdWithOutputFlag(t, ios)
+	root.SetArgs([]string{"validate", "-f", filePath})
+	require.NoError(t, root.Execute())
+
+	assert.Contains(t, stdout.String(), "Config is valid")
 }
 
 // TestConfigValidate_EmptyUnsupportedSections asserts that declaring an
