@@ -8,7 +8,7 @@ LDFLAGS := -s -w \
 	-X $(MODULE)/internal/version.Commit=$(COMMIT) \
 	-X $(MODULE)/internal/version.Date=$(DATE)
 
-.PHONY: build test test-verbose lint fmt vet check install clean docker-up docker-down validate-skills test-skills test-e2e test-e2e-full
+.PHONY: build test test-verbose lint fmt vet check install clean docker-up docker-down validate-skills test-skills test-e2e test-e2e-full test-e2e-permutation
 
 build:
 	go build -ldflags "$(LDFLAGS)" -o bin/$(BINARY) ./cmd/a7
@@ -57,3 +57,9 @@ test-e2e:
 
 test-e2e-full:
 	go run github.com/onsi/ginkgo/v2/ginkgo -r --procs=1 --tags=e2e --timeout=45m -v ./test/e2e/...
+
+# test-e2e-permutation runs the combinatorial CLI matrix (see test/e2e/permutation_test.go).
+# Writes test/e2e/_artifacts/permutation-report.{json,md}.
+test-e2e-permutation:
+	go run github.com/onsi/ginkgo/v2/ginkgo -r --procs=1 --tags=e2e --timeout=60m \
+		--focus="Permutation" -v ./test/e2e/...

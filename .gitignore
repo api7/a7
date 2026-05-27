@@ -11,3 +11,4 @@ dist/
 *.swp
 *.swo
 *~
+test/e2e/_artifacts/
