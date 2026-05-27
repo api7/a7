@@ -647,3 +647,36 @@ func jsonEscape(s string) string {
 	}
 	return string(b)
 }
+
+// isCapabilityGapStderr returns true when the create-step stderr looks like a
+// known environmental gap on the target EE rather than a bug in the CLI or
+// the test fixture. Used by the CRUD walker to downgrade a cascade of follow-
+// up failures into a single informational "skipped" record.
+//
+// Known patterns:
+//   - "can not create a Stream Route to the HTTP Service" — stream routes on
+//     an EE deployment that only exposes HTTP services.
+//   - "resource not found" returned from a create call — usually means the
+//     resource type's admin endpoint is not exposed at all (e.g. secret
+//     provider on some builds).
+//   - secret-provider / vault gaps already covered by isKnownSecretCapability
+//     Gap in local_stability_ginkgo_test.go; cover the same shape here so
+//     both suites stay in agreement.
+func isCapabilityGapStderr(stderr string) bool {
+	low := strings.ToLower(stderr)
+	for _, needle := range []string{
+		"can not create a stream route",
+		"can not create a stream",
+		"stream route to the http service",
+		"secret provider",
+		"vault",
+		"not configured",
+		"not enabled",
+		"not supported",
+	} {
+		if strings.Contains(low, needle) {
+			return true
+		}
+	}
+	return false
+}

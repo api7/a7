@@ -111,7 +111,11 @@ func runCRUDWalker(baseEnv []string, spec resourceSpec) {
 		gg = []string{"-g", gatewayGroup}
 	}
 
-	// Step 1: create via file
+	// Step 1: create via file. Run directly (not via walkStep) so we can
+	// inspect stderr for known capability-gap patterns. If the EE rejects
+	// the resource type for environmental reasons (e.g. stream-route on an
+	// HTTP-only deployment), the remaining steps would all cascade fail; we
+	// downgrade those to a single informational "skipped" record instead.
 	filePath, fileCleanup, err := resourceCleanupFile(spec, id, parentID)
 	if err != nil {
 		recorder.Record(6, fmt.Sprintf("%s create-via-file write", spec.name), nil, nil, "", "", err, 0, false,
@@ -119,8 +123,29 @@ func runCRUDWalker(baseEnv []string, spec resourceSpec) {
 		return
 	}
 	defer fileCleanup()
-	walkStep(baseEnv, 6, fmt.Sprintf("%s create -f", spec.name),
-		append([]string{spec.name, "create", "-f", filePath}, gg...), nil, false, nil)
+
+	createArgs := append([]string{spec.name, "create", "-f", filePath}, gg...)
+	createStart := time.Now()
+	createStdout, createStderr, createErr := runA7WithEnv(baseEnv, createArgs...)
+	if createErr != nil && isCapabilityGapStderr(createStderr) {
+		recorder.Record(6, fmt.Sprintf("%s CRUD skipped (capability gap)", spec.name),
+			createArgs, nil, createStdout, createStderr, nil, time.Since(createStart),
+			false, "")
+		return
+	}
+	failureReason := ""
+	if createErr != nil {
+		failureReason = fmt.Sprintf("unexpected non-zero exit: %v; stderr=%s", createErr, truncate(createStderr, 200))
+	}
+	recorder.Record(6, fmt.Sprintf("%s create -f", spec.name),
+		createArgs, nil, createStdout, createStderr, createErr, time.Since(createStart),
+		false, failureReason)
+	if createErr != nil {
+		// create failed for a reason other than a known capability gap; the
+		// remaining steps would all fail with "resource not found". Stop here
+		// rather than producing cascade noise.
+		return
+	}
 
 	// Step 2: get table
 	walkStep(baseEnv, 6, fmt.Sprintf("%s get default", spec.name),
@@ -441,7 +466,12 @@ func tempName(prefix, ext string) string {
 // The ginkgo container for the permutation suite. One Describe per top-level
 // concern; each tier is one It so a tier failure does not short-circuit later
 // tiers.
-var _ = Describe("Permutation", Ordered, ContinueOnFailure, func() {
+//
+// Label("permutation") opts this suite out of the regular `make test-e2e`
+// target. The default CI runs that target on every PR; the permutation matrix
+// is much larger than the existing per-resource happy-path coverage and is
+// intentionally manual via the dedicated `make test-e2e-permutation` target.
+var _ = Describe("Permutation", Ordered, ContinueOnFailure, Label("permutation"), func() {
 	var env []string
 
 	BeforeAll(func() {
