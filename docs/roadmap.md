@@ -1,97 +1,61 @@
 # Development Roadmap
 
-This document defines the per-PR development plan for the a7 CLI (API7 Enterprise Edition). Each PR is self-contained and ships implementation code, e2e tests against a real API7 EE instance, and user-facing documentation updates.
+This document tracks phase status for the a7 CLI (API7 Enterprise Edition) and records what is **deferred (post-GA)**. For the authoritative scope statement see `PRD.md`. For per-resource validation against a live API7 EE see `docs/ga-test-plan.md` and `docs/ga-test-report.md`.
 
-> **Status: 🚧 Phase 5 (Documentation) IN PROGRESS**
-
----
-
-## Phase 5 — Documentation (Current)
-
-**Goal**: Establish comprehensive documentation for the a7 project, adapting a6 references for API7 EE specific concepts (dual-API, gateway groups, JSON Patch).
-
-### PR-28: Core Documentation Infrastructure
-
-| File | Purpose |
-|------|---------|
-| `docs/adr/001-tech-stack.md` | Tech stack decisions, dual-API architecture |
-| `docs/coding-standards.md` | Go style, naming (Tokens, Gateway Groups) |
-| `docs/golden-example.md` | Reference implementation for action commands |
-| `docs/testing-strategy.md` | Test patterns, E2E setup for EE |
-| `docs/skills.md` | AI agent skill taxonomy and roadmap |
-| `docs/documentation-maintenance.md` | Rules for keeping docs in sync |
-| `docs/roadmap.md` | THIS file |
-| `docs/api7ee-api-spec.md` | API7 EE Admin API reference |
+> **Status: GA Readiness Handoff.** Phases 1 through 8 are complete. Current effort is GA validation of the management plane against a real API7 EE instance (see issue #22). Phase 9 work is deferred post-GA.
 
 ---
 
-## Phase 6 — AI Agent Skills
+## Completed Phases
 
-**Goal**: Create 40 `SKILL.md` files enabling AI agents to operate API7 EE.
+| Phase | Scope | Status |
+|-------|-------|--------|
+| 1 | Core CLI scaffold (Factory DI, IOStreams, HTTP client, mock framework, completions, `a7 version`) | ✅ |
+| 2 | Resource CRUD for all API7 EE supported resources (route, service, consumer, credential, ssl, plugin, plugin-metadata, global-rule, stream-route, secret, proto, gateway-group) | ✅ |
+| 3 | CLI usability (`-f/--file`, `export`, `--force`, `--label`). `--dry-run` and `--verbose` are partial; see PRD Phase 3. | ✅ (partial flags noted in PRD) |
+| 4 | Declarative configuration (`a7 config dump|diff|sync|validate`) | ✅ |
+| 5 | Documentation (ADR, coding standards, golden example, testing strategy, skills, api spec, user guides) | ✅ |
+| 6 | AI agent skills (40 SKILL.md files, taxonomy in `docs/skills.md`) | ✅ |
+| 7 | Debug & operations (`a7 debug logs`, `a7 debug trace`, `a7 update`) | ✅ |
+| 8 | E2E tests against a real API7 EE Docker stack (per-resource CRUD, config sync/diff/dump/validate, debug, completion, version) | ✅ |
 
-### PR-29: AI Gateway & Enterprise Skills
-- **Skills**: `a7-plugin-ai-proxy`, `a7-plugin-ai-prompt-template`, `a7-plugin-ai-rag`, `a7-recipe-gateway-group`
-- **Focus**: Configuring LLM providers and supported API7 EE runtime resources.
-
-### PR-30: Security & Auth Skills
-- **Skills**: `a7-plugin-key-auth`, `a7-plugin-openid-connect`, `a7-plugin-wolf-rbac`, `a7-recipe-rbac-setup`
-- **Focus**: Enterprise authentication and role-based access control.
-
----
-
-## Phase 7 — Debug & Operations
-
-**Goal**: Implement operational tools for troubleshooting API7 EE environments.
-
-### PR-31: Debug Logs & Trace
-- **Commands**: `a7 debug logs`, `a7 debug trace <route-id>`
-- **Function**: Stream logs from EE control-plane/gateway; trace request execution path with EE-specific headers.
-
-### PR-32: Resource Update (JSON Patch)
-- **Commands**: `a7 <resource> update <id> --patch`
-- **Function**: Implement precise updates using JSON Patch (RFC 6902) as required by API7 EE.
+For the detailed checklist of items under each phase see `PRD.md` "Implementation Phases".
 
 ---
 
-## Phase 8 — E2E Tests
+## GA Readiness Handoff (Current Focus)
 
-**Goal**: Establish a robust integration test suite against a real API7 EE instance.
+Tracking issue: **api7/a7#22**. Scope: management-plane validation against API7 EE 3.9.12, not new enterprise features and not data-plane traffic forwarding.
 
-### PR-33: E2E Framework & Smoke Tests
-- **Infrastructure**: `docker-compose.yml` with API7 EE + etcd + httpbin.
-- **Scenarios**: `TestSmoke_Connectivity`, `TestAuth_TokenValidation`.
+Working items live as sub-issues of #22. Exit criteria (copied from #22 for visibility):
 
-### PR-34: Resource Lifecycle Tests
-- **Scenarios**: CRUD tests for all 16 core resources, verifying gateway group scoping and dual-API prefix handling.
+- Core resource commands work against real API7 EE.
+- E2E covers full CRUD round-trips through the CLI.
+- `config sync/diff/dump/validate` work with service-centered resources.
+- Unsupported resources are removed or clearly blocked.
+- Docs and skills only describe supported workflows.
+- CI green on `master`.
+- Release notes state supported API7 EE versions and unsupported resources.
 
----
-
-## Phase 9 — Enterprise Features
-
-**Goal**: Finalize CLI support for advanced API7 EE modules.
-
-### PR-35: Token & RBAC Management
-- **Commands**: `a7 token create|list`, `a7 user/role/policy`
-- **Focus**: Managing CLI access tokens and platform permissions.
-
-### PR-36: Custom Plugin Extensions
-- **Commands**: `a7 custom-plugin` (future)
-- **Focus**: Custom Lua plugin management when exposed by supported API7 EE APIs.
+`docs/ga-test-plan.md` is the per-resource test plan; `docs/ga-test-report.md` records run dispositions.
 
 ---
 
-## Summary Table (Remaining Phases)
+## Deferred (Post-GA)
 
-| Phase | PR | Scope | Validation |
-|-------|----|-------|------------|
-| 5 | PR-28 | Documentation Infrastructure | Doc linting |
-| 6 | PR-29 | AI Gateway Skills | Skill validation |
-| 6 | PR-30 | Security & Auth Skills | Skill validation |
-| 7 | PR-31 | Debug Tooling | E2E output validation |
-| 7 | PR-32 | JSON Patch Support | API integration tests |
-| 8 | PR-33 | E2E Test Infra | Smoke tests |
-| 8 | PR-34 | Resource CRUD E2E | Lifecycle validation |
-| 9 | PR-35 | Token & RBAC | Multi-user E2E |
-| 9 | PR-36 | Custom Plugin Extensions | Feature-specific E2E |
+Previously tracked as "Phase 9". These are **not** in GA scope and not committed for the GA release. They are recorded so the design intent is preserved; revisit only after GA stability is locked in.
 
-**Total**: 9 PRs to reach production readiness.
+| Area | Notes |
+|------|-------|
+| Token management (`a7 token ...`) | Access-token CRUD on the control plane. |
+| RBAC (`a7 user`, `a7 role`, `a7 permission-policy`) | User and role administration. |
+| Developer Portal (`a7 portal ...`) | Applications, developers, subscriptions. |
+| Custom plugin management (`a7 custom-plugin ...`) | When and if the EE API surface stabilizes. |
+| Audit log querying (`a7 audit-log list`) | |
+| System settings (`a7 system settings ...`) | |
+| Session login (`a7 auth login|logout`) | Cookie-based session auth; access tokens cover GA. |
+| Interactive mode | Fuzzy selection across resources. |
+| Extension / plugin system | Out-of-tree CLI extensions. |
+| Bulk operations | Multi-resource batch CRUD. |
+
+These items are listed under "Deferred (Post-GA)" in `PRD.md`.

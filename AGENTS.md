@@ -14,14 +14,19 @@ a7 is a Go CLI wrapping the API7 Enterprise Edition Admin API (control-plane + A
 
 | Document | Purpose | When to Read |
 |---|---|---|
-| `AGENTS.md` (this file) | Entry point, development guide | Always — read first |
-| `PRD.md` | Product requirements, command design, scope | Before adding features |
-| `docs/roadmap.md` | Per-PR development plan with dependencies | Before starting any PR |
+| `AGENTS.md` (this file) | Entry point, development guide | Always, read first |
+| `PRD.md` | Product requirements, GA scope, command design | Before adding features |
+| `docs/roadmap.md` | Phase status and deferred (post-GA) work | Before starting any PR |
+| `docs/ga-test-plan.md` | GA validation checklist against a real API7 EE | Before / during GA verification |
+| `docs/ga-test-report.md` | Recorded GA test runs and dispositions | When checking what has been validated |
 | `docs/api7ee-api-spec.md` | API7 EE Admin API reference | When implementing API client |
 | `docs/adr/001-tech-stack.md` | Architecture decisions, patterns | Before writing code |
 | `docs/golden-example.md` | Complete reference implementation | When adding new commands |
 | `docs/coding-standards.md` | Go style, naming conventions | Before writing code |
 | `docs/testing-strategy.md` | Test patterns and practices | Before writing tests |
+| `docs/documentation-maintenance.md` | Rules for keeping docs in sync | When updating docs |
+| `docs/skills.md` | AI agent skill taxonomy and SKILL.md format | When adding or editing `skills/` entries |
+| `docs/user-guide/` | Per-resource user-facing guides | When changing user-visible behavior |
 
 ### Project Structure
 
@@ -32,50 +37,50 @@ a7/
 │   └── e2e.yml                    # E2E tests with real API7 EE
 ├── cmd/a7/main.go                 # Entry point
 ├── pkg/cmd/                       # Command implementations
-│   ├── root/root.go              # Root command registration
 │   ├── factory.go                # Factory DI container
+│   ├── root/                     # Root command registration
 │   ├── route/                    # Published route commands
 │   ├── service/                  # Published service commands
 │   ├── consumer/                 # Consumer commands
+│   ├── credential/               # Consumer credential commands
 │   ├── ssl/                      # SSL certificate commands
-│   ├── plugin/                   # Plugin listing commands
+│   ├── plugin/                   # Plugin listing (read-only)
+│   ├── plugin-metadata/          # Plugin metadata commands
 │   ├── global-rule/              # Global rule commands
 │   ├── stream-route/             # Stream route commands
-│   ├── secret-provider/          # Secret provider commands
-│   ├── plugin-metadata/          # Plugin metadata commands
-│   ├── credential/               # Consumer credential commands
-│   ├── route-template/           # Route template commands (EE)
+│   ├── secret/                   # Secret commands
+│   ├── proto/                    # Proto commands
 │   ├── gateway-group/            # Gateway group commands (EE)
-│   ├── service-registry/         # Service registry commands (EE)
-│   ├── token/                    # Access token commands (EE)
-│   ├── user/                     # User management commands (EE)
-│   ├── role/                     # Role & RBAC commands (EE)
-│   ├── permission-policy/        # Permission policy commands (EE)
-│   ├── custom-plugin/            # Custom plugin commands (EE)
-│   ├── portal/                   # Developer portal commands (EE)
-│   ├── audit-log/                # Audit log commands (EE)
 │   ├── context/                  # Context/profile management
-│   ├── auth/                     # Auth login/logout commands
 │   ├── config/                   # Declarative config commands
+│   ├── debug/                    # Debug logs and trace
 │   ├── completion/               # Shell completion
+│   ├── update/                   # Self-update command
 │   └── version/                  # Version command
 ├── pkg/api/                       # API7 EE API client
 │   ├── client.go                 # HTTP client (auth transport)
 │   ├── types.go                  # Generic response types
 │   ├── types_route.go            # Route types
 │   ├── types_service.go          # Service types
-│   ├── types_upstream.go         # Upstream types
+│   ├── types_upstream.go         # Upstream types (inline-only in API7 EE)
 │   ├── types_consumer.go         # Consumer types
+│   ├── types_consumer_group.go   # Consumer group types (not exposed)
+│   ├── types_credential.go       # Credential types
 │   ├── types_ssl.go              # SSL types
+│   ├── types_plugin.go           # Plugin types
+│   ├── types_plugin_metadata.go  # Plugin metadata types
+│   ├── types_global_rule.go      # Global rule types
+│   ├── types_stream_route.go     # Stream route types
+│   ├── types_secret.go           # Secret types
+│   ├── types_proto.go            # Proto types
 │   ├── types_gateway_group.go    # Gateway group types (EE)
-│   ├── types_token.go            # Token types (EE)
-│   └── ...                       # One types file per resource
+│   └── types_config.go           # Declarative config types
 ├── pkg/iostreams/                 # I/O abstraction (TTY detection)
 ├── pkg/cmdutil/                   # Shared command utilities
-│   ├── errors.go                 # Error formatting
-│   └── exporter.go               # JSON/YAML export
 ├── pkg/tableprinter/              # Table output rendering
 ├── pkg/httpmock/                  # HTTP mocking for tests
+├── pkg/listutil/                  # Shared list/paging helpers
+├── pkg/selector/                  # Label selector parsing
 ├── internal/config/               # Configuration/context management
 ├── internal/version/              # Build version info
 ├── internal/update/               # Self-update mechanism
@@ -98,13 +103,13 @@ a7/
 
 ### API7 EE vs APISIX Differences (Key)
 - API7 EE uses `/apisix/admin/services` for runtime services. Upstreams are modeled inline on services and routes.
-- Gateway groups scope all operations. Many endpoints require `gateway_group_id` as a query parameter.
+- Gateway groups scope all runtime operations. Many endpoints require `gateway_group_id` as a query parameter.
 - Auth tokens use `a7ee` prefix (access token).
 - PATCH endpoints use JSON Patch (RFC 6902) arrays, not merge-patch.
-- Enterprise-specific resources: gateway groups, RBAC (users/roles/policies), developer portal, audit logs, custom plugins, service registries, tokens.
+- GA scope covers management-plane CRUD plus gateway groups. Enterprise modules such as RBAC, developer portal, audit logs, custom plugins, service registries, and access-token management are out of scope for GA, see `PRD.md` "Deferred (Post-GA)" and `docs/roadmap.md`.
 
 ### Resources NOT Exposed in API7 EE
-The following APISIX resources do **not** have REST API endpoints in API7 Enterprise Edition:
+The following APISIX resources do **not** have REST API endpoints in API7 Enterprise Edition and a7 does not expose commands for them:
 - **Standalone Upstream** (`/apisix/admin/upstreams`): Returns "resource not found". Upstreams exist only inline within services and routes.
 - **Consumer Group** (`/apisix/admin/consumer_groups`): No endpoint exposed.
 - **Plugin Config** (`/apisix/admin/plugin_configs`): No endpoint exposed.
@@ -146,7 +151,7 @@ make clean            # Remove build artifacts
 <type>(<scope>): <description>
 
 Types: feat, fix, refactor, test, docs, chore
-Scope: route, upstream, service, consumer, ssl, plugin, context, api, config, gateway-group, token, etc.
+Scope: route, service, consumer, credential, ssl, plugin, plugin-metadata, global-rule, stream-route, secret, proto, gateway-group, context, config, debug, api, etc.
 Example: feat(gateway-group): add gateway-group list command with table output
 ```
 
