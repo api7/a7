@@ -36,6 +36,9 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 		Args:    cobra.NoArgs,
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.Output, _ = c.Flags().GetString("output")
+			if err := cmdutil.ValidateOutputFormat(opts.Output); err != nil {
+				return err
+			}
 			opts.Label, _ = c.Flags().GetString("label")
 			return listRun(opts)
 		},
@@ -66,7 +69,7 @@ func listRun(opts *Options) error {
 		return fmt.Errorf("failed to list gateway groups: %s", cmdutil.FormatAPIError(err))
 	}
 
-	if opts.Output == "json" || opts.Output == "yaml" {
+	if cmdutil.IsStructuredOutput(opts.Output) {
 		exp := cmdutil.NewExporter(opts.Output, opts.IO.Out)
 		var result api.ListResponse[api.GatewayGroup]
 		if err := json.Unmarshal(body, &result); err != nil {
