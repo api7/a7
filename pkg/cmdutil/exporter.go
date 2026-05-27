@@ -8,6 +8,30 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// ValidateOutputFormat returns nil when the given --output value is one of
+// the four shapes the CLI claims to support: empty (default table), "table",
+// "json", "yaml". Anything else (typos, abbreviations, unknown formats) is
+// rejected with a clear message listing the valid set.
+//
+// Every command that accepts `-o`/`--output` should call this before
+// dispatching, so a typo like `-o jzon` fails fast with a helpful error
+// instead of silently falling back to table rendering.
+func ValidateOutputFormat(format string) error {
+	switch format {
+	case "", "table", "json", "yaml":
+		return nil
+	default:
+		return fmt.Errorf("unsupported output format: %q (valid: table, json, yaml)", format)
+	}
+}
+
+// IsStructuredOutput returns true when the format should be rendered through
+// the JSON/YAML exporter, false when the command should fall through to its
+// own table renderer. Pairs with ValidateOutputFormat.
+func IsStructuredOutput(format string) bool {
+	return format == "json" || format == "yaml"
+}
+
 // Exporter formats and writes data to the given writer.
 type Exporter struct {
 	format string

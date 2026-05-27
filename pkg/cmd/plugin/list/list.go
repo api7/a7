@@ -36,6 +36,9 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 		Args:    cobra.NoArgs,
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.Output, _ = c.Flags().GetString("output")
+			if err := cmdutil.ValidateOutputFormat(opts.Output); err != nil {
+				return err
+			}
 			opts.GatewayGroup, _ = c.Flags().GetString("gateway-group")
 			return actionRun(opts)
 		},
@@ -74,8 +77,8 @@ func actionRun(opts *Options) error {
 		return fmt.Errorf("failed to parse plugin list response: %w", err)
 	}
 
-	if opts.Output == "json" {
-		return cmdutil.NewExporter("json", opts.IO.Out).Write(plugins)
+	if cmdutil.IsStructuredOutput(opts.Output) {
+		return cmdutil.NewExporter(opts.Output, opts.IO.Out).Write(plugins)
 	}
 
 	for _, name := range plugins {

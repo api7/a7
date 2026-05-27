@@ -30,6 +30,9 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 		Args:    cobra.NoArgs,
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.Output, _ = c.Flags().GetString("output")
+			if err := cmdutil.ValidateOutputFormat(opts.Output); err != nil {
+				return err
+			}
 			return listRun(opts, f)
 		},
 	}
@@ -49,7 +52,7 @@ func listRun(opts *Options, f *cmd.Factory) error {
 		return nil
 	}
 
-	if opts.Output != "" {
+	if cmdutil.IsStructuredOutput(opts.Output) {
 		type contextJSON struct {
 			Name          string `json:"name"`
 			Server        string `json:"server"`

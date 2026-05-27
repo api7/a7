@@ -40,6 +40,9 @@ func NewCmd(f *cmd.Factory) *cobra.Command {
 		Args:    cobra.NoArgs,
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.Output, _ = c.Flags().GetString("output")
+			if err := cmdutil.ValidateOutputFormat(opts.Output); err != nil {
+				return err
+			}
 			opts.GatewayGroup, _ = c.Flags().GetString("gateway-group")
 			opts.Label, _ = c.Flags().GetString("label")
 			return actionRun(opts)
@@ -95,7 +98,7 @@ func actionRun(opts *Options) error {
 		resp.List = filtered
 	}
 
-	if opts.Output != "" {
+	if cmdutil.IsStructuredOutput(opts.Output) {
 		return cmdutil.NewExporter(opts.Output, opts.IO.Out).Write(api.RedactSSLs(resp.List))
 	}
 
