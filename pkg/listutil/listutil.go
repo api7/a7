@@ -16,10 +16,14 @@ const defaultPageSize = 500
 
 // FetchPaginated fetches all items from a paginated API7 EE list endpoint.
 // API7 EE returns ListResponse[T] with .List []T directly (no ListItem wrapper).
-// Returns (nil, nil) when the endpoint signals that the resource is unavailable
-// (e.g., stream mode disabled, endpoint not exposed); callers that need stricter
-// behavior should inspect the returned error themselves.
-func FetchPaginated[T any](client *api.Client, path string, extraQuery map[string]string) ([]T, error) {
+//
+// When allowOptional is true, the helper converts API errors that mark a
+// resource as unavailable (400/404, see cmdutil.IsOptionalResourceError) into
+// (nil, nil). This is only appropriate for endpoints that genuinely may not be
+// in use on the target gateway (stream_routes, protos, secret_providers).
+// All other callers must pass false so transient failures or contract changes
+// surface as errors instead of silently shrinking the result.
+func FetchPaginated[T any](client *api.Client, path string, extraQuery map[string]string, allowOptional bool) ([]T, error) {
 	page := 1
 	var items []T
 
@@ -34,7 +38,7 @@ func FetchPaginated[T any](client *api.Client, path string, extraQuery map[strin
 
 		body, err := client.Get(path, query)
 		if err != nil {
-			if cmdutil.IsOptionalResourceError(err) {
+			if allowOptional && cmdutil.IsOptionalResourceError(err) {
 				return nil, nil
 			}
 			return nil, err
@@ -61,9 +65,10 @@ func FetchPaginated[T any](client *api.Client, path string, extraQuery map[strin
 // route in a gateway group must iterate services and merge.
 //
 // baseQuery is merged into each per-service request (e.g. `gateway_group_id`).
-// A service whose route fetch returns an "optional resource" error (400/404)
-// is skipped, matching the behavior of FetchPaginated.
-func FetchRoutesForServices(client *api.Client, services []api.Service, baseQuery map[string]string) ([]api.Route, error) {
+// allowOptional is threaded into the underlying FetchPaginated call; pass
+// false unless the caller has a specific reason to tolerate per-service
+// 400/404 responses.
+func FetchRoutesForServices(client *api.Client, services []api.Service, baseQuery map[string]string, allowOptional bool) ([]api.Route, error) {
 	seen := make(map[string]bool)
 	var allRoutes []api.Route
 	for _, svc := range services {
@@ -75,7 +80,7 @@ func FetchRoutesForServices(client *api.Client, services []api.Service, baseQuer
 			q[k] = v
 		}
 		q["service_id"] = svc.ID
-		routes, err := FetchPaginated[api.Route](client, "/apisix/admin/routes", q)
+		routes, err := FetchPaginated[api.Route](client, "/apisix/admin/routes", q, allowOptional)
 		if err != nil {
 			return nil, err
 		}
