@@ -287,6 +287,102 @@ func TestConfigValidate_MissingFileFlag(t *testing.T) {
 	assert.Contains(t, err.Error(), "required flag \"file\" not set")
 }
 
+func TestConfigValidate_DuplicateCredentialName(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+
+	filePath := filepath.Join(t.TempDir(), "config.yaml")
+	err := os.WriteFile(filePath, []byte(`
+version: "1"
+consumers:
+  - username: alice
+    credentials:
+      - name: dup
+        plugins:
+          key-auth:
+            key: a
+      - name: dup
+        plugins:
+          key-auth:
+            key: b
+`), 0o644)
+	require.NoError(t, err)
+
+	c := NewCmdValidate(factoryWithIO(ios))
+	c.SetArgs([]string{"-f", filePath})
+	err = c.Execute()
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate name \"dup\"")
+}
+
+func TestConfigValidate_CredentialMissingName(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+
+	filePath := filepath.Join(t.TempDir(), "config.yaml")
+	err := os.WriteFile(filePath, []byte(`
+version: "1"
+consumers:
+  - username: alice
+    credentials:
+      - plugins:
+          key-auth:
+            key: x
+`), 0o644)
+	require.NoError(t, err)
+
+	c := NewCmdValidate(factoryWithIO(ios))
+	c.SetArgs([]string{"-f", filePath})
+	err = c.Execute()
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "name is required")
+}
+
+func TestConfigValidate_CredentialNoPlugin(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+
+	filePath := filepath.Join(t.TempDir(), "config.yaml")
+	err := os.WriteFile(filePath, []byte(`
+version: "1"
+consumers:
+  - username: alice
+    credentials:
+      - name: empty
+`), 0o644)
+	require.NoError(t, err)
+
+	c := NewCmdValidate(factoryWithIO(ios))
+	c.SetArgs([]string{"-f", filePath})
+	err = c.Execute()
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "at least one plugin is required")
+}
+
+func TestConfigValidate_CredentialInvalidName(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+
+	filePath := filepath.Join(t.TempDir(), "config.yaml")
+	err := os.WriteFile(filePath, []byte(`
+version: "1"
+consumers:
+  - username: alice
+    credentials:
+      - name: "bad name with spaces"
+        plugins:
+          key-auth:
+            key: x
+`), 0o644)
+	require.NoError(t, err)
+
+	c := NewCmdValidate(factoryWithIO(ios))
+	c.SetArgs([]string{"-f", filePath})
+	err = c.Execute()
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid name")
+}
+
 // TestConfigValidate_EmptyUnsupportedSections asserts that declaring an
 // unsupported top-level section (upstreams, consumer_groups, service_templates)
 // is rejected even when the section is explicitly empty. Presence alone is

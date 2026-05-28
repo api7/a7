@@ -249,6 +249,104 @@ routes:
 	reg.Verify(t)
 }
 
+func TestConfigDiff_CredentialCreateUpdateDelete(t *testing.T) {
+	reg := &httpmock.Registry{}
+	registerEmptyResources(reg, map[string]bool{"/apisix/admin/consumers": true})
+	// Two consumers: alice (kept, credentials change) and bob (kept too).
+	reg.Register(http.MethodGet, "/apisix/admin/consumers", httpmock.JSONResponse(`{
+		"total": 2,
+		"list": [{"username":"alice"},{"username":"bob"}]
+	}`))
+	// alice has two credentials remotely: k-update (will be updated) and
+	// k-delete (will be removed).
+	reg.Register(http.MethodGet, "/apisix/admin/consumers/alice/credentials", httpmock.JSONResponse(`{
+		"total": 2,
+		"list": [
+			{"name":"k-update","plugins":{"key-auth":{"key":"old"}}},
+			{"name":"k-delete","plugins":{"key-auth":{"key":"gone"}}}
+		]
+	}`))
+	// bob has no credentials remotely; local config will add one.
+	reg.Register(http.MethodGet, "/apisix/admin/consumers/bob/credentials", httpmock.JSONResponse(`{
+		"total": 0,
+		"list": []
+	}`))
+
+	local := writeConfig(t, `
+version: "1"
+consumers:
+  - username: alice
+    credentials:
+      - name: k-update
+        plugins:
+          key-auth:
+            key: new
+      - name: k-create
+        plugins:
+          key-auth:
+            key: brand-new
+  - username: bob
+    credentials:
+      - name: bob-key
+        plugins:
+          key-auth:
+            key: bob-secret
+`)
+
+	ios, _, stdout, _ := iostreams.Test()
+	c := NewCmdDiff(newFactory(reg, ios))
+	c.SetArgs([]string{"-f", local})
+	err := c.Execute()
+
+	require.Error(t, err)
+	assert.True(t, cmdutil.IsSilent(err))
+	out := stdout.String()
+	assert.Contains(t, out, "credentials: create=2 update=1 delete=1")
+	assert.Contains(t, out, "CREATE alice/k-create")
+	assert.Contains(t, out, "CREATE bob/bob-key")
+	assert.Contains(t, out, "UPDATE alice/k-update")
+	assert.Contains(t, out, "DELETE alice/k-delete")
+	// Consumers themselves should be unchanged because we strip credentials
+	// out of the consumer payload before diffing.
+	assert.Contains(t, out, "consumers: create=0 update=0 delete=0")
+	reg.Verify(t)
+}
+
+func TestConfigDiff_CredentialDeleteCascadeWithConsumer(t *testing.T) {
+	reg := &httpmock.Registry{}
+	registerEmptyResources(reg, map[string]bool{"/apisix/admin/consumers": true})
+	// Consumer alice exists remotely with credentials, but local config has
+	// no consumers. The consumer DELETE cascades to credentials server-side,
+	// so the credential delete entries should be filtered out.
+	reg.Register(http.MethodGet, "/apisix/admin/consumers", httpmock.JSONResponse(`{
+		"total": 1,
+		"list": [{"username":"alice"}]
+	}`))
+	reg.Register(http.MethodGet, "/apisix/admin/consumers/alice/credentials", httpmock.JSONResponse(`{
+		"total": 1,
+		"list": [{"name":"cascaded","plugins":{"key-auth":{"key":"x"}}}]
+	}`))
+
+	local := writeConfig(t, `
+version: "1"
+`)
+
+	ios, _, stdout, _ := iostreams.Test()
+	c := NewCmdDiff(newFactory(reg, ios))
+	c.SetArgs([]string{"-f", local})
+	err := c.Execute()
+
+	require.Error(t, err)
+	assert.True(t, cmdutil.IsSilent(err))
+	out := stdout.String()
+	assert.Contains(t, out, "consumers: create=0 update=0 delete=1")
+	assert.Contains(t, out, "DELETE alice")
+	// Credential delete must be filtered out by cascade logic.
+	assert.Contains(t, out, "credentials: create=0 update=0 delete=0")
+	assert.NotContains(t, out, "DELETE alice/cascaded")
+	reg.Verify(t)
+}
+
 func TestConfigDiff_StreamRoutesDisabled(t *testing.T) {
 	reg := &httpmock.Registry{}
 	registerEmptyResources(reg, map[string]bool{"/apisix/admin/stream_routes": true})

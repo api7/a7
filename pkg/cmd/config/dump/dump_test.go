@@ -231,6 +231,48 @@ func TestConfigDump_FileFlag(t *testing.T) {
 	reg.Verify(t)
 }
 
+func TestConfigDump_ConsumerCredentials(t *testing.T) {
+	reg := &httpmock.Registry{}
+	registerEmptyResources(reg, map[string]bool{"/apisix/admin/consumers": true})
+	reg.Register(http.MethodGet, "/apisix/admin/consumers", httpmock.JSONResponse(`{
+		"total": 1,
+		"list": [{"username":"alice"}]
+	}`))
+	reg.Register(http.MethodGet, "/apisix/admin/consumers/alice/credentials", httpmock.JSONResponse(`{
+		"total": 1,
+		"list": [{
+			"id": "alice-key",
+			"name": "alice-key",
+			"plugins": {"key-auth": {"key": "alice-secret"}}
+		}]
+	}`))
+
+	ios, _, stdout, _ := iostreams.Test()
+
+	c := NewCmdDump(newFactory(reg, ios))
+	c.SetArgs([]string{"--output", "json"})
+	require.NoError(t, c.Execute())
+
+	var result map[string]interface{}
+	require.NoError(t, json.Unmarshal(stdout.Bytes(), &result))
+
+	consumers, ok := result["consumers"].([]interface{})
+	require.True(t, ok, "consumers section missing")
+	require.Len(t, consumers, 1)
+	alice := consumers[0].(map[string]interface{})
+	assert.Equal(t, "alice", alice["username"])
+
+	creds, ok := alice["credentials"].([]interface{})
+	require.True(t, ok, "alice should have credentials")
+	require.Len(t, creds, 1)
+	cred := creds[0].(map[string]interface{})
+	assert.Equal(t, "alice-key", cred["name"])
+	plugins := cred["plugins"].(map[string]interface{})
+	keyAuth := plugins["key-auth"].(map[string]interface{})
+	assert.Equal(t, "alice-secret", keyAuth["key"])
+	reg.Verify(t)
+}
+
 func TestConfigDump_StreamRoutesDisabled(t *testing.T) {
 	reg := &httpmock.Registry{}
 	registerEmptyResources(reg, map[string]bool{"/apisix/admin/stream_routes": true})

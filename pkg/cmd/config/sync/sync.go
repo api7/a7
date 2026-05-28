@@ -208,6 +208,15 @@ func putPathAndBody(resourceType, key string, payload map[string]interface{}) (s
 		return fmt.Sprintf("/apisix/admin/services/%s", key), payload, nil
 	case "consumers":
 		return "/apisix/admin/consumers", payload, nil
+	case "credentials":
+		username, credName, err := splitCredentialKey(key, payload)
+		if err != nil {
+			return "", nil, err
+		}
+		// Strip diff-only metadata before sending the body upstream.
+		delete(payload, "_consumer_username")
+		delete(payload, "_diff_key")
+		return fmt.Sprintf("/apisix/admin/consumers/%s/credentials/%s", username, credName), payload, nil
 	case "ssl":
 		return fmt.Sprintf("/apisix/admin/ssls/%s", key), payload, nil
 	case "global_rules":
@@ -234,6 +243,12 @@ func deletePath(resourceType, key string) (string, error) {
 		return fmt.Sprintf("/apisix/admin/services/%s", key), nil
 	case "consumers":
 		return fmt.Sprintf("/apisix/admin/consumers/%s", key), nil
+	case "credentials":
+		username, credName, err := splitCredentialKey(key, nil)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("/apisix/admin/consumers/%s/credentials/%s", username, credName), nil
 	case "ssl":
 		return fmt.Sprintf("/apisix/admin/ssls/%s", key), nil
 	case "global_rules":
@@ -249,6 +264,26 @@ func deletePath(resourceType, key string) (string, error) {
 	default:
 		return "", fmt.Errorf("unsupported resource type: %s", resourceType)
 	}
+}
+
+// splitCredentialKey turns the composite diff key "<username>/<credname>"
+// into its two parts. Prefers `_consumer_username` from the payload when
+// present (handles credential names that happen to contain a `/`).
+func splitCredentialKey(key string, payload map[string]interface{}) (string, string, error) {
+	if payload != nil {
+		if raw, ok := payload["_consumer_username"].(string); ok && raw != "" {
+			rest := strings.TrimPrefix(key, raw+"/")
+			if rest == key || rest == "" {
+				return "", "", fmt.Errorf("invalid credential key %q (consumer %q)", key, raw)
+			}
+			return raw, rest, nil
+		}
+	}
+	idx := strings.Index(key, "/")
+	if idx <= 0 || idx >= len(key)-1 {
+		return "", "", fmt.Errorf("invalid credential key %q (expected <username>/<name>)", key)
+	}
+	return key[:idx], key[idx+1:], nil
 }
 
 func cloneMap(in map[string]interface{}) map[string]interface{} {

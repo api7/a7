@@ -226,6 +226,116 @@ version: "1"
 	reg.Verify(t)
 }
 
+func TestConfigSync_Credential_RoundTrip(t *testing.T) {
+	reg := &httpmock.Registry{}
+	registerEmptyResources(reg, map[string]bool{"/apisix/admin/consumers": true})
+	// Remote: consumer alice with two credentials; one will be updated, one
+	// will be deleted because it is not in the local config.
+	reg.Register(http.MethodGet, "/apisix/admin/consumers", httpmock.JSONResponse(`{
+		"total": 1,
+		"list": [{"username":"alice"}]
+	}`))
+	reg.Register(http.MethodGet, "/apisix/admin/consumers/alice/credentials", httpmock.JSONResponse(`{
+		"total": 2,
+		"list": [
+			{"name":"k-update","plugins":{"key-auth":{"key":"old"}}},
+			{"name":"k-delete","plugins":{"key-auth":{"key":"gone"}}}
+		]
+	}`))
+
+	// Capture the PUT bodies so we can assert the payload is clean and the
+	// path follows /apisix/admin/consumers/{user}/credentials/{name}.
+	reg.RegisterResponder(http.MethodPut, "/apisix/admin/consumers/alice/credentials/k-create", func(r *http.Request) (httpmock.Response, error) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			return httpmock.Response{}, err
+		}
+		var payload map[string]interface{}
+		require.NoError(t, json.Unmarshal(body, &payload))
+		assert.NotContains(t, payload, "_consumer_username")
+		assert.NotContains(t, payload, "_diff_key")
+		assert.Equal(t, "k-create", payload["name"])
+		return httpmock.JSONResponse(`{"name":"k-create"}`), nil
+	})
+	reg.RegisterResponder(http.MethodPut, "/apisix/admin/consumers/alice/credentials/k-update", func(r *http.Request) (httpmock.Response, error) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			return httpmock.Response{}, err
+		}
+		var payload map[string]interface{}
+		require.NoError(t, json.Unmarshal(body, &payload))
+		plugins, ok := payload["plugins"].(map[string]interface{})
+		require.True(t, ok)
+		keyAuth, ok := plugins["key-auth"].(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, "new", keyAuth["key"])
+		return httpmock.JSONResponse(`{"name":"k-update"}`), nil
+	})
+	reg.Register(http.MethodDelete, "/apisix/admin/consumers/alice/credentials/k-delete", httpmock.JSONResponse(`{"message":"deleted"}`))
+	// Consumers themselves are unchanged because credentials are stripped
+	// out of the consumer payload before diffing, so no consumer PUT/DELETE
+	// is expected here.
+
+	local := writeConfig(t, `
+version: "1"
+consumers:
+  - username: alice
+    credentials:
+      - name: k-update
+        plugins:
+          key-auth:
+            key: new
+      - name: k-create
+        plugins:
+          key-auth:
+            key: brand-new
+`)
+
+	ios, _, stdout, _ := iostreams.Test()
+	c := NewCmdSync(newFactory(reg, ios))
+	c.SetArgs([]string{"-f", local})
+	require.NoError(t, c.Execute())
+
+	assert.Equal(t, 1, reg.CallCount(http.MethodPut, "/apisix/admin/consumers/alice/credentials/k-create"))
+	assert.Equal(t, 1, reg.CallCount(http.MethodPut, "/apisix/admin/consumers/alice/credentials/k-update"))
+	assert.Equal(t, 1, reg.CallCount(http.MethodDelete, "/apisix/admin/consumers/alice/credentials/k-delete"))
+	assert.Contains(t, stdout.String(), "credentials: created=1 updated=1 deleted=1")
+	reg.Verify(t)
+}
+
+func TestConfigSync_CredentialCascadeOnConsumerDelete(t *testing.T) {
+	reg := &httpmock.Registry{}
+	registerEmptyResources(reg, map[string]bool{"/apisix/admin/consumers": true})
+	// Remote consumer alice with one credential. Local config has nothing,
+	// so alice (and her credential) must be removed. The server cascades the
+	// credential delete, so the sync layer should NOT issue an explicit
+	// DELETE for the credential.
+	reg.Register(http.MethodGet, "/apisix/admin/consumers", httpmock.JSONResponse(`{
+		"total": 1,
+		"list": [{"username":"alice"}]
+	}`))
+	reg.Register(http.MethodGet, "/apisix/admin/consumers/alice/credentials", httpmock.JSONResponse(`{
+		"total": 1,
+		"list": [{"name":"cascaded","plugins":{"key-auth":{"key":"x"}}}]
+	}`))
+	reg.Register(http.MethodDelete, "/apisix/admin/consumers/alice", httpmock.JSONResponse(`{"message":"deleted"}`))
+
+	local := writeConfig(t, `
+version: "1"
+`)
+
+	ios, _, stdout, _ := iostreams.Test()
+	c := NewCmdSync(newFactory(reg, ios))
+	c.SetArgs([]string{"-f", local})
+	require.NoError(t, c.Execute())
+
+	assert.Equal(t, 1, reg.CallCount(http.MethodDelete, "/apisix/admin/consumers/alice"))
+	assert.Equal(t, 0, reg.CallCount(http.MethodDelete, "/apisix/admin/consumers/alice/credentials/cascaded"))
+	assert.Contains(t, stdout.String(), "consumers: created=0 updated=0 deleted=1")
+	assert.Contains(t, stdout.String(), "credentials: created=0 updated=0 deleted=0")
+	reg.Verify(t)
+}
+
 func TestConfigSync_ValidationFailureStopsSync(t *testing.T) {
 	reg := &httpmock.Registry{}
 	ios, _, _, _ := iostreams.Test()

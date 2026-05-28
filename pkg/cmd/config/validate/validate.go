@@ -160,6 +160,31 @@ func ValidateConfigFile(cfg api.ConfigFile) []string {
 		} else {
 			seenConsumerUsernames[username] = struct{}{}
 		}
+
+		// Validate nested credentials. Each credential needs a name that
+		// matches the standard id pattern, must be unique inside the same
+		// consumer, and should declare at least one plugin (the whole point
+		// of a credential).
+		seenCredentialNames := map[string]struct{}{}
+		for j, cred := range c.Credentials {
+			name := strings.TrimSpace(cred.Name)
+			if name == "" {
+				errs = append(errs, fmt.Sprintf("consumers[%d].credentials[%d]: name is required", i, j))
+				continue
+			}
+			if !idPattern.MatchString(name) {
+				errs = append(errs, fmt.Sprintf("consumers[%d].credentials[%d]: invalid name %q", i, j, name))
+				continue
+			}
+			if _, ok := seenCredentialNames[name]; ok {
+				errs = append(errs, fmt.Sprintf("consumers[%d].credentials[%d]: duplicate name %q", i, j, name))
+				continue
+			}
+			seenCredentialNames[name] = struct{}{}
+			if len(cred.Plugins) == 0 {
+				errs = append(errs, fmt.Sprintf("consumers[%d].credentials[%d]: at least one plugin is required", i, j))
+			}
+		}
 	}
 
 	errs = append(errs, checkDuplicateIDs(cfg.SSL, func(s api.SSL) string { return s.ID }, "ssl")...)

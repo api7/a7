@@ -39,6 +39,7 @@ type DiffResult struct {
 	Routes         ResourceDiff `json:"routes"`
 	Services       ResourceDiff `json:"services"`
 	Consumers      ResourceDiff `json:"consumers"`
+	Credentials    ResourceDiff `json:"credentials"`
 	SSL            ResourceDiff `json:"ssl"`
 	GlobalRules    ResourceDiff `json:"global_rules"`
 	StreamRoutes   ResourceDiff `json:"stream_routes"`
@@ -66,6 +67,9 @@ type DiffSection struct {
 
 // Sections returns diff sections ordered for safe sync:
 // base resources first, then dependents (routes reference upstreams/services).
+// Credentials follow consumers so creates happen after their parent consumer
+// exists; on the reverse pass (deletes) they precede consumers so credentials
+// scheduled for explicit deletion are removed before their parent is.
 func (r *DiffResult) Sections() []DiffSection {
 	if r == nil {
 		return nil
@@ -73,6 +77,7 @@ func (r *DiffResult) Sections() []DiffSection {
 	return []DiffSection{
 		{Name: "services", Diff: r.Services},
 		{Name: "consumers", Diff: r.Consumers},
+		{Name: "credentials", Diff: r.Credentials},
 		{Name: "ssl", Diff: r.SSL},
 		{Name: "global_rules", Diff: r.GlobalRules},
 		{Name: "protos", Diff: r.Protos},
@@ -127,6 +132,23 @@ func FetchRemoteConfig(client *api.Client, gatewayGroup string) (*api.ConfigFile
 	if err != nil {
 		return nil, err
 	}
+	// Fetch credentials per consumer and attach. API7 EE exposes credentials
+	// as nested resources under /apisix/admin/consumers/{username}/credentials.
+	for i, c := range consumers {
+		if strings.TrimSpace(c.Username) == "" {
+			continue
+		}
+		creds, err := listutil.FetchPaginated[api.Credential](
+			client,
+			fmt.Sprintf("/apisix/admin/consumers/%s/credentials", c.Username),
+			query,
+			true,
+		)
+		if err != nil {
+			return nil, err
+		}
+		consumers[i].Credentials = creds
+	}
 	ssl, err := listutil.FetchPaginated[api.SSL](client, "/apisix/admin/ssls", query, false)
 	if err != nil {
 		return nil, err
@@ -177,6 +199,19 @@ func ComputeDiff(local, remote api.ConfigFile) (*DiffResult, error) {
 		return nil, fmt.Errorf("remote config: %w", err)
 	}
 
+	// Build flat credential lists keyed by `username/name`. We carry the
+	// parent username inside the value map so the sync layer can route each
+	// PUT/DELETE to the correct nested endpoint.
+	localCredItems := flattenCredentials(local.Consumers)
+	remoteCredItems := flattenCredentials(remote.Consumers)
+
+	// Strip credentials off the consumer payloads we feed into the consumer
+	// diff: credentials live in their own section, and including them in the
+	// consumer body would produce spurious consumer updates whenever only
+	// credentials changed.
+	localConsumers := stripConsumerCredentials(local.Consumers)
+	remoteConsumers := stripConsumerCredentials(remote.Consumers)
+
 	type diffSpec struct {
 		local    interface{}
 		remote   interface{}
@@ -187,7 +222,8 @@ func ComputeDiff(local, remote api.ConfigFile) (*DiffResult, error) {
 	specs := []diffSpec{
 		{local.Routes, remote.Routes, "id", "routes"},
 		{local.Services, remote.Services, "id", "services"},
-		{local.Consumers, remote.Consumers, "username", "consumers"},
+		{localConsumers, remoteConsumers, "username", "consumers"},
+		{localCredItems, remoteCredItems, "_diff_key", "credentials"},
 		{local.SSL, remote.SSL, "id", "ssl"},
 		{local.GlobalRules, remote.GlobalRules, "id", "global_rules"},
 		{local.StreamRoutes, remote.StreamRoutes, "id", "stream_routes"},
@@ -213,17 +249,107 @@ func ComputeDiff(local, remote api.ConfigFile) (*DiffResult, error) {
 		diffs[i] = d
 	}
 
+	// Cascade: when a consumer is deleted, API7 EE deletes its credentials
+	// server-side. Drop any credential-delete entry whose parent consumer is
+	// also being deleted so the sync layer doesn't try to delete a child of a
+	// gone parent (would 404).
+	consumerDeletes := make(map[string]struct{}, len(diffs[2].Delete))
+	for _, item := range diffs[2].Delete {
+		consumerDeletes[item.Key] = struct{}{}
+	}
+	diffs[3] = filterCascadedCredentialDeletes(diffs[3], consumerDeletes)
+
 	return &DiffResult{
 		Routes:         diffs[0],
 		Services:       diffs[1],
 		Consumers:      diffs[2],
-		SSL:            diffs[3],
-		GlobalRules:    diffs[4],
-		StreamRoutes:   diffs[5],
-		Protos:         diffs[6],
-		Secrets:        diffs[7],
-		PluginMetadata: diffs[8],
+		Credentials:    diffs[3],
+		SSL:            diffs[4],
+		GlobalRules:    diffs[5],
+		StreamRoutes:   diffs[6],
+		Protos:         diffs[7],
+		Secrets:        diffs[8],
+		PluginMetadata: diffs[9],
 	}, nil
+}
+
+// flattenCredentials produces a flat list of credential maps where each
+// element carries a synthetic `_diff_key` of "<username>/<credential-name>"
+// and a `_consumer_username` field. The diff layer keys on `_diff_key`; the
+// sync layer reads `_consumer_username` and the original credential name to
+// build the nested URL.
+func flattenCredentials(consumers []api.Consumer) []map[string]interface{} {
+	var out []map[string]interface{}
+	for _, c := range consumers {
+		if strings.TrimSpace(c.Username) == "" {
+			continue
+		}
+		for _, cred := range c.Credentials {
+			if strings.TrimSpace(cred.Name) == "" {
+				continue
+			}
+			b, err := json.Marshal(cred)
+			if err != nil {
+				continue
+			}
+			var m map[string]interface{}
+			if err := json.Unmarshal(b, &m); err != nil {
+				continue
+			}
+			m["_consumer_username"] = c.Username
+			m["_diff_key"] = c.Username + "/" + cred.Name
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+// stripConsumerCredentials returns a copy of consumers with the Credentials
+// field cleared so the consumer-level diff/sync ignores it.
+func stripConsumerCredentials(consumers []api.Consumer) []api.Consumer {
+	if len(consumers) == 0 {
+		return nil
+	}
+	out := make([]api.Consumer, len(consumers))
+	for i, c := range consumers {
+		c.Credentials = nil
+		out[i] = c
+	}
+	return out
+}
+
+// filterCascadedCredentialDeletes removes credential-delete entries whose
+// parent consumer is also being deleted. The server cascades the deletion,
+// so explicitly issuing a DELETE on the credential would 404.
+func filterCascadedCredentialDeletes(diff ResourceDiff, deletedConsumers map[string]struct{}) ResourceDiff {
+	if len(deletedConsumers) == 0 || len(diff.Delete) == 0 {
+		return diff
+	}
+	filtered := make([]ResourceItem, 0, len(diff.Delete))
+	for _, item := range diff.Delete {
+		username := credentialParentUsername(item)
+		if _, gone := deletedConsumers[username]; gone {
+			continue
+		}
+		filtered = append(filtered, item)
+	}
+	diff.Delete = filtered
+	return diff
+}
+
+// credentialParentUsername extracts the consumer username from a credential
+// diff item. Prefers the embedded `_consumer_username` field; falls back to
+// splitting the composite diff key on the first `/`.
+func credentialParentUsername(item ResourceItem) string {
+	if item.Value != nil {
+		if raw, ok := item.Value["_consumer_username"].(string); ok && raw != "" {
+			return raw
+		}
+	}
+	if idx := strings.Index(item.Key, "/"); idx > 0 {
+		return item.Key[:idx]
+	}
+	return ""
 }
 
 func ValidateSupportedSections(cfg api.ConfigFile) error {

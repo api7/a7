@@ -6,4 +6,9 @@ type Consumer struct {
 	Desc     string                 `json:"desc,omitempty" yaml:"desc,omitempty"`
 	Labels   map[string]string      `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Plugins  map[string]interface{} `json:"plugins,omitempty" yaml:"plugins,omitempty"`
+	// Credentials holds the consumer's credentials in declarative configs.
+	// API7 EE exposes credentials under /apisix/admin/consumers/{username}/credentials,
+	// but the field is omitted from the consumer payload sent to the parent
+	// endpoint — the sync layer extracts and applies credentials separately.
+	Credentials []Credential `json:"credentials,omitempty" yaml:"credentials,omitempty"`
 }
