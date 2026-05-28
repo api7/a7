@@ -101,6 +101,10 @@ func ReadConfigFile(file string) (api.ConfigFile, error) {
 		}
 	}
 
+	if err := applyEnvSubstitution(&cfg); err != nil {
+		return api.ConfigFile{}, fmt.Errorf("failed to apply env substitution: %w", err)
+	}
+
 	return cfg, nil
 }
 

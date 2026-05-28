@@ -226,6 +226,54 @@ version: "1"
 	reg.Verify(t)
 }
 
+func TestConfigSync_SubstitutesEnvVarsInRequestBody(t *testing.T) {
+	t.Setenv("ROUTE_NAME", "hello-from-env")
+	t.Setenv("ROUTE_URI", "/from-env")
+
+	reg := &httpmock.Registry{}
+	registerEmptyResources(reg, nil)
+
+	var capturedName, capturedURI string
+	reg.RegisterResponder(http.MethodPut, "/apisix/admin/routes/r1", func(r *http.Request) (httpmock.Response, error) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			return httpmock.Response{}, err
+		}
+		var payload map[string]interface{}
+		if err := json.Unmarshal(body, &payload); err != nil {
+			return httpmock.Response{}, err
+		}
+		if v, ok := payload["name"].(string); ok {
+			capturedName = v
+		}
+		if v, ok := payload["uri"].(string); ok {
+			capturedURI = v
+		}
+		return httpmock.JSONResponse(`{"id":"r1"}`), nil
+	})
+
+	local := writeConfig(t, `
+version: "1"
+routes:
+  - id: r1
+    name: "Route ${ROUTE_NAME}"
+    uri: "${ROUTE_URI}"
+    service_id: svc-1
+`)
+
+	ios, _, stdout, _ := iostreams.Test()
+	c := NewCmdSync(newFactory(reg, ios))
+	c.SetArgs([]string{"-f", local})
+	err := c.Execute()
+
+	require.NoError(t, err)
+	assert.Equal(t, 1, reg.CallCount(http.MethodPut, "/apisix/admin/routes/r1"))
+	assert.Equal(t, "Route hello-from-env", capturedName, "request payload should have ${ROUTE_NAME} resolved")
+	assert.Equal(t, "/from-env", capturedURI, "request payload should have ${ROUTE_URI} resolved")
+	assert.Contains(t, stdout.String(), "Sync completed")
+	reg.Verify(t)
+}
+
 func TestConfigSync_ValidationFailureStopsSync(t *testing.T) {
 	reg := &httpmock.Registry{}
 	ios, _, _, _ := iostreams.Test()
