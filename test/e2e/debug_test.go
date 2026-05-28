@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,6 +18,15 @@ import (
 
 func createDebugTraceRoute(t testTB, env []string, serviceID, routeID, path string, extraFields string) {
 	t.Helper()
+	// Inject a default proxy-rewrite to a path go-httpbin always serves so
+	// waitForDebugTraceRoute can use a non-404 response as the propagation
+	// signal. Without this every synthetic route path (e.g. /debug-trace-test)
+	// hits httpbin at the same path, which returns 404 forever, and the wait
+	// loop cannot distinguish "route not propagated" from "upstream has no
+	// such path". Callers that supply their own plugins keep them.
+	if !strings.Contains(extraFields, "plugins") {
+		extraFields += `, "plugins": {"proxy-rewrite": {"uri": "/anything"}}`
+	}
 	routeJSON := fmt.Sprintf(`{
 		"id": %q,
 		"name": %q,
