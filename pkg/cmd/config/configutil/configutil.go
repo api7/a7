@@ -107,9 +107,24 @@ func ReadConfigFile(file string) (api.ConfigFile, error) {
 // FetchRemoteConfig fetches all runtime resources from API7 EE
 // for the given gateway group and assembles them into a ConfigFile.
 func FetchRemoteConfig(client *api.Client, gatewayGroup string) (*api.ConfigFile, error) {
+	return FetchRemoteConfigWithLabels(client, gatewayGroup, nil)
+}
+
+// FetchRemoteConfigWithLabels behaves like FetchRemoteConfig but also forwards
+// a label selector to every list endpoint that supports server-side filtering.
+// API7 EE expects labels as `labels[key]=value` query params.
+//
+// Plugin metadata is fetched per-plugin from /apisix/admin/plugin_metadata/<name>
+// and the upstream plugin list endpoint (/apisix/admin/plugins/list) is not
+// label-aware, so labels are not forwarded there: callers must treat plugin
+// metadata as label-selector no-op.
+func FetchRemoteConfigWithLabels(client *api.Client, gatewayGroup string, labels map[string]string) (*api.ConfigFile, error) {
 	query := map[string]string{}
 	if gatewayGroup != "" {
 		query["gateway_group_id"] = gatewayGroup
+	}
+	for k, v := range labels {
+		query[fmt.Sprintf("labels[%s]", k)] = v
 	}
 
 	services, err := listutil.FetchPaginated[api.Service](client, "/apisix/admin/services", query, false)
@@ -118,7 +133,8 @@ func FetchRemoteConfig(client *api.Client, gatewayGroup string) (*api.ConfigFile
 	}
 
 	// API7 EE requires service_id when listing routes with access tokens.
-	// Fetch routes per service and aggregate.
+	// Fetch routes per service and aggregate. The label selector is propagated
+	// so route filtering happens server-side as well.
 	routes, err := listutil.FetchRoutesForServices(client, services, query, false)
 	if err != nil {
 		return nil, err
@@ -148,7 +164,13 @@ func FetchRemoteConfig(client *api.Client, gatewayGroup string) (*api.ConfigFile
 		return nil, err
 	}
 
-	pluginMetadata, err := fetchPluginMetadata(client, query)
+	// Plugin metadata does not have a list endpoint; the per-plugin lookup is
+	// not label-filtered, so we strip the labels from the plugin metadata query.
+	pluginQuery := map[string]string{}
+	if gatewayGroup != "" {
+		pluginQuery["gateway_group_id"] = gatewayGroup
+	}
+	pluginMetadata, err := fetchPluginMetadata(client, pluginQuery)
 	if err != nil {
 		return nil, err
 	}

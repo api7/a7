@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -21,8 +22,9 @@ type Options struct {
 	Client func() (*http.Client, error)
 	Config func() (config.Config, error)
 
-	Output string
-	File   string
+	Output        string
+	File          string
+	LabelSelector []string
 }
 
 func NewCmdDump(f *cmd.Factory) *cobra.Command {
@@ -44,11 +46,42 @@ func NewCmdDump(f *cmd.Factory) *cobra.Command {
 
 	c.Flags().StringVarP(&opts.Output, "output", "o", "yaml", "Output format: yaml, json")
 	c.Flags().StringVarP(&opts.File, "file", "f", "", "Write output to file")
+	c.Flags().StringArrayVar(&opts.LabelSelector, "label-selector", nil,
+		"Filter dumped resources by label in key=value format (repeatable; multiple selectors are AND-combined)")
 
 	return c
 }
 
+// parseLabelSelectors converts repeated key=value flags into a labels map.
+// Whitespace around key and value is preserved (callers typically supply
+// shell-quoted values). An empty key, or any entry missing "=", is rejected
+// so users get a clear error instead of silently filtering on the wrong field.
+func parseLabelSelectors(raw []string) (map[string]string, error) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	out := make(map[string]string, len(raw))
+	for _, item := range raw {
+		idx := strings.Index(item, "=")
+		if idx < 0 {
+			return nil, fmt.Errorf("invalid --label-selector %q: expected key=value", item)
+		}
+		key := item[:idx]
+		value := item[idx+1:]
+		if key == "" {
+			return nil, fmt.Errorf("invalid --label-selector %q: key is empty", item)
+		}
+		out[key] = value
+	}
+	return out, nil
+}
+
 func dumpRun(opts *Options) error {
+	labels, err := parseLabelSelectors(opts.LabelSelector)
+	if err != nil {
+		return err
+	}
+
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
@@ -63,7 +96,7 @@ func dumpRun(opts *Options) error {
 
 	gatewayGroup := cfg.GatewayGroup()
 
-	remote, err := configutil.FetchRemoteConfig(client, gatewayGroup)
+	remote, err := configutil.FetchRemoteConfigWithLabels(client, gatewayGroup, labels)
 	if err != nil {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
 	}

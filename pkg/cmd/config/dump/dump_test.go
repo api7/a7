@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -229,6 +230,133 @@ func TestConfigDump_FileFlag(t *testing.T) {
 	assert.Contains(t, string(content), "version: \"1\"")
 	assert.Contains(t, string(content), "uri: /hello")
 	reg.Verify(t)
+}
+
+// captureLabelsResponder returns an httpmock responder that records the
+// `labels[*]` query parameters of each request into the given map (keyed by
+// the inner label name) and returns an empty paginated list response. The
+// responder is safe to register on multiple endpoints because all writes go
+// through a shared map keyed by label name, so the assertion below is on the
+// set of labels API7 EE saw, not on which endpoint asked first.
+func captureLabelsResponder(captured map[string]string) func(*http.Request) (httpmock.Response, error) {
+	return func(req *http.Request) (httpmock.Response, error) {
+		for k, vs := range req.URL.Query() {
+			if !strings.HasPrefix(k, "labels[") || !strings.HasSuffix(k, "]") {
+				continue
+			}
+			inner := strings.TrimSuffix(strings.TrimPrefix(k, "labels["), "]")
+			if len(vs) > 0 {
+				captured[inner] = vs[0]
+			}
+		}
+		return httpmock.JSONResponse(`{"total":0,"list":[]}`), nil
+	}
+}
+
+func TestConfigDump_LabelSelector_PassesQueryParam(t *testing.T) {
+	reg := &httpmock.Registry{}
+	captured := map[string]string{}
+
+	// Register every list endpoint with a label-capturing responder so we can
+	// confirm the flag is plumbed through to *all* of them, not just one.
+	for _, path := range []string{
+		"/apisix/admin/services",
+		"/apisix/admin/consumers",
+		"/apisix/admin/ssls",
+		"/apisix/admin/global_rules",
+		"/apisix/admin/stream_routes",
+		"/apisix/admin/protos",
+		"/apisix/admin/secret_providers",
+	} {
+		reg.RegisterResponder(http.MethodGet, path, captureLabelsResponder(captured))
+	}
+	reg.Register(http.MethodGet, "/apisix/admin/plugins/list", httpmock.JSONResponse(`[]`))
+
+	ios, _, _, _ := iostreams.Test()
+
+	c := NewCmdDump(newFactory(reg, ios))
+	c.SetArgs([]string{"--output", "json", "--label-selector", "team=alpha"})
+	err := c.Execute()
+	require.NoError(t, err)
+
+	assert.Equal(t, map[string]string{"team": "alpha"}, captured)
+}
+
+func TestConfigDump_LabelSelector_Repeatable(t *testing.T) {
+	reg := &httpmock.Registry{}
+	captured := map[string]string{}
+
+	for _, path := range []string{
+		"/apisix/admin/services",
+		"/apisix/admin/consumers",
+		"/apisix/admin/ssls",
+		"/apisix/admin/global_rules",
+		"/apisix/admin/stream_routes",
+		"/apisix/admin/protos",
+		"/apisix/admin/secret_providers",
+	} {
+		reg.RegisterResponder(http.MethodGet, path, captureLabelsResponder(captured))
+	}
+	reg.Register(http.MethodGet, "/apisix/admin/plugins/list", httpmock.JSONResponse(`[]`))
+
+	ios, _, _, _ := iostreams.Test()
+
+	c := NewCmdDump(newFactory(reg, ios))
+	c.SetArgs([]string{
+		"--output", "json",
+		"--label-selector", "a=1",
+		"--label-selector", "b=2",
+	})
+	err := c.Execute()
+	require.NoError(t, err)
+
+	assert.Equal(t, map[string]string{"a": "1", "b": "2"}, captured)
+}
+
+func TestConfigDump_LabelSelector_InvalidFormat(t *testing.T) {
+	reg := &httpmock.Registry{}
+	// No mocks should be hit: we expect dumpRun to fail before any HTTP call.
+
+	ios, _, _, _ := iostreams.Test()
+
+	c := NewCmdDump(newFactory(reg, ios))
+	c.SetArgs([]string{"--label-selector", "noequals"})
+	c.SilenceErrors = true
+	c.SilenceUsage = true
+	err := c.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "label-selector")
+	assert.Contains(t, err.Error(), "noequals")
+}
+
+// TestConfigDump_LabelSelector_PerServiceRouteFetch asserts that the label
+// selector is also threaded into the per-service /apisix/admin/routes call,
+// which is fetched via FetchRoutesForServices rather than the generic list
+// helper. Without this, dump would over-fetch routes that don't match the
+// requested label set.
+func TestConfigDump_LabelSelector_PerServiceRouteFetch(t *testing.T) {
+	reg := &httpmock.Registry{}
+	registerEmptyResources(reg, map[string]bool{"/apisix/admin/services": true})
+	reg.Register(http.MethodGet, "/apisix/admin/services", httpmock.JSONResponse(`{
+		"total": 1,
+		"list": [{"id":"svc-1","name":"svc"}]
+	}`))
+
+	var routesLabel string
+	reg.RegisterResponder(http.MethodGet, "/apisix/admin/routes", func(req *http.Request) (httpmock.Response, error) {
+		if v := req.URL.Query().Get("labels[team]"); v != "" {
+			routesLabel = v
+		}
+		return httpmock.JSONResponse(`{"total":0,"list":[]}`), nil
+	})
+
+	ios, _, _, _ := iostreams.Test()
+
+	c := NewCmdDump(newFactory(reg, ios))
+	c.SetArgs([]string{"--output", "json", "--label-selector", "team=alpha"})
+	err := c.Execute()
+	require.NoError(t, err)
+	assert.Equal(t, "alpha", routesLabel)
 }
 
 func TestConfigDump_StreamRoutesDisabled(t *testing.T) {
