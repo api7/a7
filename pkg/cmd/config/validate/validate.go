@@ -26,7 +26,8 @@ type Options struct {
 	Client func() (*http.Client, error)
 	Config func() (config.Config, error)
 
-	File string
+	File   string
+	Remote bool
 }
 
 func NewCmdValidate(f *cmd.Factory) *cobra.Command {
@@ -49,6 +50,7 @@ func NewCmdValidate(f *cmd.Factory) *cobra.Command {
 	}
 
 	c.Flags().StringVarP(&opts.File, "file", "f", "", "Path to declarative config file (required)")
+	c.Flags().BoolVar(&opts.Remote, "remote", false, "After local validation, dry-run validate against API7 EE")
 
 	return c
 }
@@ -76,8 +78,40 @@ func validateRun(opts *Options) error {
 		return fmt.Errorf("config validation failed:\n- %s", strings.Join(errs, "\n- "))
 	}
 
+	if opts.Remote {
+		remoteErrs, err := runRemoteValidation(opts, cfg)
+		if err != nil {
+			return err
+		}
+		if len(remoteErrs) > 0 {
+			prefixed := make([]string, len(remoteErrs))
+			for i, e := range remoteErrs {
+				prefixed[i] = "[remote] " + e
+			}
+			return fmt.Errorf("config validation failed:\n- %s", strings.Join(prefixed, "\n- "))
+		}
+	}
+
 	fmt.Fprintln(opts.IO.Out, "Config is valid")
 	return nil
+}
+
+// runRemoteValidation resolves the HTTP client and config, then dispatches to
+// the dry-run endpoint. Returning an error here means we couldn't reach the
+// remote at all (no client, no base URL); returning a non-empty []string means
+// we reached the remote but it rejected the config.
+func runRemoteValidation(opts *Options, cfg api.ConfigFile) ([]string, error) {
+	configReader, err := opts.Config()
+	if err != nil {
+		return nil, err
+	}
+
+	httpClient, err := opts.Client()
+	if err != nil {
+		return nil, err
+	}
+
+	return validateRemote(httpClient, configReader.BaseURL(), cfg, configReader.GatewayGroup()), nil
 }
 
 func readFile(path string) ([]byte, error) {

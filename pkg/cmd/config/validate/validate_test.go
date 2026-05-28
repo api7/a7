@@ -1,6 +1,8 @@
 package validate
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/api7/a7/internal/config"
 	cmd "github.com/api7/a7/pkg/cmd"
+	"github.com/api7/a7/pkg/httpmock"
 	"github.com/api7/a7/pkg/iostreams"
 )
 
@@ -37,6 +40,18 @@ func factoryWithIO(ios *iostreams.IOStreams) *cmd.Factory {
 		HttpClient: func() (*http.Client, error) {
 			return nil, nil
 		},
+		Config: func() (config.Config, error) {
+			return &mockConfig{baseURL: "http://localhost:9180"}, nil
+		},
+	}
+}
+
+// factoryWithHTTP wires an httpmock.Registry into the Factory so tests can
+// stub the remote-validate endpoint. Mirrors dump_test.newFactory.
+func factoryWithHTTP(reg *httpmock.Registry, ios *iostreams.IOStreams) *cmd.Factory {
+	return &cmd.Factory{
+		IOStreams:  ios,
+		HttpClient: func() (*http.Client, error) { return reg.GetClient(), nil },
 		Config: func() (config.Config, error) {
 			return &mockConfig{baseURL: "http://localhost:9180"}, nil
 		},
@@ -332,4 +347,129 @@ func TestConfigValidate_EmptyUnsupportedSections(t *testing.T) {
 			assert.Contains(t, err.Error(), tc.wantErr)
 		})
 	}
+}
+
+const validRemoteConfig = `
+version: "1"
+routes:
+  - id: "route-1"
+    uri: /hello
+    service_id: service-1
+services:
+  - id: service-1
+    name: service-1
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: 127.0.0.1
+          port: 8080
+          weight: 1
+`
+
+func TestConfigValidate_Remote_HappyPath(t *testing.T) {
+	reg := &httpmock.Registry{}
+	var receivedBody map[string]interface{}
+	reg.RegisterResponder(http.MethodPost, "/apisix/admin/configs/validate", func(r *http.Request) (httpmock.Response, error) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			return httpmock.Response{}, err
+		}
+		if err := json.Unmarshal(body, &receivedBody); err != nil {
+			return httpmock.Response{}, err
+		}
+		return httpmock.JSONResponse(`{}`), nil
+	})
+
+	ios, _, stdout, _ := iostreams.Test()
+	filePath := filepath.Join(t.TempDir(), "config.yaml")
+	require.NoError(t, os.WriteFile(filePath, []byte(validRemoteConfig), 0o644))
+
+	c := NewCmdValidate(factoryWithHTTP(reg, ios))
+	c.SetArgs([]string{"-f", filePath, "--remote"})
+	err := c.Execute()
+
+	require.NoError(t, err)
+	assert.Contains(t, stdout.String(), "Config is valid")
+	assert.Equal(t, 1, reg.CallCount(http.MethodPost, "/apisix/admin/configs/validate"))
+	// The request body should carry the local routes and services in the
+	// flat shape adc's validator uses.
+	require.NotNil(t, receivedBody)
+	assert.Contains(t, receivedBody, "routes")
+	assert.Contains(t, receivedBody, "services")
+	reg.Verify(t)
+}
+
+func TestConfigValidate_Remote_CollectsErrors(t *testing.T) {
+	reg := &httpmock.Registry{}
+	reg.Register(http.MethodPost, "/apisix/admin/configs/validate", httpmock.StringResponse(http.StatusBadRequest, `{
+		"error_msg": "schema validation failed",
+		"errors": [
+			{"resource_type": "routes", "index": 0, "field": "plugins.limit-count.count", "message": "required field missing"},
+			{"resource_type": "services", "index": 0, "message": "invalid upstream scheme"}
+		]
+	}`))
+
+	ios, _, _, _ := iostreams.Test()
+	filePath := filepath.Join(t.TempDir(), "config.yaml")
+	require.NoError(t, os.WriteFile(filePath, []byte(validRemoteConfig), 0o644))
+
+	c := NewCmdValidate(factoryWithHTTP(reg, ios))
+	c.SetArgs([]string{"-f", filePath, "--remote"})
+	err := c.Execute()
+
+	require.Error(t, err)
+	msg := err.Error()
+	assert.Contains(t, msg, "[remote]")
+	assert.Contains(t, msg, "routes[0].plugins.limit-count.count")
+	assert.Contains(t, msg, "required field missing")
+	assert.Contains(t, msg, "services[0]")
+	assert.Contains(t, msg, "invalid upstream scheme")
+	reg.Verify(t)
+}
+
+func TestConfigValidate_Remote_LocalErrorsSkipRemote(t *testing.T) {
+	reg := &httpmock.Registry{}
+	// If the remote endpoint is hit, the mock responder returns an error
+	// that surfaces through httpmock's RoundTrip — test failure.
+	reg.RegisterResponder(http.MethodPost, "/apisix/admin/configs/validate", func(_ *http.Request) (httpmock.Response, error) {
+		t.Fatalf("remote validate should not be called when local validation fails")
+		return httpmock.Response{}, nil
+	})
+
+	ios, _, _, _ := iostreams.Test()
+	filePath := filepath.Join(t.TempDir(), "config.yaml")
+	require.NoError(t, os.WriteFile(filePath, []byte(`
+version: "1"
+routes:
+  - id: bad-route
+`), 0o644))
+
+	c := NewCmdValidate(factoryWithHTTP(reg, ios))
+	c.SetArgs([]string{"-f", filePath, "--remote"})
+	err := c.Execute()
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "either uri or uris is required")
+	assert.NotContains(t, err.Error(), "[remote]")
+	assert.Equal(t, 0, reg.CallCount(http.MethodPost, "/apisix/admin/configs/validate"))
+}
+
+func TestConfigValidate_NoRemoteFlag_BehavesAsBefore(t *testing.T) {
+	reg := &httpmock.Registry{}
+	reg.RegisterResponder(http.MethodPost, "/apisix/admin/configs/validate", func(_ *http.Request) (httpmock.Response, error) {
+		t.Fatalf("remote validate should not be called without --remote")
+		return httpmock.Response{}, nil
+	})
+
+	ios, _, stdout, _ := iostreams.Test()
+	filePath := filepath.Join(t.TempDir(), "config.yaml")
+	require.NoError(t, os.WriteFile(filePath, []byte(validRemoteConfig), 0o644))
+
+	c := NewCmdValidate(factoryWithHTTP(reg, ios))
+	c.SetArgs([]string{"-f", filePath})
+	err := c.Execute()
+
+	require.NoError(t, err)
+	assert.Contains(t, stdout.String(), "Config is valid")
+	assert.Equal(t, 0, reg.CallCount(http.MethodPost, "/apisix/admin/configs/validate"))
 }
