@@ -231,6 +231,119 @@ func TestConfigDump_FileFlag(t *testing.T) {
 	reg.Verify(t)
 }
 
+func TestConfigDump_IncludeOnly_RoutesAndServices(t *testing.T) {
+	reg := &httpmock.Registry{}
+	// Only register services and routes endpoints. If the command tries to
+	// GET any other resource endpoint, httpmock will fail the request and
+	// the command will return an error.
+	reg.Register(http.MethodGet, "/apisix/admin/services", httpmock.JSONResponse(`{
+		"total": 1,
+		"list": [{"id":"svc-1","name":"svc"}]
+	}`))
+	reg.Register(http.MethodGet, "/apisix/admin/routes", httpmock.JSONResponse(`{
+		"total": 1,
+		"list": [{"id":"r1","uri":"/hello","service_id":"svc-1"}]
+	}`))
+
+	ios, _, stdout, _ := iostreams.Test()
+
+	c := NewCmdDump(newFactory(reg, ios))
+	c.SetArgs([]string{"--output", "json", "--include-resource-type", "routes,services"})
+	err := c.Execute()
+
+	require.NoError(t, err)
+	var result map[string]interface{}
+	require.NoError(t, json.Unmarshal(stdout.Bytes(), &result))
+
+	assert.Equal(t, "1", result["version"])
+	routes := result["routes"].([]interface{})
+	assert.Len(t, routes, 1)
+	services := result["services"].([]interface{})
+	assert.Len(t, services, 1)
+	assert.NotContains(t, result, "consumers")
+	assert.NotContains(t, result, "ssl")
+	assert.NotContains(t, result, "global_rules")
+	assert.NotContains(t, result, "stream_routes")
+	assert.NotContains(t, result, "protos")
+	assert.NotContains(t, result, "secrets")
+	assert.NotContains(t, result, "plugin_metadata")
+
+	reg.Verify(t)
+}
+
+func TestConfigDump_ExcludeSSL_SkipsSSLEndpoint(t *testing.T) {
+	reg := &httpmock.Registry{}
+	// Register everything except SSL. If the command tries to GET
+	// /apisix/admin/ssls it will fail because no mock is registered.
+	registerEmptyResources(reg, map[string]bool{
+		"/apisix/admin/ssls":     true,
+		"/apisix/admin/services": true,
+	})
+	reg.Register(http.MethodGet, "/apisix/admin/services", httpmock.JSONResponse(`{
+		"total": 1,
+		"list": [{"id":"svc-1","name":"svc"}]
+	}`))
+	reg.Register(http.MethodGet, "/apisix/admin/routes", httpmock.JSONResponse(`{
+		"total": 0,
+		"list": []
+	}`))
+
+	ios, _, stdout, _ := iostreams.Test()
+
+	c := NewCmdDump(newFactory(reg, ios))
+	c.SetArgs([]string{"--output", "json", "--exclude-resource-type", "ssl"})
+	err := c.Execute()
+
+	require.NoError(t, err)
+	// Defence-in-depth: the SSL endpoint must never have been called.
+	assert.Equal(t, 0, reg.CallCount(http.MethodGet, "/apisix/admin/ssls"),
+		"expected no GET to /apisix/admin/ssls when ssl is excluded")
+
+	var result map[string]interface{}
+	require.NoError(t, json.Unmarshal(stdout.Bytes(), &result))
+	assert.Equal(t, "1", result["version"])
+	assert.NotContains(t, result, "ssl")
+
+	reg.Verify(t)
+}
+
+func TestConfigDump_IncludeAndExcludeBothSet_Errors(t *testing.T) {
+	reg := &httpmock.Registry{}
+
+	ios, _, _, _ := iostreams.Test()
+
+	c := NewCmdDump(newFactory(reg, ios))
+	c.SetArgs([]string{
+		"--include-resource-type", "routes",
+		"--exclude-resource-type", "ssl",
+	})
+	c.SilenceUsage = true
+	c.SilenceErrors = true
+	err := c.Execute()
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "mutually exclusive")
+}
+
+func TestConfigDump_UnknownResourceType_Errors(t *testing.T) {
+	reg := &httpmock.Registry{}
+
+	ios, _, _, _ := iostreams.Test()
+
+	c := NewCmdDump(newFactory(reg, ios))
+	c.SetArgs([]string{"--include-resource-type", "not_a_real_type"})
+	c.SilenceUsage = true
+	c.SilenceErrors = true
+	err := c.Execute()
+
+	require.Error(t, err)
+	msg := err.Error()
+	assert.Contains(t, msg, "unknown resource type")
+	assert.Contains(t, msg, "not_a_real_type")
+	// The error should mention at least one valid type to guide the user.
+	assert.Contains(t, msg, "routes")
+}
+
 func TestConfigDump_StreamRoutesDisabled(t *testing.T) {
 	reg := &httpmock.Registry{}
 	registerEmptyResources(reg, map[string]bool{"/apisix/admin/stream_routes": true})

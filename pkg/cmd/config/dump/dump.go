@@ -21,8 +21,10 @@ type Options struct {
 	Client func() (*http.Client, error)
 	Config func() (config.Config, error)
 
-	Output string
-	File   string
+	Output              string
+	File                string
+	IncludeResourceType []string
+	ExcludeResourceType []string
 }
 
 func NewCmdDump(f *cmd.Factory) *cobra.Command {
@@ -44,11 +46,20 @@ func NewCmdDump(f *cmd.Factory) *cobra.Command {
 
 	c.Flags().StringVarP(&opts.Output, "output", "o", "yaml", "Output format: yaml, json")
 	c.Flags().StringVarP(&opts.File, "file", "f", "", "Write output to file")
+	c.Flags().StringSliceVar(&opts.IncludeResourceType, "include-resource-type", nil,
+		"Only fetch the listed resource types (comma-separated). Mutually exclusive with --exclude-resource-type.")
+	c.Flags().StringSliceVar(&opts.ExcludeResourceType, "exclude-resource-type", nil,
+		"Fetch all resource types except those listed (comma-separated). Mutually exclusive with --include-resource-type.")
 
 	return c
 }
 
 func dumpRun(opts *Options) error {
+	filter, err := configutil.NewResourceTypeFilter(opts.IncludeResourceType, opts.ExcludeResourceType)
+	if err != nil {
+		return &cmdutil.FlagError{Err: err}
+	}
+
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
@@ -63,7 +74,7 @@ func dumpRun(opts *Options) error {
 
 	gatewayGroup := cfg.GatewayGroup()
 
-	remote, err := configutil.FetchRemoteConfig(client, gatewayGroup)
+	remote, err := configutil.FetchRemoteConfig(client, gatewayGroup, filter)
 	if err != nil {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
 	}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -14,6 +15,139 @@ import (
 	"github.com/api7/a7/pkg/cmdutil"
 	"github.com/api7/a7/pkg/listutil"
 )
+
+// Resource type identifiers used by --include-resource-type /
+// --exclude-resource-type. Values mirror the JSON/YAML field names in
+// api.ConfigFile so they are familiar to users editing declarative configs.
+const (
+	ResourceTypeRoutes         = "routes"
+	ResourceTypeServices       = "services"
+	ResourceTypeConsumers      = "consumers"
+	ResourceTypeSSL            = "ssl"
+	ResourceTypeGlobalRules    = "global_rules"
+	ResourceTypeStreamRoutes   = "stream_routes"
+	ResourceTypeProtos         = "protos"
+	ResourceTypeSecrets        = "secrets"
+	ResourceTypePluginMetadata = "plugin_metadata"
+)
+
+// KnownResourceTypes lists the resource types accepted by the include/exclude
+// filters, in a stable display order.
+var KnownResourceTypes = []string{
+	ResourceTypeRoutes,
+	ResourceTypeServices,
+	ResourceTypeConsumers,
+	ResourceTypeSSL,
+	ResourceTypeGlobalRules,
+	ResourceTypeStreamRoutes,
+	ResourceTypeProtos,
+	ResourceTypeSecrets,
+	ResourceTypePluginMetadata,
+}
+
+// ResourceTypeFilter selects which resource types FetchRemoteConfig should
+// fetch from the remote. A nil filter means "fetch everything".
+//
+// The filter is constructed via NewResourceTypeFilter from user-supplied
+// include/exclude lists. The two lists are mutually exclusive.
+type ResourceTypeFilter struct {
+	// included is the set of resource types the user explicitly requested.
+	// All lookups against the filter consult this set.
+	included map[string]bool
+}
+
+// NewResourceTypeFilter builds a ResourceTypeFilter from comma/repeated-flag
+// values supplied by the user.
+//
+//   - If both include and exclude are empty, the returned filter is nil
+//     (meaning "fetch all resource types").
+//   - If both include and exclude are non-empty, an error is returned.
+//   - Unknown resource types in either list produce an error that lists the
+//     valid types.
+func NewResourceTypeFilter(include, exclude []string) (*ResourceTypeFilter, error) {
+	include = normalizeResourceList(include)
+	exclude = normalizeResourceList(exclude)
+
+	if len(include) > 0 && len(exclude) > 0 {
+		return nil, fmt.Errorf("--include-resource-type and --exclude-resource-type are mutually exclusive")
+	}
+
+	if len(include) == 0 && len(exclude) == 0 {
+		return nil, nil
+	}
+
+	if err := validateResourceTypes(include, "--include-resource-type"); err != nil {
+		return nil, err
+	}
+	if err := validateResourceTypes(exclude, "--exclude-resource-type"); err != nil {
+		return nil, err
+	}
+
+	included := make(map[string]bool, len(KnownResourceTypes))
+	if len(include) > 0 {
+		for _, t := range include {
+			included[t] = true
+		}
+	} else {
+		excludedSet := make(map[string]bool, len(exclude))
+		for _, t := range exclude {
+			excludedSet[t] = true
+		}
+		for _, t := range KnownResourceTypes {
+			if !excludedSet[t] {
+				included[t] = true
+			}
+		}
+	}
+
+	return &ResourceTypeFilter{included: included}, nil
+}
+
+// Includes reports whether the given resource type is selected by the filter.
+// A nil filter includes all known resource types.
+func (f *ResourceTypeFilter) Includes(resourceType string) bool {
+	if f == nil {
+		return true
+	}
+	return f.included[resourceType]
+}
+
+func normalizeResourceList(in []string) []string {
+	out := make([]string, 0, len(in))
+	for _, raw := range in {
+		for _, part := range strings.Split(raw, ",") {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+			out = append(out, part)
+		}
+	}
+	return out
+}
+
+func validateResourceTypes(types []string, flagName string) error {
+	known := make(map[string]bool, len(KnownResourceTypes))
+	for _, t := range KnownResourceTypes {
+		known[t] = true
+	}
+	var unknown []string
+	for _, t := range types {
+		if !known[t] {
+			unknown = append(unknown, t)
+		}
+	}
+	if len(unknown) > 0 {
+		sort.Strings(unknown)
+		return fmt.Errorf(
+			"unknown resource type(s) for %s: %s; valid types are: %s",
+			flagName,
+			strings.Join(unknown, ", "),
+			strings.Join(KnownResourceTypes, ", "),
+		)
+	}
+	return nil
+}
 
 type ResourceItem struct {
 	Key   string                 `json:"key"`
@@ -104,59 +238,120 @@ func ReadConfigFile(file string) (api.ConfigFile, error) {
 	return cfg, nil
 }
 
-// FetchRemoteConfig fetches all runtime resources from API7 EE
-// for the given gateway group and assembles them into a ConfigFile.
-func FetchRemoteConfig(client *api.Client, gatewayGroup string) (*api.ConfigFile, error) {
+// FetchRemoteConfig fetches runtime resources from API7 EE for the given
+// gateway group and assembles them into a ConfigFile. If filter is nil, all
+// known resource types are fetched. Otherwise only the resource types
+// selected by the filter are fetched; excluded endpoints are not hit at all.
+//
+// Dependency note: routes are listed per-service (API7 EE requires
+// service_id under access-token auth), so if the filter selects routes but
+// not services, the services endpoint is still fetched internally to derive
+// the list of services to iterate. Services data is only emitted in the
+// returned ConfigFile when the filter explicitly includes services.
+func FetchRemoteConfig(client *api.Client, gatewayGroup string, filter *ResourceTypeFilter) (*api.ConfigFile, error) {
 	query := map[string]string{}
 	if gatewayGroup != "" {
 		query["gateway_group_id"] = gatewayGroup
 	}
 
-	services, err := listutil.FetchPaginated[api.Service](client, "/apisix/admin/services", query, false)
-	if err != nil {
-		return nil, err
+	includeRoutes := filter.Includes(ResourceTypeRoutes)
+	includeServices := filter.Includes(ResourceTypeServices)
+
+	var services []api.Service
+	if includeServices || includeRoutes {
+		var err error
+		services, err = listutil.FetchPaginated[api.Service](client, "/apisix/admin/services", query, false)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	// API7 EE requires service_id when listing routes with access tokens.
-	// Fetch routes per service and aggregate.
-	routes, err := listutil.FetchRoutesForServices(client, services, query, false)
-	if err != nil {
-		return nil, err
-	}
-	consumers, err := listutil.FetchPaginated[api.Consumer](client, "/apisix/admin/consumers", query, false)
-	if err != nil {
-		return nil, err
-	}
-	ssl, err := listutil.FetchPaginated[api.SSL](client, "/apisix/admin/ssls", query, false)
-	if err != nil {
-		return nil, err
-	}
-	globalRules, err := listutil.FetchPaginated[api.GlobalRule](client, "/apisix/admin/global_rules", query, false)
-	if err != nil {
-		return nil, err
-	}
-	streamRoutes, err := listutil.FetchPaginated[api.StreamRoute](client, "/apisix/admin/stream_routes", query, true)
-	if err != nil {
-		return nil, err
-	}
-	protos, err := listutil.FetchPaginated[api.Proto](client, "/apisix/admin/protos", query, true)
-	if err != nil {
-		return nil, err
-	}
-	secrets, err := listutil.FetchPaginated[api.Secret](client, "/apisix/admin/secret_providers", query, true)
-	if err != nil {
-		return nil, err
+	var routes []api.Route
+	if includeRoutes {
+		var err error
+		// API7 EE requires service_id when listing routes with access tokens.
+		// Fetch routes per service and aggregate.
+		routes, err = listutil.FetchRoutesForServices(client, services, query, false)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	pluginMetadata, err := fetchPluginMetadata(client, query)
-	if err != nil {
-		return nil, err
+	var consumers []api.Consumer
+	if filter.Includes(ResourceTypeConsumers) {
+		var err error
+		consumers, err = listutil.FetchPaginated[api.Consumer](client, "/apisix/admin/consumers", query, false)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var ssl []api.SSL
+	if filter.Includes(ResourceTypeSSL) {
+		var err error
+		ssl, err = listutil.FetchPaginated[api.SSL](client, "/apisix/admin/ssls", query, false)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var globalRules []api.GlobalRule
+	if filter.Includes(ResourceTypeGlobalRules) {
+		var err error
+		globalRules, err = listutil.FetchPaginated[api.GlobalRule](client, "/apisix/admin/global_rules", query, false)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var streamRoutes []api.StreamRoute
+	if filter.Includes(ResourceTypeStreamRoutes) {
+		var err error
+		streamRoutes, err = listutil.FetchPaginated[api.StreamRoute](client, "/apisix/admin/stream_routes", query, true)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var protos []api.Proto
+	if filter.Includes(ResourceTypeProtos) {
+		var err error
+		protos, err = listutil.FetchPaginated[api.Proto](client, "/apisix/admin/protos", query, true)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var secrets []api.Secret
+	if filter.Includes(ResourceTypeSecrets) {
+		var err error
+		secrets, err = listutil.FetchPaginated[api.Secret](client, "/apisix/admin/secret_providers", query, true)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var pluginMetadata []api.PluginMetadataEntry
+	if filter.Includes(ResourceTypePluginMetadata) {
+		var err error
+		pluginMetadata, err = fetchPluginMetadata(client, query)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Drop services from the output when they were only fetched as a
+	// dependency for routes (i.e. user said --include-resource-type routes
+	// without listing services).
+	emittedServices := services
+	if !includeServices {
+		emittedServices = nil
 	}
 
 	remote := &api.ConfigFile{
 		Version:        "1",
 		Routes:         stripTimestampsFromSlice(routes),
-		Services:       stripTimestampsFromSlice(services),
+		Services:       stripTimestampsFromSlice(emittedServices),
 		Consumers:      stripTimestampsFromSlice(consumers),
 		SSL:            stripTimestampsFromSlice(ssl),
 		GlobalRules:    stripTimestampsFromSlice(globalRules),

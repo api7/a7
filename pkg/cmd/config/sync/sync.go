@@ -80,7 +80,7 @@ func syncRun(opts *Options) error {
 
 	gatewayGroup := cfg.GatewayGroup()
 
-	remote, err := configutil.FetchRemoteConfig(client, gatewayGroup)
+	remote, err := configutil.FetchRemoteConfig(client, gatewayGroup, nil)
 	if err != nil {
 		return fmt.Errorf("%s", cmdutil.FormatAPIError(err))
 	}
