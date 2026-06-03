@@ -1,7 +1,5 @@
 # a7 — CLI for API7 Enterprise Edition
 
-> **⚠️ This project is under active development and is NOT production-ready.** APIs, commands, and output formats may change without notice.
-
 `a7` is a command-line tool for managing [API7 Enterprise Edition](https://api7.ai) API Gateway from your terminal. It wraps both the API7 EE control-plane API (`/api/*`) and the APISIX admin API (`/apisix/admin/*`) to provide convenient, scriptable access to gateway groups, routes, services, consumers, SSL certificates, plugins, and more.
 
 ## Features
