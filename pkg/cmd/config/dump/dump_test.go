@@ -250,3 +250,41 @@ func TestConfigDump_StreamRoutesDisabled(t *testing.T) {
 	assert.NotContains(t, result, "stream_routes")
 	reg.Verify(t)
 }
+
+// TestConfigDump_L4ServiceKeepsTypeAndPlugins guards against the export
+// dropping L4 (stream) service configuration. A stream service is marked by
+// `type: stream`; without it the service re-imports as L7 and its stream
+// routes can no longer bind. Plugins must survive too.
+func TestConfigDump_L4ServiceKeepsTypeAndPlugins(t *testing.T) {
+	reg := &httpmock.Registry{}
+	registerEmptyResources(reg, map[string]bool{"/apisix/admin/services": true})
+	reg.Register(http.MethodGet, "/apisix/admin/services", httpmock.JSONResponse(`{
+		"total": 1,
+		"list": [{
+			"id": "l4-svc",
+			"name": "tcp-svc",
+			"type": "stream",
+			"plugins": {"limit-conn": {"conn": 10, "burst": 5, "default_conn_delay": 0.1, "key": "remote_addr"}},
+			"upstream": {"type": "roundrobin", "nodes": [{"host": "10.0.0.1", "port": 6379, "weight": 1}]}
+		}]
+	}`))
+	// Routes are fetched per-service; return none for the stream service.
+	reg.Register(http.MethodGet, "/apisix/admin/routes", httpmock.JSONResponse(`{"total":0,"list":[]}`))
+
+	ios, _, stdout, _ := iostreams.Test()
+
+	c := NewCmdDump(newFactory(reg, ios))
+	c.SetArgs([]string{"--output", "json"})
+	require.NoError(t, c.Execute())
+
+	var result map[string]interface{}
+	require.NoError(t, json.Unmarshal(stdout.Bytes(), &result))
+
+	services := result["services"].([]interface{})
+	require.Len(t, services, 1)
+	svc := services[0].(map[string]interface{})
+	assert.Equal(t, "stream", svc["type"], "L4 service type must survive export")
+	plugins := svc["plugins"].(map[string]interface{})
+	assert.Contains(t, plugins, "limit-conn", "L4 service plugins must survive export")
+	reg.Verify(t)
+}

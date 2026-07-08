@@ -2,9 +2,12 @@ package api
 
 // Service represents a published service in API7 EE (runtime).
 type Service struct {
-	ID              string                 `json:"id,omitempty" yaml:"id,omitempty"`
-	Name            string                 `json:"name,omitempty" yaml:"name,omitempty"`
-	Desc            string                 `json:"desc,omitempty" yaml:"desc,omitempty"`
+	ID   string `json:"id,omitempty" yaml:"id,omitempty"`
+	Name string `json:"name,omitempty" yaml:"name,omitempty"`
+	Desc string `json:"desc,omitempty" yaml:"desc,omitempty"`
+	// Type marks an L4 service ("stream"); absent/"http" for L7. Stream routes
+	// can only bind to stream-typed services, so it must survive export.
+	Type            string                 `json:"type,omitempty" yaml:"type,omitempty"`
 	Labels          map[string]string      `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Upstream        map[string]interface{} `json:"upstream,omitempty" yaml:"upstream,omitempty"`
 	UpstreamID      string                 `json:"upstream_id,omitempty" yaml:"upstream_id,omitempty"`
