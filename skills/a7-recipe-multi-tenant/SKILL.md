@@ -48,18 +48,23 @@ For route traffic, use the current a7 model:
 
 ## Approach A: Gateway Groups for Isolation
 
-Gateway groups are the primary isolation boundary.
+Gateway groups are the primary isolation boundary. With `jq` installed, create
+the groups and capture the IDs returned by API7 EE:
 
 ```bash
-a7 gateway-group create --name premium-tier --description "High-performance tier for paid customers"
-a7 gateway-group create --name standard-tier --description "Standard tier for free and trial users"
-a7 gateway-group create --name platform --description "Shared platform gateway group for tenant consumers and routes"
+PREMIUM_GROUP_ID=$(a7 gateway-group create --name premium-tier --description "High-performance tier for paid customers" --output json | jq -r '.id')
+STANDARD_GROUP_ID=$(a7 gateway-group create --name standard-tier --description "Standard tier for free and trial users" --output json | jq -r '.id')
+PLATFORM_GROUP_ID=$(a7 gateway-group create --name platform --description "Shared platform gateway group for tenant consumers and routes" --output json | jq -r '.id')
 ```
+
+API7 EE generates gateway-group IDs. Keep these variables in the current shell
+and pass the generated IDs, rather than the display names, to runtime-resource
+commands.
 
 Each group can have its own global policies:
 
 ```bash
-a7 global-rule create -g standard-tier -f - <<'EOF'
+a7 global-rule create -g "$STANDARD_GROUP_ID" -f - <<'EOF'
 {
   "plugins": {
     "limit-count": {
@@ -79,7 +84,7 @@ Model tenants as consumers, attach per-consumer plugins when needed, and create
 credentials with `a7 credential create`.
 
 ```bash
-a7 consumer create -g platform -f - <<'EOF'
+a7 consumer create -g "$PLATFORM_GROUP_ID" -f - <<'EOF'
 {
   "username": "startup-xyz",
   "desc": "Free tier tenants",
@@ -96,9 +101,9 @@ a7 consumer create -g platform -f - <<'EOF'
 }
 EOF
 
-a7 credential create -g platform --consumer startup-xyz --plugins-json '{"key-auth":{"key":"startup-xyz-key"}}'
+a7 credential create -g "$PLATFORM_GROUP_ID" --consumer startup-xyz --plugins-json '{"key-auth":{"key":"startup-xyz-key"}}'
 
-a7 consumer create -g platform -f - <<'EOF'
+a7 consumer create -g "$PLATFORM_GROUP_ID" -f - <<'EOF'
 {
   "username": "acme-corp",
   "desc": "Pro tier tenants",
@@ -115,7 +120,7 @@ a7 consumer create -g platform -f - <<'EOF'
 }
 EOF
 
-a7 credential create -g platform --consumer acme-corp --plugins-json '{"key-auth":{"key":"acme-secret-key"}}'
+a7 credential create -g "$PLATFORM_GROUP_ID" --consumer acme-corp --plugins-json '{"key-auth":{"key":"acme-secret-key"}}'
 ```
 
 ## Approach C: Tenant-Aware Service Route
@@ -123,7 +128,7 @@ a7 credential create -g platform --consumer acme-corp --plugins-json '{"key-auth
 Create the backend service first:
 
 ```bash
-a7 service create -g platform -f - <<'EOF'
+a7 service create -g "$PLATFORM_GROUP_ID" -f - <<'EOF'
 {
   "id": "tenant-api-service",
   "name": "tenant-api-service",
@@ -140,7 +145,7 @@ EOF
 Create the tenant route with `paths` and `service_id`:
 
 ```bash
-a7 route create -g platform -f - <<'EOF'
+a7 route create -g "$PLATFORM_GROUP_ID" -f - <<'EOF'
 {
   "id": "multi-tenant-api",
   "name": "multi-tenant-api",
@@ -197,7 +202,7 @@ routes:
 Apply it:
 
 ```bash
-a7 config sync -g platform -f platform-tenants.yaml
+a7 config sync -g "$PLATFORM_GROUP_ID" -f platform-tenants.yaml
 ```
 
 Use `a7 consumer create -f` and `a7 credential create` for tenant identities and
@@ -206,10 +211,10 @@ key material.
 ## Verification
 
 ```bash
-a7 consumer list -g platform
-a7 credential list -g platform --consumer startup-xyz
-a7 service get tenant-api-service -g platform -o json
-a7 route get multi-tenant-api -g platform -o json
+a7 consumer list -g "$PLATFORM_GROUP_ID"
+a7 credential list -g "$PLATFORM_GROUP_ID" --consumer startup-xyz
+a7 service get tenant-api-service -g "$PLATFORM_GROUP_ID" -o json
+a7 route get multi-tenant-api -g "$PLATFORM_GROUP_ID" -o json
 ```
 
 Traffic verification requires a deployed gateway:

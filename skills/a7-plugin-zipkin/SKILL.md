@@ -137,10 +137,12 @@ Jaeger supports the Zipkin v2 API:
 
 ### Enable globally via Global Rule
 
+Do not set an `id` in the create payload. The CLI derives the Global Rule ID
+from the plugin name.
+
 ```bash
 a7 global-rule create --gateway-group prod -f - <<'EOF'
 {
-  "id": "zipkin-global",
   "plugins": {
     "zipkin": {
       "endpoint": "http://zipkin:9411/api/v2/spans",

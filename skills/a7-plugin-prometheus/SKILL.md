@@ -93,10 +93,12 @@ EOF
 
 Use a Global Rule to enable metrics for all routes in the `prod` group:
 
+Do not set an `id` in the create payload. The CLI derives the Global Rule ID
+from the plugin name.
+
 ```bash
 a7 global-rule create --gateway-group prod -f - <<'EOF'
 {
-  "id": "prometheus-global",
   "plugins": {
     "prometheus": {}
   }

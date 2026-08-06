@@ -12,6 +12,15 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"unicode"
+
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+
+	"github.com/api7/a7/internal/config"
+	cmd "github.com/api7/a7/pkg/cmd"
+	rootcmd "github.com/api7/a7/pkg/cmd/root"
+	"github.com/api7/a7/pkg/iostreams"
 )
 
 var skillNamePattern = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
@@ -230,9 +239,24 @@ func TestSkillShellExamplesUseSupportedA7CommandsAndFlags(t *testing.T) {
 	rootHelp := commandHelp(t, nil)
 	rootCommands := availableCommands(rootHelp)
 	rootFlags := availableFlags(rootHelp, longFlagPattern)
-	regressionPath, regressionHelp, regressionErr := resolveCommand(t, "regression", []string{"route", "--gateway-group", "default", "craete"}, rootCommands, rootFlags, valueFlags)
+	commandTree := newA7CommandTree()
+	regressionPath, regressionHelp, _, regressionErr := resolveCommand(t, "regression", []string{"route", "--gateway-group", "default", "craete"}, rootCommands, rootFlags, valueFlags)
 	if regressionErr == nil {
 		t.Fatalf("expected misspelled command after a persistent flag to fail, got path %q and help %q", regressionPath, regressionHelp)
+	}
+	_, _, remaining, err := resolveCommand(t, "regression", []string{"route", "get", "one", "two"}, rootCommands, rootFlags, valueFlags)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := validatePositionalArgs(commandTree, []string{"route", "get"}, remaining); err == nil {
+		t.Fatal("expected extra positional argument to fail")
+	}
+	_, _, remaining, err = resolveCommand(t, "regression", []string{"route", "get"}, rootCommands, rootFlags, valueFlags)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := validatePositionalArgs(commandTree, []string{"route", "get"}, remaining); err == nil {
+		t.Fatal("expected missing positional argument to fail")
 	}
 	embedded := cliInvocations("CURRENT=$(a7 route get example -g default)", invocationPattern)
 	if len(embedded) != 1 || !strings.HasPrefix(embedded[0], "a7 route get") {
@@ -246,11 +270,14 @@ func TestSkillShellExamplesUseSupportedA7CommandsAndFlags(t *testing.T) {
 		for _, block := range shellFencePattern.FindAllStringSubmatch(string(data), -1) {
 			for _, line := range joinedShellLines(block[1]) {
 				for _, invocation := range cliInvocations(line, invocationPattern) {
-					fields := strings.Fields(invocation)
+					fields, err := shellFields(invocation)
+					if err != nil {
+						t.Fatalf("%s: cannot parse command %q: %v", file, invocation, err)
+					}
 					if len(fields) < 2 {
 						continue
 					}
-					path, help, err := resolveCommand(t, file, commandFields(fields[1:]), rootCommands, rootFlags, valueFlags)
+					path, help, remaining, err := resolveCommand(t, file, commandFields(fields[1:]), rootCommands, rootFlags, valueFlags)
 					if err != nil {
 						t.Fatalf("%s: %v", file, err)
 					}
@@ -262,6 +289,9 @@ func TestSkillShellExamplesUseSupportedA7CommandsAndFlags(t *testing.T) {
 						if !validFlags[flag] {
 							t.Fatalf("%s: command %q uses unsupported flag %q", file, "a7 "+strings.Join(path, " "), flag)
 						}
+					}
+					if err := validatePositionalArgs(commandTree, path, remaining); err != nil {
+						t.Fatalf("%s: command %q uses invalid positional arguments: %v", file, "a7 "+strings.Join(path, " "), err)
 					}
 				}
 			}
@@ -376,14 +406,15 @@ func TestCommandFieldIsSubcommand_RejectsUnknownNestedCommand(t *testing.T) {
 	}
 }
 
-func resolveCommand(t *testing.T, file string, fields []string, commands map[string]bool, rootFlags map[string]bool, valueFlags map[string]bool) ([]string, string, error) {
+func resolveCommand(t *testing.T, file string, fields []string, commands map[string]bool, rootFlags map[string]bool, valueFlags map[string]bool) ([]string, string, []string, error) {
 	t.Helper()
 	if len(fields) == 0 || !commands[fields[0]] {
-		return nil, "", fmt.Errorf("unsupported a7 command %q", strings.Join(fields, " "))
+		return nil, "", nil, fmt.Errorf("unsupported a7 command %q", strings.Join(fields, " "))
 	}
 	path := []string{fields[0]}
 	help := commandHelp(t, path)
-	for index := 1; index < len(fields); {
+	index := 1
+	for index < len(fields) {
 		field := fields[index]
 		if strings.ContainsAny(field, "|<>") {
 			break
@@ -395,12 +426,12 @@ func resolveCommand(t *testing.T, file string, fields []string, commands map[str
 		if strings.HasPrefix(field, "-") {
 			flag := strings.SplitN(field, "=", 2)[0]
 			if !rootFlags[flag] {
-				return path, help, fmt.Errorf("unsupported interspersed flag %q before a7 subcommand", flag)
+				return path, help, nil, fmt.Errorf("unsupported interspersed flag %q before a7 subcommand", flag)
 			}
 			index++
 			if valueFlags[flag] && !strings.Contains(field, "=") {
 				if index >= len(fields) {
-					return path, help, fmt.Errorf("flag %q requires a value", flag)
+					return path, help, nil, fmt.Errorf("flag %q requires a value", flag)
 				}
 				index++
 			}
@@ -408,7 +439,7 @@ func resolveCommand(t *testing.T, file string, fields []string, commands map[str
 		}
 		isSubcommand, err := commandFieldIsSubcommand(subcommands, field)
 		if err != nil {
-			return path, help, fmt.Errorf("a7 %s: %w", strings.Join(path, " "), err)
+			return path, help, nil, fmt.Errorf("a7 %s: %w", strings.Join(path, " "), err)
 		}
 		if !isSubcommand {
 			break
@@ -417,7 +448,162 @@ func resolveCommand(t *testing.T, file string, fields []string, commands map[str
 		help = commandHelp(t, path)
 		index++
 	}
-	return path, help, nil
+	return path, help, fields[index:], nil
+}
+
+func newA7CommandTree() *cobra.Command {
+	ios, _, _, _ := iostreams.Test()
+	cfg := config.NewFileConfig()
+	factory := &cmd.Factory{
+		IOStreams: ios,
+		Config: func() (config.Config, error) {
+			return cfg, nil
+		},
+	}
+	return rootcmd.NewCmd(factory, cfg)
+}
+
+func validatePositionalArgs(root *cobra.Command, path []string, fields []string) error {
+	command, remainingPath, err := root.Find(path)
+	if err != nil {
+		return err
+	}
+	if len(remainingPath) != 0 {
+		return fmt.Errorf("failed to resolve command path %q", strings.Join(path, " "))
+	}
+	args, err := positionalArgs(command, fields)
+	if err != nil {
+		return err
+	}
+	return command.ValidateArgs(args)
+}
+
+func positionalArgs(command *cobra.Command, fields []string) ([]string, error) {
+	var args []string
+	for index := 0; index < len(fields); index++ {
+		field := fields[index]
+		if strings.ContainsAny(field, "|<>") {
+			break
+		}
+		if field == "--" {
+			for _, arg := range fields[index+1:] {
+				if strings.ContainsAny(arg, "|<>") {
+					break
+				}
+				args = append(args, arg)
+			}
+			break
+		}
+		if strings.HasPrefix(field, "--") {
+			nameValue := strings.TrimPrefix(field, "--")
+			name, _, hasInlineValue := strings.Cut(nameValue, "=")
+			flag := lookupFlag(command, name)
+			if flag == nil {
+				return nil, fmt.Errorf("unsupported flag %q", field)
+			}
+			if !hasInlineValue && flag.NoOptDefVal == "" {
+				index++
+				if index >= len(fields) {
+					return nil, fmt.Errorf("flag %q requires a value", field)
+				}
+			}
+			continue
+		}
+		if strings.HasPrefix(field, "-") && field != "-" {
+			shorthandValue := strings.TrimPrefix(field, "-")
+			shorthand := shorthandValue[:1]
+			flag := lookupShorthandFlag(command, shorthand)
+			if flag == nil {
+				return nil, fmt.Errorf("unsupported shorthand flag %q", field)
+			}
+			hasInlineValue := len(shorthandValue) > 1
+			if !hasInlineValue && flag.NoOptDefVal == "" {
+				index++
+				if index >= len(fields) {
+					return nil, fmt.Errorf("flag %q requires a value", field)
+				}
+			}
+			continue
+		}
+		args = append(args, field)
+	}
+	return args, nil
+}
+
+func lookupFlag(command *cobra.Command, name string) *pflag.Flag {
+	if flag := command.Flags().Lookup(name); flag != nil {
+		return flag
+	}
+	if flag := command.InheritedFlags().Lookup(name); flag != nil {
+		return flag
+	}
+	return command.Root().PersistentFlags().Lookup(name)
+}
+
+func lookupShorthandFlag(command *cobra.Command, shorthand string) *pflag.Flag {
+	if flag := command.Flags().ShorthandLookup(shorthand); flag != nil {
+		return flag
+	}
+	if flag := command.InheritedFlags().ShorthandLookup(shorthand); flag != nil {
+		return flag
+	}
+	return command.Root().PersistentFlags().ShorthandLookup(shorthand)
+}
+
+func shellFields(line string) ([]string, error) {
+	var fields []string
+	var current strings.Builder
+	var quote rune
+	var escaped bool
+	var started bool
+	for _, char := range line {
+		if escaped {
+			current.WriteRune(char)
+			escaped = false
+			started = true
+			continue
+		}
+		if quote != 0 {
+			if char == quote {
+				quote = 0
+				continue
+			}
+			if quote == '"' && char == '\\' {
+				escaped = true
+				continue
+			}
+			current.WriteRune(char)
+			started = true
+			continue
+		}
+		switch {
+		case char == '\\':
+			escaped = true
+			started = true
+		case char == '\'' || char == '"':
+			quote = char
+			started = true
+		case unicode.IsSpace(char):
+			if started {
+				fields = append(fields, current.String())
+				current.Reset()
+				started = false
+			}
+		default:
+			current.WriteRune(char)
+			started = true
+		}
+	}
+	if escaped {
+		return nil, fmt.Errorf("unfinished escape")
+	}
+	if quote != 0 {
+		return nil, fmt.Errorf("unterminated quote %q", string(quote))
+	}
+	if started {
+		fields = append(fields, current.String())
+	}
+	return fields, nil
 }
 
 func cliInvocations(line string, invocationPattern *regexp.Regexp) []string {

@@ -128,10 +128,12 @@ Associates access logs with trace IDs in the SkyWalking UI.
 
 ### Enable globally via Global Rule
 
+Do not set an `id` in the create payload. The CLI derives the Global Rule ID
+from the plugin name.
+
 ```bash
 a7 global-rule create --gateway-group default -f - <<'EOF'
 {
-  "id": "skywalking-global",
   "plugins": {
     "skywalking": {
       "sample_ratio": 0.5
