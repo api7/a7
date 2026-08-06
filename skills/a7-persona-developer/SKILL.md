@@ -149,7 +149,7 @@ Use `debug trace` to see exactly which plugins are executed and how the URI is t
 
 ```bash
 # Trace a request with an API Key
-a7 debug trace -g dev-group \
+a7 debug trace user-v1-get -g dev-group \
   --path /v1/users/123 \
   --method GET \
   --header "X-API-KEY: my-dev-key"
@@ -158,8 +158,8 @@ a7 debug trace -g dev-group \
 ### Live Log Streaming
 
 ```bash
-# Stream error logs for your specific group
-a7 debug logs -g dev-group --follow --type error
+# Stream logs from a specific API7 Gateway container
+a7 debug logs --container <gateway-container> --follow
 ```
 
 ## CI/CD Integration
@@ -184,7 +184,7 @@ Automate your API lifecycle using `a7` in your pipelines.
 | Exposing an API path | Create or update a service-backed route | `a7 route create -f route.yaml` |
 | Backend URI mismatch | Use `proxy-rewrite` | `a7 route update ...` |
 | Testing Canary version | Use `traffic-split` | `a7 route update ...` |
-| Auth failure (401) | Check Trace & Logs | `a7 debug trace` & `a7 debug logs` |
+| Auth failure (401) | Check Trace & Logs | `a7 debug trace <route-id>` & `a7 debug logs` |
 
 ## Best Practices
 
