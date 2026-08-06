@@ -51,9 +51,9 @@ For route traffic, use the current a7 model:
 Gateway groups are the primary isolation boundary.
 
 ```bash
-a7 gateway-group create premium-tier --desc "High-performance tier for paid customers"
-a7 gateway-group create standard-tier --desc "Standard tier for free and trial users"
-a7 gateway-group create platform --desc "Shared platform gateway group for tenant consumers and routes"
+a7 gateway-group create --name premium-tier --description "High-performance tier for paid customers"
+a7 gateway-group create --name standard-tier --description "Standard tier for free and trial users"
+a7 gateway-group create --name platform --description "Shared platform gateway group for tenant consumers and routes"
 ```
 
 Each group can have its own global policies:

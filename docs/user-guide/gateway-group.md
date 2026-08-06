@@ -47,15 +47,15 @@ Creates a new gateway group.
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--name` | `-n` | | Name of the gateway group (required) |
-| `--desc` | `-d` | | Description |
+| `--name` | | | Name of the gateway group (required) |
+| `--description` | | | Description |
 | `--file` | `-f` | | Path to a configuration file |
 
 **Examples:**
 
 Create a gateway group via flags:
 ```bash
-a7 gateway-group create --name staging --desc "Staging environment"
+a7 gateway-group create --name staging --description "Staging environment"
 ```
 
 ### `a7 gateway-group update`
@@ -65,13 +65,13 @@ Updates an existing gateway group's configuration.
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--name` | `-n` | | New name |
-| `--desc` | `-d` | | New description |
+| `--description` | | | New description |
 | `--file` | `-f` | | Path to a configuration file |
 
 **Examples:**
 
 ```bash
-a7 gateway-group update staging --desc "Updated staging description"
+a7 gateway-group update staging --description "Updated staging description"
 ```
 
 ### `a7 gateway-group delete`

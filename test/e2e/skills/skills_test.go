@@ -222,8 +222,12 @@ func TestSkillShellExamplesUseSupportedA7CommandsAndFlags(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if len(matches) == 0 {
+		t.Fatal("expected at least one skill file")
+	}
 	rootHelp := commandHelp(t, nil)
 	rootCommands := availableCommands(rootHelp)
+	rootFlags := availableFlags(rootHelp)
 	for _, file := range matches {
 		data, err := os.ReadFile(file)
 		if err != nil {
@@ -236,12 +240,12 @@ func TestSkillShellExamplesUseSupportedA7CommandsAndFlags(t *testing.T) {
 					continue
 				}
 				path, help := resolveCommand(t, file, fields[1:], rootCommands)
-				validHelp := rootHelp + "\n" + help
+				validFlags := mergeFlagSets(rootFlags, availableFlags(help))
 				for _, flag := range longFlagPattern.FindAllString(line, -1) {
 					if flag == "--help" {
 						continue
 					}
-					if !strings.Contains(validHelp, flag) {
+					if !validFlags[flag] {
 						t.Fatalf("%s: command %q uses unsupported flag %q", file, "a7 "+strings.Join(path, " "), flag)
 					}
 				}
@@ -282,6 +286,57 @@ func availableCommands(help string) map[string]bool {
 	return commands
 }
 
+func availableFlags(help string) map[string]bool {
+	flags := map[string]bool{}
+	inFlags := false
+	for _, line := range strings.Split(help, "\n") {
+		heading := strings.TrimSpace(line)
+		if heading == "Flags:" || heading == "Global Flags:" {
+			inFlags = true
+			continue
+		}
+		if heading == "" {
+			inFlags = false
+			continue
+		}
+		if !inFlags {
+			continue
+		}
+		if flag := longFlagPattern.FindString(line); flag != "" {
+			flags[flag] = true
+		}
+	}
+	return flags
+}
+
+func mergeFlagSets(first map[string]bool, second map[string]bool) map[string]bool {
+	merged := map[string]bool{}
+	for flag := range first {
+		merged[flag] = true
+	}
+	for flag := range second {
+		merged[flag] = true
+	}
+	return merged
+}
+
+func commandFieldIsSubcommand(subcommands map[string]bool, field string) (bool, error) {
+	if len(subcommands) == 0 {
+		return false, nil
+	}
+	if !subcommands[field] {
+		return false, fmt.Errorf("unsupported nested command %q", field)
+	}
+	return true, nil
+}
+
+func TestCommandFieldIsSubcommand_RejectsUnknownNestedCommand(t *testing.T) {
+	subcommands := map[string]bool{"create": true, "list": true}
+	if _, err := commandFieldIsSubcommand(subcommands, "crte"); err == nil {
+		t.Fatal("expected misspelled nested command to fail")
+	}
+}
+
 func resolveCommand(t *testing.T, file string, fields []string, commands map[string]bool) ([]string, string) {
 	t.Helper()
 	if len(fields) == 0 || !commands[fields[0]] {
@@ -294,7 +349,11 @@ func resolveCommand(t *testing.T, file string, fields []string, commands map[str
 			break
 		}
 		subcommands := availableCommands(help)
-		if !subcommands[field] {
+		isSubcommand, err := commandFieldIsSubcommand(subcommands, field)
+		if err != nil {
+			t.Fatalf("%s: a7 %s: %v", file, strings.Join(path, " "), err)
+		}
+		if !isSubcommand {
 			break
 		}
 		path = append(path, field)

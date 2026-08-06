@@ -142,14 +142,37 @@ openssl genrsa -out private.pem 2048
 openssl rsa -in private.pem -pubout -out public.pem
 ```
 
-### 2. Create credential with public key
+### 2. Create a consumer
 
 ```bash
-a7 credential create cred-bob-jwt -g default --consumer bob -f credential.yaml
+a7 consumer create -g default -f - <<'EOF'
+{
+  "username": "bob"
+}
+EOF
 ```
 
-Where `credential.yaml` contains the `jwt-auth` plugin configuration and the
-public key. Keep the private key outside API7 Gateway.
+### 3. Create a credential with the public key
+
+Save the following as `bob-rs256-credential.yaml`, replacing the placeholder
+with the contents of `public.pem`:
+
+```yaml
+plugins:
+  jwt-auth:
+    key: bob-key
+    algorithm: RS256
+    public_key: |
+      -----BEGIN PUBLIC KEY-----
+      replace-with-the-base64-body-from-public.pem
+      -----END PUBLIC KEY-----
+```
+
+```bash
+a7 credential create cred-bob-jwt -g default --consumer bob -f bob-rs256-credential.yaml
+```
+
+Keep the private key outside API7 Gateway.
 
 Sign tokens with `private.pem` externally. API7 EE only needs the public key.
 
