@@ -15,6 +15,8 @@ import (
 )
 
 var skillNamePattern = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+var shellFencePattern = regexp.MustCompile("(?s)```(?:bash|sh|shell)\\s*\\n(.*?)```")
+var longFlagPattern = regexp.MustCompile(`--[a-z][a-z0-9-]*`)
 var a7Binary string
 
 func locateRepoRoot() (string, error) {
@@ -212,6 +214,114 @@ func TestSkillDeclaredA7CommandsExist(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestSkillShellExamplesUseSupportedA7CommandsAndFlags(t *testing.T) {
+	root := repoRoot(t)
+	matches, err := filepath.Glob(filepath.Join(root, "skills", "*", "SKILL.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootHelp := commandHelp(t, nil)
+	rootCommands := availableCommands(rootHelp)
+	for _, file := range matches {
+		data, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, block := range shellFencePattern.FindAllStringSubmatch(string(data), -1) {
+			for _, line := range joinedShellLines(block[1]) {
+				fields := strings.Fields(line)
+				if len(fields) < 2 || fields[0] != "a7" {
+					continue
+				}
+				path, help := resolveCommand(t, file, fields[1:], rootCommands)
+				validHelp := rootHelp + "\n" + help
+				for _, flag := range longFlagPattern.FindAllString(line, -1) {
+					if flag == "--help" {
+						continue
+					}
+					if !strings.Contains(validHelp, flag) {
+						t.Fatalf("%s: command %q uses unsupported flag %q", file, "a7 "+strings.Join(path, " "), flag)
+					}
+				}
+			}
+		}
+	}
+}
+
+func commandHelp(t *testing.T, path []string) string {
+	t.Helper()
+	args := append(append([]string{}, path...), "--help")
+	output, err := exec.Command(a7Binary, args...).CombinedOutput()
+	if err != nil {
+		t.Fatalf("a7 %s --help failed: %v\n%s", strings.Join(path, " "), err, output)
+	}
+	return string(output)
+}
+
+func availableCommands(help string) map[string]bool {
+	commands := map[string]bool{}
+	inCommands := false
+	for _, line := range strings.Split(help, "\n") {
+		if strings.TrimSpace(line) == "Available Commands:" {
+			inCommands = true
+			continue
+		}
+		if !inCommands {
+			continue
+		}
+		if strings.TrimSpace(line) == "" {
+			break
+		}
+		fields := strings.Fields(line)
+		if len(fields) > 0 {
+			commands[fields[0]] = true
+		}
+	}
+	return commands
+}
+
+func resolveCommand(t *testing.T, file string, fields []string, commands map[string]bool) ([]string, string) {
+	t.Helper()
+	if len(fields) == 0 || !commands[fields[0]] {
+		t.Fatalf("%s: unsupported a7 command %q", file, strings.Join(fields, " "))
+	}
+	path := []string{fields[0]}
+	help := commandHelp(t, path)
+	for _, field := range fields[1:] {
+		if strings.HasPrefix(field, "-") || strings.ContainsAny(field, "|<>") {
+			break
+		}
+		subcommands := availableCommands(help)
+		if !subcommands[field] {
+			break
+		}
+		path = append(path, field)
+		help = commandHelp(t, path)
+	}
+	return path, help
+}
+
+func joinedShellLines(block string) []string {
+	var commands []string
+	var current string
+	for _, raw := range strings.Split(block, "\n") {
+		line := strings.TrimSpace(raw)
+		if current == "" && (line == "" || strings.HasPrefix(line, "#")) {
+			continue
+		}
+		current += " " + strings.TrimSuffix(line, "\\")
+		if strings.HasSuffix(line, "\\") {
+			continue
+		}
+		commands = append(commands, strings.TrimSpace(current))
+		current = ""
+	}
+	if strings.TrimSpace(current) != "" {
+		commands = append(commands, strings.TrimSpace(current))
+	}
+	return commands
 }
 
 func TestPluginSkillsDeclarePluginName(t *testing.T) {

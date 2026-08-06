@@ -133,7 +133,7 @@ Run a local APISIX instance via Docker and test your routes using generic `a7` c
 Before pushing to the Dashboard, validate your config against the enterprise schema.
 
 ```bash
-a7 config validate -g dev-group -f my-api.yaml
+a7 config validate -f my-api.yaml
 ```
 
 ### 3. Sync to Dashboard
@@ -150,17 +150,16 @@ Use `debug trace` to see exactly which plugins are executed and how the URI is t
 ```bash
 # Trace a request with an API Key
 a7 debug trace -g dev-group \
-  --uri /v1/users/123 \
+  --path /v1/users/123 \
   --method GET \
-  --header "X-API-KEY: my-dev-key" \
-  --verbose
+  --header "X-API-KEY: my-dev-key"
 ```
 
 ### Live Log Streaming
 
 ```bash
 # Stream error logs for your specific group
-a7 debug logs -g dev-group --follow --level error
+a7 debug logs -g dev-group --follow --type error
 ```
 
 ## CI/CD Integration
@@ -195,5 +194,5 @@ Automate your API lifecycle using `a7` in your pipelines.
 4. **Token Security**: Do not hardcode your `--token` in scripts; use environment variables or secrets.
 5. **Declarative Sync**: Prefer `a7 config sync` for complex multi-route deployments.
 6. **Documentation**: Always provide a description (`--desc`) for routes and services for colleagues.
-7. **Trace Verbosity**: Use `--verbose` in `debug trace` to inspect plugin input/output headers.
+7. **Trace Scope**: Send only the headers needed to reproduce the request, and redact credentials before sharing trace output.
 8. **Route Model**: Prefer `service create` plus `route create` with `service_id`; avoid standalone upstream workflows for API7 EE.

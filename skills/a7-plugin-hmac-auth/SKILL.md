@@ -71,33 +71,32 @@ EOF
 ### 2. Add hmac-auth credential
 
 ```bash
-curl -k "https://$(a7 context current -o json | jq -r .server):7443/apisix/admin/consumers/alice/credentials" \
-  -X PUT \
-  -H "X-API-KEY: $(a7 context current -o json | jq -r .token)" \
-  -d '{
-    "id": "cred-alice-hmac",
-    "plugins": {
-      "hmac-auth": {
-        "key_id": "alice-key",
-        "secret_key": "alice-secret-key-value"
-      }
-    }
-  }'
+a7 credential create cred-alice-hmac -g default \
+  --consumer alice \
+  --plugins-json '{"hmac-auth":{"key_id":"alice-key","secret_key":"alice-secret-key-value"}}'
 ```
 
-### 3. Create a route with hmac-auth enabled
+### 3. Create a service and route with hmac-auth enabled
 
 ```bash
-a7 route create -g default -f - <<'EOF'
+a7 service create -g default -f - <<'EOF'
 {
-  "id": "hmac-protected",
-  "uri": "/api/*",
-  "plugins": {
-    "hmac-auth": {}
-  },
+  "id": "hmac-protected-service",
+  "name": "HMAC protected service",
   "upstream": {
     "type": "roundrobin",
     "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
+  }
+}
+EOF
+
+a7 route create -g default -f - <<'EOF'
+{
+  "id": "hmac-protected",
+  "paths": ["/api/*"],
+  "service_id": "hmac-protected-service",
+  "plugins": {
+    "hmac-auth": {}
   }
 }
 EOF

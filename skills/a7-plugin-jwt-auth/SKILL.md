@@ -92,35 +92,32 @@ EOF
 ### 2. Add jwt-auth credential
 
 ```bash
-curl -k "https://$(a7 context current -o json | jq -r .server):7443/apisix/admin/consumers/alice/credentials" \
-  -X PUT \
-  -H "X-API-KEY: $(a7 context current -o json | jq -r .token)" \
-  -d '{
-    "id": "cred-alice-jwt",
-    "plugins": {
-      "jwt-auth": {
-        "key": "alice-key",
-        "secret": "alice-secret-minimum-32-chars-long",
-        "algorithm": "HS256",
-        "exp": 86400
-      }
-    }
-  }'
+a7 credential create cred-alice-jwt -g default \
+  --consumer alice \
+  --plugins-json '{"jwt-auth":{"key":"alice-key","secret":"alice-secret-minimum-32-chars-long","algorithm":"HS256","exp":86400}}'
 ```
 
-### 3. Create a route with jwt-auth
+### 3. Create a service and route with jwt-auth
 
 ```bash
-a7 route create -g default -f - <<'EOF'
+a7 service create -g default -f - <<'EOF'
 {
-  "id": "jwt-protected",
-  "uri": "/api/*",
-  "plugins": {
-    "jwt-auth": {}
-  },
+  "id": "jwt-protected-service",
+  "name": "JWT protected service",
   "upstream": {
     "type": "roundrobin",
     "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
+  }
+}
+EOF
+
+a7 route create -g default -f - <<'EOF'
+{
+  "id": "jwt-protected",
+  "paths": ["/api/*"],
+  "service_id": "jwt-protected-service",
+  "plugins": {
+    "jwt-auth": {}
   }
 }
 EOF
@@ -148,20 +145,11 @@ openssl rsa -in private.pem -pubout -out public.pem
 ### 2. Create credential with public key
 
 ```bash
-curl -k "https://$(a7 context current -o json | jq -r .server):7443/apisix/admin/consumers/bob/credentials" \
-  -X PUT \
-  -H "X-API-KEY: $(a7 context current -o json | jq -r .token)" \
-  -d '{
-    "id": "cred-bob-jwt",
-    "plugins": {
-      "jwt-auth": {
-        "key": "bob-key",
-        "algorithm": "RS256",
-        "public_key": "-----BEGIN PUBLIC KEY-----\nMIIBIjAN...\n-----END PUBLIC KEY-----"
-      }
-    }
-  }'
+a7 credential create cred-bob-jwt -g default --consumer bob -f credential.yaml
 ```
+
+Where `credential.yaml` contains the `jwt-auth` plugin configuration and the
+public key. Keep the private key outside API7 Gateway.
 
 Sign tokens with `private.pem` externally. API7 EE only needs the public key.
 

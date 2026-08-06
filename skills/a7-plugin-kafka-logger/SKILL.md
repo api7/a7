@@ -106,7 +106,7 @@ EOF
 Apply a Global Rule for all traffic in the `prod` group:
 
 ```bash
-a7 global_rule create --gateway-group prod -f - <<'EOF'
+a7 global-rule create --gateway-group prod -f - <<'EOF'
 {
   "id": "kafka-logger-global",
   "plugins": {

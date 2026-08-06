@@ -71,35 +71,33 @@ EOF
 
 ### 2. Add key-auth credential to the consumer
 
-Use the Admin API (credentials are sub-resources of consumers):
-
 ```bash
-curl -k "https://$(a7 context current -o json | jq -r .server):7443/apisix/admin/consumers/alice/credentials" \
-  -X PUT \
-  -H "X-API-KEY: $(a7 context current -o json | jq -r .token)" \
-  -d '{
-    "id": "cred-alice-key-auth",
-    "plugins": {
-      "key-auth": {
-        "key": "alice-secret-key-001"
-      }
-    }
-  }'
+a7 credential create cred-alice-key-auth -g default \
+  --consumer alice \
+  --plugins-json '{"key-auth":{"key":"alice-secret-key-001"}}'
 ```
 
-### 3. Create a route with key-auth enabled
+### 3. Create a service and route with key-auth enabled
 
 ```bash
-a7 route create -g default -f - <<'EOF'
+a7 service create -g default -f - <<'EOF'
 {
-  "id": "protected-api",
-  "uri": "/api/*",
-  "plugins": {
-    "key-auth": {}
-  },
+  "id": "protected-api-service",
+  "name": "Protected API",
   "upstream": {
     "type": "roundrobin",
     "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
+  }
+}
+EOF
+
+a7 route create -g default -f - <<'EOF'
+{
+  "id": "protected-api",
+  "paths": ["/api/*"],
+  "service_id": "protected-api-service",
+  "plugins": {
+    "key-auth": {}
   }
 }
 EOF

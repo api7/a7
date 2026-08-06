@@ -129,7 +129,7 @@ Associates access logs with trace IDs in the SkyWalking UI.
 ### Enable globally via Global Rule
 
 ```bash
-a7 global_rule create --gateway-group default -f - <<'EOF'
+a7 global-rule create --gateway-group default -f - <<'EOF'
 {
   "id": "skywalking-global",
   "plugins": {

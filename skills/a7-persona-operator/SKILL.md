@@ -83,7 +83,7 @@ a7 config dump -g finance-dept > finance-backup-$(date +%F).yaml
 a7 config diff -g finance-dept -f finance-infra.yaml
 
 # Validate enterprise plugin configuration before sync
-a7 config validate -g finance-dept -f updated-config.yaml
+a7 config validate -f updated-config.yaml
 ```
 
 ### 3. Enterprise Security & SSL
@@ -117,7 +117,7 @@ a7 config diff -g prod-group -f infra-v2.yaml
 a7 config sync -g prod-group -f infra-v2.yaml
 
 # 4. Verify traffic flow in Prod
-a7 debug trace -g prod-group --uri /v1/status
+a7 debug trace -g prod-group --path /v1/status
 ```
 
 ### Emergency Rollback
@@ -136,10 +136,10 @@ a7 config sync -g prod-group -f last-good-backup.yaml
 
 ```bash
 # 1. Trace a request through a specific Gateway Group
-a7 debug trace -g customer-facing --uri /api/v1/checkout --method POST
+a7 debug trace -g customer-facing --path /api/v1/checkout --method POST
 
 # 2. Follow real-time error logs for a Gateway Group
-a7 debug logs -g customer-facing --follow --level error
+a7 debug logs -g customer-facing --follow --type error
 
 # 3. Check for misconfigured Global Rules
 a7 global-rule list -g customer-facing --output json
@@ -149,7 +149,7 @@ a7 global-rule list -g customer-facing --output json
 
 ```bash
 # Check the execution time of plugins in the trace
-a7 debug trace -g api-internal --uri /heavy-endpoint --verbose
+a7 debug trace -g api-internal --path /heavy-endpoint
 
 # List active routes and their hit counts (if metrics enabled)
 a7 route list -g api-internal --output wide

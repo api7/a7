@@ -138,7 +138,7 @@ Jaeger supports the Zipkin v2 API:
 ### Enable globally via Global Rule
 
 ```bash
-a7 global_rule create --gateway-group prod -f - <<'EOF'
+a7 global-rule create --gateway-group prod -f - <<'EOF'
 {
   "id": "zipkin-global",
   "plugins": {

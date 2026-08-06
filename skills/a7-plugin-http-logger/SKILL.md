@@ -117,7 +117,7 @@ EOF
 Apply a Global Rule to log all traffic in the `prod` group:
 
 ```bash
-a7 global_rule create --gateway-group prod -f - <<'EOF'
+a7 global-rule create --gateway-group prod -f - <<'EOF'
 {
   "id": "http-logger-global",
   "plugins": {

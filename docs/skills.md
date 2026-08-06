@@ -4,7 +4,29 @@ This document describes the skill system for the a7 CLI. Skills are structured k
 
 ## Overview
 
-Skills are `SKILL.md` files stored in the `skills/` directory. Each skill provides domain-specific instructions, command patterns, and decision guidance for AI agents. The format is compatible with 39+ AI coding agents including Claude Code, OpenCode, Cursor, GitHub Copilot, and Windsurf.
+Skills are `SKILL.md` files stored in the `skills/` directory. Each skill provides domain-specific instructions, command patterns, and decision guidance for AI agents. The supported installation examples cover Claude Code, Codex, Cursor, and GitHub Copilot.
+
+Install the narrowest skill needed for the current task. Do not install the full
+collection by default: overlapping persona, recipe, and plugin guidance adds
+routing ambiguity and makes review and updates harder.
+
+## Install a Skill
+
+Preview the available skills, then copy one skill into the current project:
+
+```bash
+npx skills add api7/a7 --list
+npx skills add api7/a7 --skill a7-plugin-key-auth --agent codex --copy
+```
+
+Replace `codex` with `claude-code`, `cursor`, or `github-copilot`. Review the
+selected `SKILL.md` before use. Installation copies instructions only; it does
+not install `a7`, connect to API7 Gateway, or run gateway commands.
+
+Use a non-production gateway group and a narrowly scoped token for a first run.
+Ask the agent to inspect current resources, propose an exact change, wait for
+approval, apply only the approved change, verify the result, and retain a
+rollback path. Never put an access token in a prompt or committed file.
 
 ## Directory Structure
 
@@ -116,14 +138,15 @@ Every PR validates `skills/` with `scripts/validate-skills.sh`. The script check
 6. skill names are unique
 
 The E2E suite also contains static skill checks under `test/e2e/skills`.
-Those checks keep this document aligned with the actual `skills/` inventory and
-prevent references to known removed commands such as the old health and portal
-commands.
+Those checks keep this document aligned with the actual `skills/` inventory,
+reject known removed commands, and validate commands and long flags used in
+shell examples against the current a7 CLI help tree.
 
 Run locally:
 
 ```bash
 make validate-skills
+make test-skills
 ```
 
 ## Adding a New Skill
@@ -131,7 +154,7 @@ make validate-skills
 1. Choose the skill type and name following the [taxonomy](#skill-taxonomy)
 2. Create the directory: `mkdir skills/<skill-name>`
 3. Create `skills/<skill-name>/SKILL.md` with frontmatter and body
-4. Run validation: `make validate-skills`
+4. Run validation: `make validate-skills test-skills`
 5. Update this document if adding a new skill type or category
 
 ## Current Inventory

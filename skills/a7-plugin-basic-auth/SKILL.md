@@ -65,33 +65,32 @@ EOF
 ### 2. Add basic-auth credential
 
 ```bash
-curl -k "https://$(a7 context current -o json | jq -r .server):7443/apisix/admin/consumers/alice/credentials" \
-  -X PUT \
-  -H "X-API-KEY: $(a7 context current -o json | jq -r .token)" \
-  -d '{
-    "id": "cred-alice-basic-auth",
-    "plugins": {
-      "basic-auth": {
-        "username": "alice",
-        "password": "alice-password-123"
-      }
-    }
-  }'
+a7 credential create cred-alice-basic-auth -g default \
+  --consumer alice \
+  --plugins-json '{"basic-auth":{"username":"alice","password":"alice-password-123"}}'
 ```
 
-### 3. Create a route with basic-auth enabled
+### 3. Create a service and route with basic-auth enabled
 
 ```bash
-a7 route create -g default -f - <<'EOF'
+a7 service create -g default -f - <<'EOF'
 {
-  "id": "basic-protected",
-  "uri": "/api/*",
-  "plugins": {
-    "basic-auth": {}
-  },
+  "id": "basic-protected-service",
+  "name": "Basic protected service",
   "upstream": {
     "type": "roundrobin",
     "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
+  }
+}
+EOF
+
+a7 route create -g default -f - <<'EOF'
+{
+  "id": "basic-protected",
+  "paths": ["/api/*"],
+  "service_id": "basic-protected-service",
+  "plugins": {
+    "basic-auth": {}
   }
 }
 EOF

@@ -94,7 +94,7 @@ EOF
 Use a Global Rule to enable metrics for all routes in the `prod` group:
 
 ```bash
-a7 global_rule create --gateway-group prod -f - <<'EOF'
+a7 global-rule create --gateway-group prod -f - <<'EOF'
 {
   "id": "prometheus-global",
   "plugins": {
