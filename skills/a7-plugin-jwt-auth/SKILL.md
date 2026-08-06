@@ -155,7 +155,7 @@ EOF
 ### 3. Create a credential with the public key
 
 Save the following as `bob-rs256-credential.yaml`, replacing the placeholder
-with the contents of `public.pem`:
+with the base64 body between the PEM delimiters in `public.pem`:
 
 ```yaml
 plugins:

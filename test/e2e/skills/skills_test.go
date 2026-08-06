@@ -15,8 +15,6 @@ import (
 )
 
 var skillNamePattern = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
-var shellFencePattern = regexp.MustCompile("(?s)```(?:bash|sh|shell)\\s*\\n(.*?)```")
-var longFlagPattern = regexp.MustCompile(`--[a-z][a-z0-9-]*`)
 var a7Binary string
 
 func locateRepoRoot() (string, error) {
@@ -217,6 +215,10 @@ func TestSkillDeclaredA7CommandsExist(t *testing.T) {
 }
 
 func TestSkillShellExamplesUseSupportedA7CommandsAndFlags(t *testing.T) {
+	shellFencePattern := regexp.MustCompile("(?s)```(?:bash|sh|shell)\\s*\\n(.*?)```")
+	longFlagPattern := regexp.MustCompile(`--[a-z][a-z0-9-]*`)
+	invocationPattern := regexp.MustCompile(`(?:^|[^A-Za-z0-9_-])(a7(?:\s+[^|;&)]*)?)`)
+	valueFlags := a7GlobalValueFlags()
 	root := repoRoot(t)
 	matches, err := filepath.Glob(filepath.Join(root, "skills", "*", "SKILL.md"))
 	if err != nil {
@@ -227,7 +229,15 @@ func TestSkillShellExamplesUseSupportedA7CommandsAndFlags(t *testing.T) {
 	}
 	rootHelp := commandHelp(t, nil)
 	rootCommands := availableCommands(rootHelp)
-	rootFlags := availableFlags(rootHelp)
+	rootFlags := availableFlags(rootHelp, longFlagPattern)
+	regressionPath, regressionHelp, regressionErr := resolveCommand(t, "regression", []string{"route", "--gateway-group", "default", "craete"}, rootCommands, rootFlags, valueFlags)
+	if regressionErr == nil {
+		t.Fatalf("expected misspelled command after a persistent flag to fail, got path %q and help %q", regressionPath, regressionHelp)
+	}
+	embedded := cliInvocations("CURRENT=$(a7 route get example -g default)", invocationPattern)
+	if len(embedded) != 1 || !strings.HasPrefix(embedded[0], "a7 route get") {
+		t.Fatalf("expected embedded a7 invocation, got %q", embedded)
+	}
 	for _, file := range matches {
 		data, err := os.ReadFile(file)
 		if err != nil {
@@ -235,22 +245,51 @@ func TestSkillShellExamplesUseSupportedA7CommandsAndFlags(t *testing.T) {
 		}
 		for _, block := range shellFencePattern.FindAllStringSubmatch(string(data), -1) {
 			for _, line := range joinedShellLines(block[1]) {
-				fields := strings.Fields(line)
-				if len(fields) < 2 || fields[0] != "a7" {
-					continue
-				}
-				path, help := resolveCommand(t, file, fields[1:], rootCommands)
-				validFlags := mergeFlagSets(rootFlags, availableFlags(help))
-				for _, flag := range longFlagPattern.FindAllString(line, -1) {
-					if flag == "--help" {
+				for _, invocation := range cliInvocations(line, invocationPattern) {
+					fields := strings.Fields(invocation)
+					if len(fields) < 2 {
 						continue
 					}
-					if !validFlags[flag] {
-						t.Fatalf("%s: command %q uses unsupported flag %q", file, "a7 "+strings.Join(path, " "), flag)
+					path, help, err := resolveCommand(t, file, commandFields(fields[1:]), rootCommands, rootFlags, valueFlags)
+					if err != nil {
+						t.Fatalf("%s: %v", file, err)
+					}
+					validFlags := mergeFlagSets(rootFlags, availableFlags(help, longFlagPattern))
+					for _, flag := range longFlagPattern.FindAllString(invocation, -1) {
+						if flag == "--help" {
+							continue
+						}
+						if !validFlags[flag] {
+							t.Fatalf("%s: command %q uses unsupported flag %q", file, "a7 "+strings.Join(path, " "), flag)
+						}
 					}
 				}
 			}
 		}
+	}
+}
+
+func commandFields(fields []string) []string {
+	valueFlags := a7GlobalValueFlags()
+	for len(fields) > 0 && strings.HasPrefix(fields[0], "-") {
+		flag := strings.SplitN(fields[0], "=", 2)[0]
+		hasInlineValue := strings.Contains(fields[0], "=")
+		fields = fields[1:]
+		if valueFlags[flag] && !hasInlineValue && len(fields) > 0 {
+			fields = fields[1:]
+		}
+	}
+	return fields
+}
+
+func a7GlobalValueFlags() map[string]bool {
+	return map[string]bool{
+		"--gateway-group": true,
+		"--output":        true,
+		"--server":        true,
+		"--token":         true,
+		"-g":              true,
+		"-o":              true,
 	}
 }
 
@@ -286,7 +325,7 @@ func availableCommands(help string) map[string]bool {
 	return commands
 }
 
-func availableFlags(help string) map[string]bool {
+func availableFlags(help string, longFlagPattern *regexp.Regexp) map[string]bool {
 	flags := map[string]bool{}
 	inFlags := false
 	for _, line := range strings.Split(help, "\n") {
@@ -337,29 +376,58 @@ func TestCommandFieldIsSubcommand_RejectsUnknownNestedCommand(t *testing.T) {
 	}
 }
 
-func resolveCommand(t *testing.T, file string, fields []string, commands map[string]bool) ([]string, string) {
+func resolveCommand(t *testing.T, file string, fields []string, commands map[string]bool, rootFlags map[string]bool, valueFlags map[string]bool) ([]string, string, error) {
 	t.Helper()
 	if len(fields) == 0 || !commands[fields[0]] {
-		t.Fatalf("%s: unsupported a7 command %q", file, strings.Join(fields, " "))
+		return nil, "", fmt.Errorf("unsupported a7 command %q", strings.Join(fields, " "))
 	}
 	path := []string{fields[0]}
 	help := commandHelp(t, path)
-	for _, field := range fields[1:] {
-		if strings.HasPrefix(field, "-") || strings.ContainsAny(field, "|<>") {
+	for index := 1; index < len(fields); {
+		field := fields[index]
+		if strings.ContainsAny(field, "|<>") {
 			break
 		}
 		subcommands := availableCommands(help)
+		if len(subcommands) == 0 {
+			break
+		}
+		if strings.HasPrefix(field, "-") {
+			flag := strings.SplitN(field, "=", 2)[0]
+			if !rootFlags[flag] {
+				return path, help, fmt.Errorf("unsupported interspersed flag %q before a7 subcommand", flag)
+			}
+			index++
+			if valueFlags[flag] && !strings.Contains(field, "=") {
+				if index >= len(fields) {
+					return path, help, fmt.Errorf("flag %q requires a value", flag)
+				}
+				index++
+			}
+			continue
+		}
 		isSubcommand, err := commandFieldIsSubcommand(subcommands, field)
 		if err != nil {
-			t.Fatalf("%s: a7 %s: %v", file, strings.Join(path, " "), err)
+			return path, help, fmt.Errorf("a7 %s: %w", strings.Join(path, " "), err)
 		}
 		if !isSubcommand {
 			break
 		}
 		path = append(path, field)
 		help = commandHelp(t, path)
+		index++
 	}
-	return path, help
+	return path, help, nil
+}
+
+func cliInvocations(line string, invocationPattern *regexp.Regexp) []string {
+	var invocations []string
+	for _, match := range invocationPattern.FindAllStringSubmatch(line, -1) {
+		if len(match) > 1 {
+			invocations = append(invocations, strings.TrimSpace(match[1]))
+		}
+	}
+	return invocations
 }
 
 func joinedShellLines(block string) []string {
