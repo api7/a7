@@ -202,8 +202,11 @@ routes:
 Apply it:
 
 ```bash
-a7 config sync -g "$PLATFORM_GROUP_ID" -f platform-tenants.yaml
+a7 config sync -g "$PLATFORM_GROUP_ID" -f platform-tenants.yaml --delete=false
 ```
+
+This file contains only the tenant service and route. Disabling deletion keeps
+the consumers and other resources that are managed separately in the gateway group.
 
 Use `a7 consumer create -f` and `a7 credential create` for tenant identities and
 key material.
