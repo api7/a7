@@ -90,10 +90,11 @@ When no custom `log_format` is set, each log entry contains:
 
 ### 1. Create a service and route with http-logger
 
-Enable logging for gateway group `default`:
+Replace `<gateway-group-id>` with the ID returned by
+`a7 gateway-group list -o json`, then enable logging:
 
 ```bash
-a7 service create --gateway-group default -f - <<'EOF'
+a7 service create --gateway-group <gateway-group-id> -f - <<'EOF'
 {
   "id": "logged-api-service",
   "name": "Logged API service",
@@ -104,7 +105,7 @@ a7 service create --gateway-group default -f - <<'EOF'
 }
 EOF
 
-a7 route create --gateway-group default -f - <<'EOF'
+a7 route create --gateway-group <gateway-group-id> -f - <<'EOF'
 {
   "id": "logged-api",
   "name": "Logged API route",
@@ -123,13 +124,13 @@ EOF
 
 ### 2. Global logging for a gateway group
 
-Apply a Global Rule to log all traffic in the `prod` group:
+Apply a Global Rule to log all traffic in the target gateway group:
 
 Do not set an `id` in the create payload. The CLI derives the Global Rule ID
 from the plugin name.
 
 ```bash
-a7 global-rule create --gateway-group prod -f - <<'EOF'
+a7 global-rule create --gateway-group <gateway-group-id> -f - <<'EOF'
 {
   "plugins": {
     "http-logger": {

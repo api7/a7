@@ -76,10 +76,11 @@ producing, custom log formats, and batch processing for efficient delivery.
 
 ### 1. Create a service and route with kafka-logger
 
-Enable logging for gateway group `default`:
+Replace `<gateway-group-id>` with the ID returned by
+`a7 gateway-group list -o json`, then enable logging:
 
 ```bash
-a7 service create --gateway-group default -f - <<'EOF'
+a7 service create --gateway-group <gateway-group-id> -f - <<'EOF'
 {
   "id": "kafka-logged-api-service",
   "name": "Kafka logged API service",
@@ -90,7 +91,7 @@ a7 service create --gateway-group default -f - <<'EOF'
 }
 EOF
 
-a7 route create --gateway-group default -f - <<'EOF'
+a7 route create --gateway-group <gateway-group-id> -f - <<'EOF'
 {
   "id": "kafka-logged-api",
   "name": "Kafka logged API route",
@@ -112,13 +113,13 @@ EOF
 
 ### 2. Global logging for a gateway group
 
-Apply a Global Rule for all traffic in the `prod` group:
+Apply a Global Rule for all traffic in the target gateway group:
 
 Do not set an `id` in the create payload. The CLI derives the Global Rule ID
 from the plugin name.
 
 ```bash
-a7 global-rule create --gateway-group prod -f - <<'EOF'
+a7 global-rule create --gateway-group <gateway-group-id> -f - <<'EOF'
 {
   "plugins": {
     "kafka-logger": {

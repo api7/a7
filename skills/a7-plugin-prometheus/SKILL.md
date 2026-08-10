@@ -69,10 +69,11 @@ prometheus port (usually `9091` or exposed via the data plane port `9080`).
 
 ### 1. Enable on a service-backed route
 
-Enable metrics for gateway group `default`:
+Replace `<gateway-group-id>` with the ID returned by
+`a7 gateway-group list -o json`, then enable metrics:
 
 ```bash
-a7 service create --gateway-group default -f - <<'EOF'
+a7 service create --gateway-group <gateway-group-id> -f - <<'EOF'
 {
   "id": "metrics-api-service",
   "name": "Metrics API service",
@@ -83,7 +84,7 @@ a7 service create --gateway-group default -f - <<'EOF'
 }
 EOF
 
-a7 route create --gateway-group default -f - <<'EOF'
+a7 route create --gateway-group <gateway-group-id> -f - <<'EOF'
 {
   "id": "my-api",
   "name": "Metrics API route",
@@ -100,13 +101,13 @@ EOF
 
 ### 2. Enable globally (all routes in a group)
 
-Use a Global Rule to enable metrics for all routes in the `prod` group:
+Use a Global Rule to enable metrics for all routes in the target gateway group:
 
 Do not set an `id` in the create payload. The CLI derives the Global Rule ID
 from the plugin name.
 
 ```bash
-a7 global-rule create --gateway-group prod -f - <<'EOF'
+a7 global-rule create --gateway-group <gateway-group-id> -f - <<'EOF'
 {
   "plugins": {
     "prometheus": {}

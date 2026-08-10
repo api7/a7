@@ -237,32 +237,35 @@ func testSkillExamplesUseSupportedA7CommandsAndFlags(t *testing.T, root, binary 
 	}
 	rootHelp := commandHelp(t, binary, nil)
 	rootCommands := availableCommands(rootHelp)
-	regressionPath, regressionHelp, _, regressionErr := resolveCommand(t, binary, "regression", []string{"route", "--gateway-group", "default", "craete"}, rootCommands, rootFlags, valueFlags)
+	regressionPath, regressionHelp, _, regressionErr := resolveCommand(t, binary, "regression", []string{"route", "--gateway-group", "default", "craete"}, rootCommands, rootFlags, valueFlags, commandTree)
 	if regressionErr == nil {
 		t.Fatalf("expected misspelled command after a persistent flag to fail, got path %q and help %q", regressionPath, regressionHelp)
 	}
-	_, _, remaining, err := resolveCommand(t, binary, "regression", []string{"route", "get", "one", "two"}, rootCommands, rootFlags, valueFlags)
+	_, _, remaining, err := resolveCommand(t, binary, "regression", []string{"route", "get", "one", "two"}, rootCommands, rootFlags, valueFlags, commandTree)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := validatePositionalArgs(commandTree, []string{"route", "get"}, remaining); err == nil {
 		t.Fatal("expected extra positional argument to fail")
 	}
-	_, _, remaining, err = resolveCommand(t, binary, "regression", []string{"route", "get"}, rootCommands, rootFlags, valueFlags)
+	_, _, remaining, err = resolveCommand(t, binary, "regression", []string{"route", "get"}, rootCommands, rootFlags, valueFlags, commandTree)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := validatePositionalArgs(commandTree, []string{"route", "get"}, remaining); err == nil {
 		t.Fatal("expected missing positional argument to fail")
 	}
-	_, _, remaining, err = resolveCommand(t, binary, "regression", []string{"route", "list", "--output", "wide"}, rootCommands, rootFlags, valueFlags)
+	_, _, remaining, err = resolveCommand(t, binary, "regression", []string{"route", "list", "--output", "wide"}, rootCommands, rootFlags, valueFlags, commandTree)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := validatePositionalArgs(commandTree, []string{"route", "list"}, remaining); err == nil {
 		t.Fatal("expected unsupported output format to fail")
 	}
-	_, _, remaining, err = resolveCommand(t, binary, "regression", []string{"debug", "trace", "<route-id>", "--bogus"}, rootCommands, rootFlags, valueFlags)
+	if _, _, _, err := resolveCommand(t, binary, "regression", []string{"route", "--output", "wide", "list"}, rootCommands, rootFlags, valueFlags, commandTree); err == nil {
+		t.Fatal("expected unsupported interspersed output format to fail")
+	}
+	_, _, remaining, err = resolveCommand(t, binary, "regression", []string{"debug", "trace", "<route-id>", "--bogus"}, rootCommands, rootFlags, valueFlags, commandTree)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -323,7 +326,7 @@ func testSkillExamplesUseSupportedA7CommandsAndFlags(t *testing.T, root, binary 
 					if err != nil {
 						t.Fatalf("%s: %v", file, err)
 					}
-					path, _, remaining, err := resolveCommand(t, binary, file, commandArgs, rootCommands, rootFlags, valueFlags)
+					path, _, remaining, err := resolveCommand(t, binary, file, commandArgs, rootCommands, rootFlags, valueFlags, commandTree)
 					if err != nil {
 						t.Fatalf("%s: %v", file, err)
 					}
@@ -480,7 +483,7 @@ func TestCommandFieldIsSubcommand_RejectsUnknownNestedCommand(t *testing.T) {
 	}
 }
 
-func resolveCommand(t *testing.T, binary, file string, fields []string, commands map[string]bool, rootFlags map[string]bool, valueFlags map[string]bool) ([]string, string, []string, error) {
+func resolveCommand(t *testing.T, binary, file string, fields []string, commands map[string]bool, rootFlags map[string]bool, valueFlags map[string]bool, root *cobra.Command) ([]string, string, []string, error) {
 	t.Helper()
 	if len(fields) == 0 || !commands[fields[0]] {
 		return nil, "", nil, fmt.Errorf("unsupported a7 command %q", strings.Join(fields, " "))
@@ -502,12 +505,30 @@ func resolveCommand(t *testing.T, binary, file string, fields []string, commands
 			if !rootFlags[flag] {
 				return path, help, nil, fmt.Errorf("unsupported interspersed flag %q before a7 subcommand", flag)
 			}
+			hasInlineValue := strings.Contains(field, "=")
+			value := ""
+			if hasInlineValue {
+				_, value, _ = strings.Cut(field, "=")
+			}
 			index++
-			if valueFlags[flag] && !strings.Contains(field, "=") {
+			if valueFlags[flag] && !hasInlineValue {
 				if index >= len(fields) {
 					return path, help, nil, fmt.Errorf("flag %q requires a value", flag)
 				}
+				value = fields[index]
 				index++
+			}
+			var rootFlag *pflag.Flag
+			if strings.HasPrefix(flag, "--") {
+				rootFlag = lookupFlag(root, strings.TrimPrefix(flag, "--"))
+			} else {
+				rootFlag = lookupShorthandFlag(root, strings.TrimPrefix(flag, "-"))
+			}
+			if rootFlag == nil {
+				return path, help, nil, fmt.Errorf("failed to resolve interspersed root flag %q", flag)
+			}
+			if err := validateKnownFlagValue(rootFlag, value); err != nil {
+				return path, help, nil, err
 			}
 			continue
 		}

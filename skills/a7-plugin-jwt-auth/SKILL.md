@@ -78,10 +78,13 @@ identity headers.
 
 ## Step-by-Step: Enable jwt-auth with HS256
 
+Replace `<gateway-group-id>` with the ID returned by
+`a7 gateway-group list -o json`.
+
 ### 1. Create a consumer
 
 ```bash
-a7 consumer create -g default -f - <<'EOF'
+a7 consumer create -g <gateway-group-id> -f - <<'EOF'
 {
   "username": "alice"
 }
@@ -91,7 +94,7 @@ EOF
 ### 2. Add jwt-auth credential
 
 ```bash
-a7 credential create cred-alice-jwt -g default \
+a7 credential create cred-alice-jwt -g <gateway-group-id> \
   --consumer alice \
   --plugins-json '{"jwt-auth":{"key":"alice-key","secret":"alice-secret-minimum-32-chars-long","algorithm":"HS256","exp":86400}}'
 ```
@@ -99,7 +102,7 @@ a7 credential create cred-alice-jwt -g default \
 ### 3. Create a service and route with jwt-auth
 
 ```bash
-a7 service create -g default -f - <<'EOF'
+a7 service create -g <gateway-group-id> -f - <<'EOF'
 {
   "id": "jwt-protected-service",
   "name": "JWT protected service",
@@ -110,7 +113,7 @@ a7 service create -g default -f - <<'EOF'
 }
 EOF
 
-a7 route create -g default -f - <<'EOF'
+a7 route create -g <gateway-group-id> -f - <<'EOF'
 {
   "id": "jwt-protected",
   "paths": ["/api/*"],
@@ -144,7 +147,7 @@ openssl rsa -in private.pem -pubout -out public.pem
 ### 2. Create a consumer
 
 ```bash
-a7 consumer create -g default -f - <<'EOF'
+a7 consumer create -g <gateway-group-id> -f - <<'EOF'
 {
   "username": "bob"
 }
@@ -168,7 +171,7 @@ plugins:
 ```
 
 ```bash
-a7 credential create cred-bob-jwt -g default --consumer bob -f bob-rs256-credential.yaml
+a7 credential create cred-bob-jwt -g <gateway-group-id> --consumer bob -f bob-rs256-credential.yaml
 ```
 
 Keep the private key outside API7 Gateway.

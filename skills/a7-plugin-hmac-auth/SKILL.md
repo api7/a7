@@ -58,10 +58,13 @@ secrets over the wire.
 
 ## Step-by-Step: Enable hmac-auth on a Route
 
+Replace `<gateway-group-id>` with the ID returned by
+`a7 gateway-group list -o json`.
+
 ### 1. Create a consumer
 
 ```bash
-a7 consumer create -g default -f - <<'EOF'
+a7 consumer create -g <gateway-group-id> -f - <<'EOF'
 {
   "username": "alice"
 }
@@ -71,7 +74,7 @@ EOF
 ### 2. Add hmac-auth credential
 
 ```bash
-a7 credential create cred-alice-hmac -g default \
+a7 credential create cred-alice-hmac -g <gateway-group-id> \
   --consumer alice \
   --plugins-json '{"hmac-auth":{"key_id":"alice-key","secret_key":"alice-secret-key-value"}}'
 ```
@@ -79,7 +82,7 @@ a7 credential create cred-alice-hmac -g default \
 ### 3. Create a service and route with hmac-auth enabled
 
 ```bash
-a7 service create -g default -f - <<'EOF'
+a7 service create -g <gateway-group-id> -f - <<'EOF'
 {
   "id": "hmac-protected-service",
   "name": "HMAC protected service",
@@ -90,7 +93,7 @@ a7 service create -g default -f - <<'EOF'
 }
 EOF
 
-a7 route create -g default -f - <<'EOF'
+a7 route create -g <gateway-group-id> -f - <<'EOF'
 {
   "id": "hmac-protected",
   "paths": ["/api/*"],

@@ -59,10 +59,13 @@ headers. On failure it returns `401 Unauthorized`.
 
 ## Step-by-Step: Enable key-auth on a Route
 
+Replace `<gateway-group-id>` with the ID returned by
+`a7 gateway-group list -o json`.
+
 ### 1. Create a consumer
 
 ```bash
-a7 consumer create -g default -f - <<'EOF'
+a7 consumer create -g <gateway-group-id> -f - <<'EOF'
 {
   "username": "alice"
 }
@@ -72,7 +75,7 @@ EOF
 ### 2. Add key-auth credential to the consumer
 
 ```bash
-a7 credential create cred-alice-key-auth -g default \
+a7 credential create cred-alice-key-auth -g <gateway-group-id> \
   --consumer alice \
   --plugins-json '{"key-auth":{"key":"alice-secret-key-001"}}'
 ```
@@ -80,7 +83,7 @@ a7 credential create cred-alice-key-auth -g default \
 ### 3. Create a service and route with key-auth enabled
 
 ```bash
-a7 service create -g default -f - <<'EOF'
+a7 service create -g <gateway-group-id> -f - <<'EOF'
 {
   "id": "protected-api-service",
   "name": "Protected API",
@@ -91,7 +94,7 @@ a7 service create -g default -f - <<'EOF'
 }
 EOF
 
-a7 route create -g default -f - <<'EOF'
+a7 route create -g <gateway-group-id> -f - <<'EOF'
 {
   "id": "protected-api",
   "paths": ["/api/*"],
@@ -162,7 +165,7 @@ Always enable this in production.
 
 ```bash
 # Create anonymous consumer with strict limits
-a7 consumer create -g default -f - <<'EOF'
+a7 consumer create -g <gateway-group-id> -f - <<'EOF'
 {
   "username": "anonymous",
   "plugins": {
