@@ -259,6 +259,21 @@ func testSkillExamplesUseSupportedA7CommandsAndFlags(t *testing.T, root, binary 
 	if err := validatePositionalArgs(commandTree, []string{"route", "list"}, remaining); err == nil {
 		t.Fatal("expected unsupported output format to fail")
 	}
+	for _, fields := range [][]string{
+		{"--bogus", "route", "list"},
+		{"--bogus=value", "route", "list"},
+	} {
+		if _, err := commandFields(fields, commandTree, rootFlags, valueFlags); err == nil {
+			t.Fatalf("expected unsupported root flag in %q to fail", fields)
+		}
+	}
+	fields, err := commandFields([]string{"--output", "json", "route", "list"}, commandTree, rootFlags, valueFlags)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(fields, " ") != "route list" {
+		t.Fatalf("expected supported root flag to be removed, got %q", fields)
+	}
 	embedded := cliInvocations("CURRENT=$(a7 route get example -g default)", invocationPattern)
 	if len(embedded) != 1 || !strings.HasPrefix(embedded[0], "a7 route get") {
 		t.Fatalf("expected embedded a7 invocation, got %q", embedded)
@@ -294,7 +309,11 @@ func testSkillExamplesUseSupportedA7CommandsAndFlags(t *testing.T, root, binary 
 					if len(fields) < 2 {
 						continue
 					}
-					path, _, remaining, err := resolveCommand(t, binary, file, commandFields(fields[1:], valueFlags), rootCommands, rootFlags, valueFlags)
+					commandArgs, err := commandFields(fields[1:], commandTree, rootFlags, valueFlags)
+					if err != nil {
+						t.Fatalf("%s: %v", file, err)
+					}
+					path, _, remaining, err := resolveCommand(t, binary, file, commandArgs, rootCommands, rootFlags, valueFlags)
 					if err != nil {
 						t.Fatalf("%s: %v", file, err)
 					}
@@ -349,16 +368,37 @@ func collectYAMLRunBlocks(node *yaml.Node, runBlocks *[]string) {
 	}
 }
 
-func commandFields(fields []string, valueFlags map[string]bool) []string {
+func commandFields(fields []string, root *cobra.Command, rootFlags, valueFlags map[string]bool) ([]string, error) {
 	for len(fields) > 0 && strings.HasPrefix(fields[0], "-") {
-		flag := strings.SplitN(fields[0], "=", 2)[0]
-		hasInlineValue := strings.Contains(fields[0], "=")
+		field := fields[0]
+		flag := strings.SplitN(field, "=", 2)[0]
+		if !rootFlags[flag] {
+			return nil, fmt.Errorf("unsupported root flag %q", flag)
+		}
+		hasInlineValue := strings.Contains(field, "=")
+		value := ""
+		if hasInlineValue {
+			_, value, _ = strings.Cut(field, "=")
+		}
 		fields = fields[1:]
-		if valueFlags[flag] && !hasInlineValue && len(fields) > 0 {
+		if valueFlags[flag] && !hasInlineValue {
+			if len(fields) == 0 {
+				return nil, fmt.Errorf("flag %q requires a value", flag)
+			}
+			value = fields[0]
 			fields = fields[1:]
 		}
+		var rootFlag *pflag.Flag
+		if strings.HasPrefix(flag, "--") {
+			rootFlag = lookupFlag(root, strings.TrimPrefix(flag, "--"))
+		} else {
+			rootFlag = lookupShorthandFlag(root, strings.TrimPrefix(flag, "-"))
+		}
+		if err := validateKnownFlagValue(rootFlag, value); err != nil {
+			return nil, err
+		}
 	}
-	return fields
+	return fields, nil
 }
 
 func rootFlagSets(root *cobra.Command) (map[string]bool, map[string]bool) {
