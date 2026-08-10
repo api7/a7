@@ -19,6 +19,7 @@ import (
 	"github.com/api7/a7/internal/config"
 	cmd "github.com/api7/a7/pkg/cmd"
 	rootcmd "github.com/api7/a7/pkg/cmd/root"
+	"github.com/api7/a7/pkg/cmdutil"
 	"github.com/api7/a7/pkg/iostreams"
 )
 
@@ -250,6 +251,13 @@ func testSkillExamplesUseSupportedA7CommandsAndFlags(t *testing.T, root, binary 
 	}
 	if err := validatePositionalArgs(commandTree, []string{"route", "get"}, remaining); err == nil {
 		t.Fatal("expected missing positional argument to fail")
+	}
+	_, _, remaining, err = resolveCommand(t, binary, "regression", []string{"route", "list", "--output", "wide"}, rootCommands, rootFlags, valueFlags)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := validatePositionalArgs(commandTree, []string{"route", "list"}, remaining); err == nil {
+		t.Fatal("expected unsupported output format to fail")
 	}
 	embedded := cliInvocations("CURRENT=$(a7 route get example -g default)", invocationPattern)
 	if len(embedded) != 1 || !strings.HasPrefix(embedded[0], "a7 route get") {
@@ -512,7 +520,7 @@ func positionalArgs(command *cobra.Command, fields []string) ([]string, error) {
 		}
 		if strings.HasPrefix(field, "--") {
 			nameValue := strings.TrimPrefix(field, "--")
-			name, _, hasInlineValue := strings.Cut(nameValue, "=")
+			name, value, hasInlineValue := strings.Cut(nameValue, "=")
 			flag := lookupFlag(command, name)
 			if flag == nil {
 				return nil, fmt.Errorf("unsupported flag %q", field)
@@ -522,6 +530,10 @@ func positionalArgs(command *cobra.Command, fields []string) ([]string, error) {
 				if index >= len(fields) {
 					return nil, fmt.Errorf("flag %q requires a value", field)
 				}
+				value = fields[index]
+			}
+			if err := validateKnownFlagValue(flag, value); err != nil {
+				return nil, err
 			}
 			continue
 		}
@@ -533,17 +545,29 @@ func positionalArgs(command *cobra.Command, fields []string) ([]string, error) {
 				return nil, fmt.Errorf("unsupported shorthand flag %q", field)
 			}
 			hasInlineValue := len(shorthandValue) > 1
+			value := strings.TrimPrefix(shorthandValue[1:], "=")
 			if !hasInlineValue && flag.NoOptDefVal == "" {
 				index++
 				if index >= len(fields) {
 					return nil, fmt.Errorf("flag %q requires a value", field)
 				}
+				value = fields[index]
+			}
+			if err := validateKnownFlagValue(flag, value); err != nil {
+				return nil, err
 			}
 			continue
 		}
 		args = append(args, field)
 	}
 	return args, nil
+}
+
+func validateKnownFlagValue(flag *pflag.Flag, value string) error {
+	if flag.Name != "output" || value == "" || value == "workflow-expression" || strings.HasPrefix(value, "$") || strings.HasPrefix(value, "<") {
+		return nil
+	}
+	return cmdutil.ValidateOutputFormat(value)
 }
 
 func lookupFlag(command *cobra.Command, name string) *pflag.Flag {

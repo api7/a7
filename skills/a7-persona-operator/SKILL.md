@@ -151,8 +151,8 @@ a7 global-rule list -g customer-facing --output json
 # Check the execution time of plugins in the trace
 a7 debug trace <route-id> -g api-internal --path /heavy-endpoint
 
-# List active routes and their hit counts (if metrics enabled)
-a7 route list -g api-internal --output wide
+# List active routes in table format
+a7 route list -g api-internal --output table
 ```
 
 ## Security Hardening (Enterprise Grade)
