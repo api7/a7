@@ -29,13 +29,13 @@ fmt:
 vet:
 	go vet ./...
 
-check: fmt vet lint test validate-skills test-skills
+check: fmt vet lint test validate-skills
 
 validate-skills:
 	bash ./scripts/validate-skills.sh
 
 test-skills:
-	go test ./test/e2e/skills -tags=e2e -count=1
+	go test ./test/skills -count=1
 
 install: build
 	cp bin/$(BINARY) $(GOPATH)/bin/$(BINARY)

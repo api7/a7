@@ -1,5 +1,3 @@
-//go:build e2e
-
 package skills
 
 import (
@@ -16,15 +14,13 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"gopkg.in/yaml.v3"
 
 	"github.com/api7/a7/internal/config"
 	cmd "github.com/api7/a7/pkg/cmd"
 	rootcmd "github.com/api7/a7/pkg/cmd/root"
 	"github.com/api7/a7/pkg/iostreams"
 )
-
-var skillNamePattern = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
-var a7Binary string
 
 func locateRepoRoot() (string, error) {
 	dir, err := os.Getwd()
@@ -43,34 +39,6 @@ func locateRepoRoot() (string, error) {
 	}
 }
 
-func TestMain(m *testing.M) {
-	root, err := locateRepoRoot()
-	if err != nil {
-		os.Exit(1)
-	}
-	tmpDir, err := os.MkdirTemp("", "a7-skills-test-*")
-	if err != nil {
-		os.Exit(1)
-	}
-
-	a7Binary = filepath.Join(tmpDir, "a7")
-	cmd := exec.Command("go", "build", "-o", a7Binary, "./cmd/a7")
-	cmd.Dir = root
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		_ = os.RemoveAll(tmpDir)
-		os.Exit(1)
-	}
-
-	exitCode := m.Run()
-	if err := os.RemoveAll(tmpDir); err != nil && exitCode == 0 {
-		fmt.Fprintf(os.Stderr, "failed to remove temp dir %s: %v\n", tmpDir, err)
-		exitCode = 1
-	}
-	os.Exit(exitCode)
-}
-
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	root, err := locateRepoRoot()
@@ -78,6 +46,18 @@ func repoRoot(t *testing.T) string {
 		t.Fatal("failed to locate repository root")
 	}
 	return root
+}
+
+func buildA7Binary(t *testing.T, root string) string {
+	t.Helper()
+	binary := filepath.Join(t.TempDir(), "a7")
+	cmd := exec.Command("go", "build", "-o", binary, "./cmd/a7")
+	cmd.Dir = root
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("failed to build a7: %v\n%s", err, output)
+	}
+	return binary
 }
 
 type skillMetadata struct {
@@ -163,6 +143,7 @@ func hasNonEmptyDescription(lines []string, startIdx int, value string) bool {
 }
 
 func TestSkillFrontmatterMatchesDirectories(t *testing.T) {
+	skillNamePattern := regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 	root := repoRoot(t)
 	entries, err := os.ReadDir(filepath.Join(root, "skills"))
 	if err != nil {
@@ -196,8 +177,21 @@ func TestSkillFrontmatterMatchesDirectories(t *testing.T) {
 	}
 }
 
-func TestSkillDeclaredA7CommandsExist(t *testing.T) {
+func TestSkillCommands(t *testing.T) {
 	root := repoRoot(t)
+	binary := buildA7Binary(t, root)
+	commandTree := newA7CommandTree()
+
+	t.Run("DeclaredA7CommandsExist", func(t *testing.T) {
+		testSkillDeclaredA7CommandsExist(t, root, binary)
+	})
+	t.Run("ExamplesUseSupportedA7CommandsAndFlags", func(t *testing.T) {
+		testSkillExamplesUseSupportedA7CommandsAndFlags(t, root, binary, commandTree)
+	})
+}
+
+func testSkillDeclaredA7CommandsExist(t *testing.T, root, binary string) {
+	t.Helper()
 	matches, err := filepath.Glob(filepath.Join(root, "skills", "*", "SKILL.md"))
 	if err != nil {
 		t.Fatal(err)
@@ -212,7 +206,7 @@ func TestSkillDeclaredA7CommandsExist(t *testing.T) {
 			if command != "a7" && !strings.HasPrefix(command, "a7 ") {
 				t.Fatalf("%s: a7_commands entry %q must start with a7", file, command)
 			}
-			helpCommand := strconv.Quote(a7Binary) + strings.TrimPrefix(command, "a7") + " --help"
+			helpCommand := strconv.Quote(binary) + strings.TrimPrefix(command, "a7") + " --help"
 			cmd := exec.Command("sh", "-c", helpCommand)
 			cmd.Dir = root
 			output, err := cmd.CombinedOutput()
@@ -223,12 +217,13 @@ func TestSkillDeclaredA7CommandsExist(t *testing.T) {
 	}
 }
 
-func TestSkillShellExamplesUseSupportedA7CommandsAndFlags(t *testing.T) {
+func testSkillExamplesUseSupportedA7CommandsAndFlags(t *testing.T, root, binary string, commandTree *cobra.Command) {
+	t.Helper()
 	shellFencePattern := regexp.MustCompile("(?s)```(?:bash|sh|shell)\\s*\\n(.*?)```")
-	longFlagPattern := regexp.MustCompile(`--[a-z][a-z0-9-]*`)
-	invocationPattern := regexp.MustCompile(`(?:^|[^A-Za-z0-9_-])(a7(?:\s+[^|;&)]*)?)`)
-	valueFlags := a7GlobalValueFlags()
-	root := repoRoot(t)
+	yamlFencePattern := regexp.MustCompile("(?s)```(?:yaml|yml)\\s*\\n(.*?)```")
+	invocationPattern := regexp.MustCompile(`(?:^|[^A-Za-z0-9_-])(a7)(?:\s|$)`)
+	workflowExpressionPattern := regexp.MustCompile(`\$\{\{.*?\}\}`)
+	rootFlags, valueFlags := rootFlagSets(commandTree)
 	matches, err := filepath.Glob(filepath.Join(root, "skills", "*", "SKILL.md"))
 	if err != nil {
 		t.Fatal(err)
@@ -236,22 +231,20 @@ func TestSkillShellExamplesUseSupportedA7CommandsAndFlags(t *testing.T) {
 	if len(matches) == 0 {
 		t.Fatal("expected at least one skill file")
 	}
-	rootHelp := commandHelp(t, nil)
+	rootHelp := commandHelp(t, binary, nil)
 	rootCommands := availableCommands(rootHelp)
-	rootFlags := availableFlags(rootHelp, longFlagPattern)
-	commandTree := newA7CommandTree()
-	regressionPath, regressionHelp, _, regressionErr := resolveCommand(t, "regression", []string{"route", "--gateway-group", "default", "craete"}, rootCommands, rootFlags, valueFlags)
+	regressionPath, regressionHelp, _, regressionErr := resolveCommand(t, binary, "regression", []string{"route", "--gateway-group", "default", "craete"}, rootCommands, rootFlags, valueFlags)
 	if regressionErr == nil {
 		t.Fatalf("expected misspelled command after a persistent flag to fail, got path %q and help %q", regressionPath, regressionHelp)
 	}
-	_, _, remaining, err := resolveCommand(t, "regression", []string{"route", "get", "one", "two"}, rootCommands, rootFlags, valueFlags)
+	_, _, remaining, err := resolveCommand(t, binary, "regression", []string{"route", "get", "one", "two"}, rootCommands, rootFlags, valueFlags)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := validatePositionalArgs(commandTree, []string{"route", "get"}, remaining); err == nil {
 		t.Fatal("expected extra positional argument to fail")
 	}
-	_, _, remaining, err = resolveCommand(t, "regression", []string{"route", "get"}, rootCommands, rootFlags, valueFlags)
+	_, _, remaining, err = resolveCommand(t, binary, "regression", []string{"route", "get"}, rootCommands, rootFlags, valueFlags)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -262,33 +255,40 @@ func TestSkillShellExamplesUseSupportedA7CommandsAndFlags(t *testing.T) {
 	if len(embedded) != 1 || !strings.HasPrefix(embedded[0], "a7 route get") {
 		t.Fatalf("expected embedded a7 invocation, got %q", embedded)
 	}
+	quoted := cliInvocations(`a7 debug trace id --header "X-Test: a|b;c&d)" --bogus`, invocationPattern)
+	if len(quoted) != 1 || !strings.Contains(quoted[0], "--bogus") {
+		t.Fatalf("expected quoted separators to preserve the complete invocation, got %q", quoted)
+	}
+	yamlBlocks, err := skillShellBlocks("```yaml\n- name: Validate\n  run: >\n    a7 route list\n    --unsupported\n```", shellFencePattern, yamlFencePattern)
+	if err != nil {
+		t.Fatalf("failed to extract workflow run block: %v", err)
+	}
+	yamlCommands := joinedShellLines(yamlBlocks[0])
+	if len(yamlCommands) != 1 || yamlCommands[0] != "a7 route list --unsupported" {
+		t.Fatalf("expected workflow run block, got %q", yamlBlocks)
+	}
 	for _, file := range matches {
 		data, err := os.ReadFile(file)
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, block := range shellFencePattern.FindAllStringSubmatch(string(data), -1) {
-			for _, line := range joinedShellLines(block[1]) {
+		blocks, err := skillShellBlocks(string(data), shellFencePattern, yamlFencePattern)
+		if err != nil {
+			t.Fatalf("%s: failed to parse fenced YAML: %v", file, err)
+		}
+		for _, block := range blocks {
+			for _, line := range joinedShellLines(block) {
 				for _, invocation := range cliInvocations(line, invocationPattern) {
-					fields, err := shellFields(invocation)
+					fields, err := shellFields(workflowExpressionPattern.ReplaceAllString(invocation, "workflow-expression"))
 					if err != nil {
 						t.Fatalf("%s: cannot parse command %q: %v", file, invocation, err)
 					}
 					if len(fields) < 2 {
 						continue
 					}
-					path, help, remaining, err := resolveCommand(t, file, commandFields(fields[1:]), rootCommands, rootFlags, valueFlags)
+					path, _, remaining, err := resolveCommand(t, binary, file, commandFields(fields[1:], valueFlags), rootCommands, rootFlags, valueFlags)
 					if err != nil {
 						t.Fatalf("%s: %v", file, err)
-					}
-					validFlags := mergeFlagSets(rootFlags, availableFlags(help, longFlagPattern))
-					for _, flag := range longFlagPattern.FindAllString(invocation, -1) {
-						if flag == "--help" {
-							continue
-						}
-						if !validFlags[flag] {
-							t.Fatalf("%s: command %q uses unsupported flag %q", file, "a7 "+strings.Join(path, " "), flag)
-						}
 					}
 					if err := validatePositionalArgs(commandTree, path, remaining); err != nil {
 						t.Fatalf("%s: command %q uses invalid positional arguments: %v", file, "a7 "+strings.Join(path, " "), err)
@@ -299,8 +299,49 @@ func TestSkillShellExamplesUseSupportedA7CommandsAndFlags(t *testing.T) {
 	}
 }
 
-func commandFields(fields []string) []string {
-	valueFlags := a7GlobalValueFlags()
+func skillShellBlocks(data string, shellFencePattern, yamlFencePattern *regexp.Regexp) ([]string, error) {
+	var blocks []string
+	for _, match := range shellFencePattern.FindAllStringSubmatch(data, -1) {
+		blocks = append(blocks, match[1])
+	}
+	for _, match := range yamlFencePattern.FindAllStringSubmatch(data, -1) {
+		runBlocks, err := yamlRunBlocks(match[1])
+		if err != nil {
+			return nil, err
+		}
+		blocks = append(blocks, runBlocks...)
+	}
+	return blocks, nil
+}
+
+func yamlRunBlocks(block string) ([]string, error) {
+	var root yaml.Node
+	if err := yaml.Unmarshal([]byte(block), &root); err != nil {
+		return nil, err
+	}
+	var runBlocks []string
+	collectYAMLRunBlocks(&root, &runBlocks)
+	return runBlocks, nil
+}
+
+func collectYAMLRunBlocks(node *yaml.Node, runBlocks *[]string) {
+	if node.Kind == yaml.MappingNode {
+		for index := 0; index+1 < len(node.Content); index += 2 {
+			key := node.Content[index]
+			value := node.Content[index+1]
+			if key.Value == "run" && value.Kind == yaml.ScalarNode {
+				*runBlocks = append(*runBlocks, value.Value)
+			}
+			collectYAMLRunBlocks(value, runBlocks)
+		}
+		return
+	}
+	for _, child := range node.Content {
+		collectYAMLRunBlocks(child, runBlocks)
+	}
+}
+
+func commandFields(fields []string, valueFlags map[string]bool) []string {
 	for len(fields) > 0 && strings.HasPrefix(fields[0], "-") {
 		flag := strings.SplitN(fields[0], "=", 2)[0]
 		hasInlineValue := strings.Contains(fields[0], "=")
@@ -312,21 +353,30 @@ func commandFields(fields []string) []string {
 	return fields
 }
 
-func a7GlobalValueFlags() map[string]bool {
-	return map[string]bool{
-		"--gateway-group": true,
-		"--output":        true,
-		"--server":        true,
-		"--token":         true,
-		"-g":              true,
-		"-o":              true,
-	}
+func rootFlagSets(root *cobra.Command) (map[string]bool, map[string]bool) {
+	rootFlags := map[string]bool{}
+	valueFlags := map[string]bool{}
+	root.PersistentFlags().VisitAll(func(flag *pflag.Flag) {
+		longName := "--" + flag.Name
+		rootFlags[longName] = true
+		if flag.NoOptDefVal == "" {
+			valueFlags[longName] = true
+		}
+		if flag.Shorthand != "" {
+			shortName := "-" + flag.Shorthand
+			rootFlags[shortName] = true
+			if flag.NoOptDefVal == "" {
+				valueFlags[shortName] = true
+			}
+		}
+	})
+	return rootFlags, valueFlags
 }
 
-func commandHelp(t *testing.T, path []string) string {
+func commandHelp(t *testing.T, binary string, path []string) string {
 	t.Helper()
 	args := append(append([]string{}, path...), "--help")
-	output, err := exec.Command(a7Binary, args...).CombinedOutput()
+	output, err := exec.Command(binary, args...).CombinedOutput()
 	if err != nil {
 		t.Fatalf("a7 %s --help failed: %v\n%s", strings.Join(path, " "), err, output)
 	}
@@ -355,40 +405,6 @@ func availableCommands(help string) map[string]bool {
 	return commands
 }
 
-func availableFlags(help string, longFlagPattern *regexp.Regexp) map[string]bool {
-	flags := map[string]bool{}
-	inFlags := false
-	for _, line := range strings.Split(help, "\n") {
-		heading := strings.TrimSpace(line)
-		if heading == "Flags:" || heading == "Global Flags:" {
-			inFlags = true
-			continue
-		}
-		if heading == "" {
-			inFlags = false
-			continue
-		}
-		if !inFlags {
-			continue
-		}
-		if flag := longFlagPattern.FindString(line); flag != "" {
-			flags[flag] = true
-		}
-	}
-	return flags
-}
-
-func mergeFlagSets(first map[string]bool, second map[string]bool) map[string]bool {
-	merged := map[string]bool{}
-	for flag := range first {
-		merged[flag] = true
-	}
-	for flag := range second {
-		merged[flag] = true
-	}
-	return merged
-}
-
 func commandFieldIsSubcommand(subcommands map[string]bool, field string) (bool, error) {
 	if len(subcommands) == 0 {
 		return false, nil
@@ -406,13 +422,13 @@ func TestCommandFieldIsSubcommand_RejectsUnknownNestedCommand(t *testing.T) {
 	}
 }
 
-func resolveCommand(t *testing.T, file string, fields []string, commands map[string]bool, rootFlags map[string]bool, valueFlags map[string]bool) ([]string, string, []string, error) {
+func resolveCommand(t *testing.T, binary, file string, fields []string, commands map[string]bool, rootFlags map[string]bool, valueFlags map[string]bool) ([]string, string, []string, error) {
 	t.Helper()
 	if len(fields) == 0 || !commands[fields[0]] {
 		return nil, "", nil, fmt.Errorf("unsupported a7 command %q", strings.Join(fields, " "))
 	}
 	path := []string{fields[0]}
-	help := commandHelp(t, path)
+	help := commandHelp(t, binary, path)
 	index := 1
 	for index < len(fields) {
 		field := fields[index]
@@ -445,7 +461,7 @@ func resolveCommand(t *testing.T, file string, fields []string, commands map[str
 			break
 		}
 		path = append(path, field)
-		help = commandHelp(t, path)
+		help = commandHelp(t, binary, path)
 		index++
 	}
 	return path, help, fields[index:], nil
@@ -608,12 +624,78 @@ func shellFields(line string) ([]string, error) {
 
 func cliInvocations(line string, invocationPattern *regexp.Regexp) []string {
 	var invocations []string
-	for _, match := range invocationPattern.FindAllStringSubmatch(line, -1) {
-		if len(match) > 1 {
-			invocations = append(invocations, strings.TrimSpace(match[1]))
+	for _, match := range invocationPattern.FindAllStringSubmatchIndex(line, -1) {
+		if len(match) >= 4 {
+			start := match[2]
+			end := shellInvocationEnd(line, match[3])
+			invocations = append(invocations, strings.TrimSpace(line[start:end]))
 		}
 	}
 	return invocations
+}
+
+func shellInvocationEnd(line string, start int) int {
+	var quote byte
+	var escaped bool
+	var substitutionDepth int
+	for index := start; index < len(line); index++ {
+		current := line[index]
+		if escaped {
+			escaped = false
+			continue
+		}
+		if quote != '\'' && current == '\\' {
+			escaped = true
+			continue
+		}
+		if quote == '\'' {
+			if current == '\'' {
+				quote = 0
+			}
+			continue
+		}
+		if quote == '"' {
+			if current == '"' {
+				quote = 0
+				continue
+			}
+			if current == '$' && index+1 < len(line) && line[index+1] == '(' {
+				substitutionDepth++
+				index++
+				continue
+			}
+			if current == ')' && substitutionDepth > 0 {
+				substitutionDepth--
+			}
+			continue
+		}
+		if quote == '`' {
+			if current == '`' {
+				quote = 0
+			}
+			continue
+		}
+
+		switch current {
+		case '\'', '"', '`':
+			quote = current
+		case '$':
+			if index+1 < len(line) && line[index+1] == '(' {
+				substitutionDepth++
+				index++
+			}
+		case ')':
+			if substitutionDepth == 0 {
+				return index
+			}
+			substitutionDepth--
+		case '|', ';', '&':
+			if substitutionDepth == 0 {
+				return index
+			}
+		}
+	}
+	return len(line)
 }
 
 func joinedShellLines(block string) []string {
