@@ -47,7 +47,6 @@ identity headers.
 | `exp` | integer | No | `86400` | Token lifetime in **seconds** (not UNIX timestamp) |
 | `base64_secret` | boolean | No | `false` | Set true if secret is base64-encoded |
 | `lifetime_grace_period` | integer | No | `0` | Clock skew tolerance in seconds |
-| `key_claim_name` | string | No | `"key"` | JWT claim containing the consumer key |
 
 ### Supported Algorithms
 
@@ -67,9 +66,9 @@ identity headers.
 | `query` | string | No | `"jwt"` | Query parameter to extract JWT from |
 | `cookie` | string | No | `"jwt"` | Cookie to extract JWT from |
 | `hide_credentials` | boolean | No | `false` | Remove JWT before forwarding upstream |
-| `key_claim_name` | string | No | `"key"` | JWT claim containing consumer key (must match credential config) |
+| `key_claim_name` | string | No | `"key"` | JWT claim containing the consumer key |
 | `anonymous_consumer` | string | No | — | Consumer for unauthenticated requests |
-| `claims_to_verify` | array | No | `["exp","nbf"]` | Claims to verify (`exp`, `nbf`) |
+| `claims_to_verify` | array | No | — | Claims to require and verify (`exp`, `nbf`). Set this explicitly because behavior when omitted varies by gateway version. |
 
 ## Token Lookup Priority
 
@@ -181,12 +180,11 @@ Sign tokens with `private.pem` externally. API7 EE only needs the public key.
 ### Custom claim name (use `iss` instead of `key`)
 
 ```bash
-# Credential config:
+# Credential config (the key value identifies the consumer):
 {
   "jwt-auth": {
     "key": "my-issuer-id",
-    "secret": "my-secret",
-    "key_claim_name": "iss"
+    "secret": "my-secret"
   }
 }
 
@@ -275,33 +273,45 @@ Client sends: `curl "http://127.0.0.1:9080/api/test?token=eyJ..."`
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `401 "failed to verify jwt"` | Token expired | Generate new token with future `exp` |
+| `401 "failed to verify jwt"` | Token expired while `exp` verification is enabled | Generate new token with future `exp` |
 | `401 "failed to verify jwt"` | Algorithm mismatch | Ensure credential `algorithm` matches token |
-| `401 "Invalid user key"` | Wrong claim name | Set `key_claim_name` on both credential and route |
+| `401 "Invalid user key"` | Wrong claim name | Set `key_claim_name` on the route or service and include that claim in the JWT |
 | Public key rejected | Missing newlines in PEM | Include `\n` after header/before footer lines |
 | Clock skew errors | Time drift | Set `lifetime_grace_period` on credential |
 
 ## Config Sync Example
 
+Save the following as `jwt-auth.yaml`:
+
 ```yaml
 version: "1"
-gateway_groups:
-  - name: default
-    consumers:
-      - username: alice
-    routes:
-      - id: jwt-protected
-        uri: /api/*
-        plugins:
-          jwt-auth: {}
-        upstream:
-          type: roundrobin
-          nodes:
-            - host: backend
-              port: 8080
-              weight: 1
+services:
+  - id: jwt-protected-service
+    name: JWT protected service
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: backend
+          port: 8080
+          weight: 1
+routes:
+  - id: jwt-protected
+    name: JWT protected route
+    paths:
+      - /api/*
+    service_id: jwt-protected-service
+    plugins:
+      jwt-auth: {}
 ```
 
-> **Note**: Consumer credentials (including JWT keys/secrets) must be created
-> separately via the Admin API; `a7 config sync` manages the consumer resource
-> but credentials are sub-resources.
+Validate and apply this partial configuration to the target gateway group:
+
+```bash
+a7 config validate -f jwt-auth.yaml
+a7 config sync -g <gateway-group-id> -f jwt-auth.yaml --delete=false
+```
+
+> **Note**: Create the consumer and credential separately with
+> `a7 consumer create` and `a7 credential create`. Config Sync manages only the
+> service and route in this example. Disabling deletion preserves other
+> resources that are not included in this partial configuration.

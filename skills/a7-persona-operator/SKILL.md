@@ -192,7 +192,7 @@ EOF
 
 | Situation | Action | Command |
 |-----------|--------|---------|
-| New Team Onboarding | Create Gateway Group & Assign RBAC | `a7 gateway-group create <name>` |
+| New Team Onboarding | Create Gateway Group & Assign RBAC | `a7 gateway-group create --name <name>` |
 | Configuration Drift | Compare local YAML with Live | `a7 config diff -g <group> -f <file>` |
 | Backend Timeout | Check route/service config and logs | `a7 route get <id> -g <group>` and `a7 debug logs` |
 | Security Breach | Block IP via Global Rule | `a7 global-rule create -g <group> -f block.json` |

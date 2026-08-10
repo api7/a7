@@ -6,9 +6,10 @@ This document describes the skill system for the a7 CLI. Skills are structured k
 
 Skills are `SKILL.md` files stored in the `skills/` directory. Each skill provides domain-specific instructions, command patterns, and decision guidance for AI agents. The supported installation examples cover Claude Code, Codex, Cursor, and GitHub Copilot.
 
-Install the narrowest skill needed for the current task. Do not install the full
-collection by default: overlapping persona, recipe, and plugin guidance adds
-routing ambiguity and makes review and updates harder.
+Start with one task-specific skill. Add another only when the task clearly spans
+multiple workflows. Do not install the full collection by default: overlapping
+persona, recipe, and plugin guidance can make skill routing and updates harder
+to review.
 
 ## Install a Skill
 
@@ -130,7 +131,7 @@ The body content depends on the skill type:
 
 Every PR validates `skills/` with `scripts/validate-skills.sh`. The script checks:
 
-1. Every `skills/*/SKILL.md` has valid YAML frontmatter
+1. Every `skills/*/SKILL.md` has frontmatter delimiters
 2. Required fields `name` and `description` are present
 3. `name` matches the directory name
 4. `name` follows kebab-case pattern
@@ -140,7 +141,8 @@ Every PR validates `skills/` with `scripts/validate-skills.sh`. The script check
 The Go test package under `test/skills` also contains static skill checks. Those
 checks keep this document aligned with the actual `skills/` inventory, reject
 known removed commands, and validate commands and flags used in shell examples
-against the current a7 CLI command tree.
+against the current a7 CLI command tree. It also validates the corrected Config
+Sync examples against the declarative configuration schema and safety rules.
 
 Run locally:
 

@@ -62,23 +62,32 @@ gateway nodes.
 
 Configure the `skywalking` plugin attributes in your API7 EE gateway group.
 
-### 3. Enable on a route
+### 3. Enable on a service-backed route
 
 Enable tracing for gateway group `default`:
 
 ```bash
+a7 service create --gateway-group default -f - <<'EOF'
+{
+  "id": "traced-api-service",
+  "name": "Traced API service",
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
+  }
+}
+EOF
+
 a7 route create --gateway-group default -f - <<'EOF'
 {
   "id": "traced-api",
-  "uri": "/api/*",
+  "name": "Traced API route",
+  "paths": ["/api/*"],
+  "service_id": "traced-api-service",
   "plugins": {
     "skywalking": {
       "sample_ratio": 1
     }
-  },
-  "upstream": {
-    "type": "roundrobin",
-    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -162,19 +171,36 @@ The plugin creates two spans per request:
 
 ## Config Sync Example
 
+Save the following as `skywalking.yaml`:
+
 ```yaml
 version: "1"
-gateway_group: default
-routes:
-  - id: traced-api
-    uri: /api/*
-    plugins:
-      skywalking:
-        sample_ratio: 1
+services:
+  - id: traced-api-service
+    name: Traced API service
     upstream:
       type: roundrobin
       nodes:
         - host: backend
           port: 8080
           weight: 1
+routes:
+  - id: traced-api
+    name: Traced API route
+    paths:
+      - /api/*
+    service_id: traced-api-service
+    plugins:
+      skywalking:
+        sample_ratio: 1
 ```
+
+Validate and apply this partial configuration to the target gateway group:
+
+```bash
+a7 config validate -f skywalking.yaml
+a7 config sync -g <gateway-group-id> -f skywalking.yaml --delete=false
+```
+
+Disabling deletion preserves resources that are not included in this partial
+configuration.

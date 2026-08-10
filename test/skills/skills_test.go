@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
@@ -17,7 +18,9 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/api7/a7/internal/config"
+	"github.com/api7/a7/pkg/api"
 	cmd "github.com/api7/a7/pkg/cmd"
+	configvalidate "github.com/api7/a7/pkg/cmd/config/validate"
 	rootcmd "github.com/api7/a7/pkg/cmd/root"
 	"github.com/api7/a7/pkg/cmdutil"
 	"github.com/api7/a7/pkg/iostreams"
@@ -835,6 +838,134 @@ func TestSkillsDoNotReferenceRemovedA7Commands(t *testing.T) {
 			}
 			if strings.Contains(string(data), pattern) {
 				t.Fatalf("%s: references removed or unsupported command %q", file, pattern)
+			}
+		}
+	}
+}
+
+func TestCorrectedSkillConfigSyncExamples(t *testing.T) {
+	root := repoRoot(t)
+	skills := []string{
+		"a7-plugin-basic-auth",
+		"a7-plugin-hmac-auth",
+		"a7-plugin-http-logger",
+		"a7-plugin-jwt-auth",
+		"a7-plugin-kafka-logger",
+		"a7-plugin-key-auth",
+		"a7-plugin-prometheus",
+		"a7-plugin-skywalking",
+		"a7-plugin-zipkin",
+	}
+	allowedKeys := configFileYAMLKeys()
+	yamlFence := regexp.MustCompile("(?s)```(?:yaml|yml)\\s*\\n(.*?)```")
+	syncLine := regexp.MustCompile(`(?m)^a7 config sync .+$`)
+
+	for _, skill := range skills {
+		t.Run(skill, func(t *testing.T) {
+			file := filepath.Join(root, "skills", skill, "SKILL.md")
+			data, err := os.ReadFile(file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			section, err := markdownSection(string(data), "## Config Sync Example")
+			if err != nil {
+				t.Fatalf("%s: %v", file, err)
+			}
+			match := yamlFence.FindStringSubmatch(section)
+			if len(match) != 2 {
+				t.Fatalf("%s: Config Sync Example must contain a YAML block", file)
+			}
+
+			var topLevel map[string]yaml.Node
+			if err := yaml.Unmarshal([]byte(match[1]), &topLevel); err != nil {
+				t.Fatalf("%s: invalid Config Sync YAML: %v", file, err)
+			}
+			for key := range topLevel {
+				if !allowedKeys[key] {
+					t.Fatalf("%s: unsupported top-level Config Sync field %q", file, key)
+				}
+			}
+
+			var cfg api.ConfigFile
+			if err := yaml.Unmarshal([]byte(match[1]), &cfg); err != nil {
+				t.Fatalf("%s: failed to decode Config Sync example: %v", file, err)
+			}
+			if errs := configvalidate.ValidateConfigFile(cfg); len(errs) > 0 {
+				t.Fatalf("%s: invalid Config Sync example: %s", file, strings.Join(errs, "; "))
+			}
+			if len(cfg.Consumers) != 0 {
+				t.Fatalf("%s: partial Config Sync example must create consumers separately", file)
+			}
+			validateConfigSyncReferences(t, file, cfg)
+
+			syncCommands := syncLine.FindAllString(section, -1)
+			if len(syncCommands) == 0 {
+				t.Fatalf("%s: Config Sync Example must show how to apply the file", file)
+			}
+			for _, command := range syncCommands {
+				if !strings.Contains(command, "--delete=false") {
+					t.Fatalf("%s: partial Config Sync command must disable deletion: %s", file, command)
+				}
+				if strings.Contains(command, "--dry-run") {
+					t.Fatalf("%s: partial Config Sync preview does not account for disabled deletion: %s", file, command)
+				}
+			}
+		})
+	}
+}
+
+func configFileYAMLKeys() map[string]bool {
+	keys := map[string]bool{}
+	typeOfConfig := reflect.TypeOf(api.ConfigFile{})
+	for index := 0; index < typeOfConfig.NumField(); index++ {
+		tag := strings.Split(typeOfConfig.Field(index).Tag.Get("yaml"), ",")[0]
+		if tag != "" && tag != "-" {
+			keys[tag] = true
+		}
+	}
+	return keys
+}
+
+func markdownSection(data, heading string) (string, error) {
+	start := strings.Index(data, heading)
+	if start == -1 {
+		return "", fmt.Errorf("missing %q section", heading)
+	}
+	section := data[start+len(heading):]
+	if end := strings.Index(section, "\n## "); end != -1 {
+		section = section[:end]
+	}
+	return section, nil
+}
+
+func validateConfigSyncReferences(t *testing.T, file string, cfg api.ConfigFile) {
+	t.Helper()
+	services := map[string]api.Service{}
+	for _, service := range cfg.Services {
+		services[service.ID] = service
+	}
+	for _, route := range cfg.Routes {
+		service, ok := services[route.ServiceID]
+		if !ok {
+			t.Fatalf("%s: route %q references missing service %q", file, route.ID, route.ServiceID)
+		}
+		if len(service.Upstream) == 0 {
+			t.Fatalf("%s: service %q must define its upstream", file, service.ID)
+		}
+		if len(route.Paths) == 0 {
+			t.Fatalf("%s: route %q must use API7 EE paths", file, route.ID)
+		}
+		if len(route.Upstream) != 0 {
+			t.Fatalf("%s: route %q must use its service upstream", file, route.ID)
+		}
+	}
+	for _, rule := range cfg.GlobalRules {
+		if len(rule.Plugins) != 1 {
+			t.Fatalf("%s: global rule %q must contain exactly one plugin", file, rule.ID)
+		}
+		for pluginName := range rule.Plugins {
+			if rule.ID != pluginName {
+				t.Fatalf("%s: global rule ID %q must match plugin name %q", file, rule.ID, pluginName)
 			}
 		}
 	}

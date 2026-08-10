@@ -244,25 +244,37 @@ recomputes the body digest and rejects the request if it does not match.
 
 ## Config Sync Example
 
+Save the following as `hmac-auth.yaml`:
+
 ```yaml
 version: "1"
-gateway_groups:
-  - name: default
-    consumers:
-      - username: alice
-    routes:
-      - id: hmac-protected
-        uri: /api/*
-        plugins:
-          hmac-auth: {}
-        upstream:
-          type: roundrobin
-          nodes:
-            - host: backend
-              port: 8080
-              weight: 1
+services:
+  - id: hmac-protected-service
+    name: HMAC protected service
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: backend
+          port: 8080
+          weight: 1
+routes:
+  - id: hmac-protected
+    name: HMAC protected route
+    paths:
+      - /api/*
+    service_id: hmac-protected-service
+    plugins:
+      hmac-auth: {}
 ```
 
-> **Note**: Consumer credentials (key_id/secret_key) must be created separately
-> via the Admin API; `a7 config sync` manages the consumer resource but
-> credentials are sub-resources.
+Validate and apply this partial configuration to the target gateway group:
+
+```bash
+a7 config validate -f hmac-auth.yaml
+a7 config sync -g <gateway-group-id> -f hmac-auth.yaml --delete=false
+```
+
+> **Note**: Create the consumer and credential separately with
+> `a7 consumer create` and `a7 credential create`. Config Sync manages only the
+> service and route in this example. Disabling deletion preserves other
+> resources that are not included in this partial configuration.

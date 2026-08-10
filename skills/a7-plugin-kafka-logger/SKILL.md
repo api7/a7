@@ -74,15 +74,28 @@ producing, custom log formats, and batch processing for efficient delivery.
 
 ## Step-by-Step: Ship Logs to Kafka
 
-### 1. Create a route with kafka-logger
+### 1. Create a service and route with kafka-logger
 
 Enable logging for gateway group `default`:
 
 ```bash
+a7 service create --gateway-group default -f - <<'EOF'
+{
+  "id": "kafka-logged-api-service",
+  "name": "Kafka logged API service",
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
+  }
+}
+EOF
+
 a7 route create --gateway-group default -f - <<'EOF'
 {
   "id": "kafka-logged-api",
-  "uri": "/api/*",
+  "name": "Kafka logged API route",
+  "paths": ["/api/*"],
+  "service_id": "kafka-logged-api-service",
   "plugins": {
     "kafka-logger": {
       "brokers": [
@@ -92,10 +105,6 @@ a7 route create --gateway-group default -f - <<'EOF'
       "kafka_topic": "api7-logs",
       "batch_max_size": 100
     }
-  },
-  "upstream": {
-    "type": "roundrobin",
-    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -196,12 +205,25 @@ EOF
 
 ## Config Sync Example
 
+Save the following as `kafka-logger.yaml`:
+
 ```yaml
 version: "1"
-gateway_group: default
+services:
+  - id: kafka-logged-api-service
+    name: Kafka logged API service
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: backend
+          port: 8080
+          weight: 1
 routes:
   - id: kafka-logged-api
-    uri: /api/*
+    name: Kafka logged API route
+    paths:
+      - /api/*
+    service_id: kafka-logged-api-service
     plugins:
       kafka-logger:
         brokers:
@@ -214,10 +236,14 @@ routes:
         required_acks: 1
         batch_max_size: 200
         inactive_timeout: 5
-    upstream:
-      type: roundrobin
-      nodes:
-        - host: backend
-          port: 8080
-          weight: 1
 ```
+
+Validate and apply this partial configuration to the target gateway group:
+
+```bash
+a7 config validate -f kafka-logger.yaml
+a7 config sync -g <gateway-group-id> -f kafka-logger.yaml --delete=false
+```
+
+Disabling deletion preserves resources that are not included in this partial
+configuration.

@@ -67,23 +67,32 @@ prometheus port (usually `9091` or exposed via the data plane port `9080`).
 
 ## Step-by-Step: Enable Prometheus Metrics
 
-### 1. Enable on a route
+### 1. Enable on a service-backed route
 
 Enable metrics for gateway group `default`:
 
 ```bash
+a7 service create --gateway-group default -f - <<'EOF'
+{
+  "id": "metrics-api-service",
+  "name": "Metrics API service",
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
+  }
+}
+EOF
+
 a7 route create --gateway-group default -f - <<'EOF'
 {
   "id": "my-api",
-  "uri": "/api/*",
+  "name": "Metrics API route",
+  "paths": ["/api/*"],
+  "service_id": "metrics-api-service",
   "plugins": {
     "prometheus": {
       "prefer_name": true
     }
-  },
-  "upstream": {
-    "type": "roundrobin",
-    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -150,23 +159,40 @@ Default buckets for latency are: 1, 2, 5, 7, 10, 15, 20, 25, 30, 40, 50, 60,
 
 ## Config Sync Example
 
+Save the following as `prometheus.yaml`:
+
 ```yaml
 version: "1"
-gateway_group: default
 global_rules:
-  - id: prometheus-global
+  - id: prometheus
     plugins:
       prometheus:
         prefer_name: true
-routes:
-  - id: my-api
-    uri: /api/*
-    plugins:
-      prometheus: {}
+services:
+  - id: metrics-api-service
+    name: Metrics API service
     upstream:
       type: roundrobin
       nodes:
         - host: backend
           port: 8080
           weight: 1
+routes:
+  - id: my-api
+    name: Metrics API route
+    paths:
+      - /api/*
+    service_id: metrics-api-service
+    plugins:
+      prometheus: {}
 ```
+
+Validate and apply this partial configuration to the target gateway group:
+
+```bash
+a7 config validate -f prometheus.yaml
+a7 config sync -g <gateway-group-id> -f prometheus.yaml --delete=false
+```
+
+Disabling deletion preserves resources that are not included in this partial
+configuration.

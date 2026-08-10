@@ -68,15 +68,28 @@ Clients can override sampling per-request by setting `x-b3-sampled: 1`.
 
 ## Step-by-Step: Enable Zipkin Tracing
 
-### 1. Create a route with zipkin
+### 1. Create a service and route with zipkin
 
 Enable tracing for gateway group `default`:
 
 ```bash
+a7 service create --gateway-group default -f - <<'EOF'
+{
+  "id": "traced-api-service",
+  "name": "Traced API service",
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
+  }
+}
+EOF
+
 a7 route create --gateway-group default -f - <<'EOF'
 {
   "id": "traced-api",
-  "uri": "/api/*",
+  "name": "Traced API route",
+  "paths": ["/api/*"],
+  "service_id": "traced-api-service",
   "plugins": {
     "zipkin": {
       "endpoint": "http://zipkin:9411/api/v2/spans",
@@ -84,10 +97,6 @@ a7 route create --gateway-group default -f - <<'EOF'
       "service_name": "my-gateway",
       "span_version": 2
     }
-  },
-  "upstream": {
-    "type": "roundrobin",
-    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -166,22 +175,39 @@ EOF
 
 ## Config Sync Example
 
+Save the following as `zipkin.yaml`:
+
 ```yaml
 version: "1"
-gateway_group: default
-routes:
-  - id: traced-api
-    uri: /api/*
-    plugins:
-      zipkin:
-        endpoint: http://zipkin:9411/api/v2/spans
-        sample_ratio: 1
-        service_name: my-gateway
-        span_version: 2
+services:
+  - id: traced-api-service
+    name: Traced API service
     upstream:
       type: roundrobin
       nodes:
         - host: backend
           port: 8080
           weight: 1
+routes:
+  - id: traced-api
+    name: Traced API route
+    paths:
+      - /api/*
+    service_id: traced-api-service
+    plugins:
+      zipkin:
+        endpoint: http://zipkin:9411/api/v2/spans
+        sample_ratio: 1
+        service_name: my-gateway
+        span_version: 2
 ```
+
+Validate and apply this partial configuration to the target gateway group:
+
+```bash
+a7 config validate -f zipkin.yaml
+a7 config sync -g <gateway-group-id> -f zipkin.yaml --delete=false
+```
+
+Disabling deletion preserves resources that are not included in this partial
+configuration.
