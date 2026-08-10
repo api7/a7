@@ -137,10 +137,10 @@ Every PR validates `skills/` with `scripts/validate-skills.sh`. The script check
 5. `description` is non-empty
 6. skill names are unique
 
-The E2E suite also contains static skill checks under `test/e2e/skills`.
-Those checks keep this document aligned with the actual `skills/` inventory,
-reject known removed commands, and validate commands and long flags used in
-shell examples against the current a7 CLI help tree.
+The Go test package under `test/skills` also contains static skill checks. Those
+checks keep this document aligned with the actual `skills/` inventory, reject
+known removed commands, and validate commands and flags used in shell examples
+against the current a7 CLI command tree.
 
 Run locally:
 

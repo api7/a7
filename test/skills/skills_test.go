@@ -259,6 +259,13 @@ func testSkillExamplesUseSupportedA7CommandsAndFlags(t *testing.T, root, binary 
 	if err := validatePositionalArgs(commandTree, []string{"route", "list"}, remaining); err == nil {
 		t.Fatal("expected unsupported output format to fail")
 	}
+	_, _, remaining, err = resolveCommand(t, binary, "regression", []string{"debug", "trace", "<route-id>", "--bogus"}, rootCommands, rootFlags, valueFlags)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := validatePositionalArgs(commandTree, []string{"debug", "trace"}, remaining); err == nil {
+		t.Fatal("expected unsupported flag after an angle-bracket placeholder to fail")
+	}
 	for _, fields := range [][]string{
 		{"--bogus", "route", "list"},
 		{"--bogus=value", "route", "list"},
@@ -546,12 +553,12 @@ func positionalArgs(command *cobra.Command, fields []string) ([]string, error) {
 	var args []string
 	for index := 0; index < len(fields); index++ {
 		field := fields[index]
-		if strings.ContainsAny(field, "|<>") {
+		if isShellControlToken(field) {
 			break
 		}
 		if field == "--" {
 			for _, arg := range fields[index+1:] {
-				if strings.ContainsAny(arg, "|<>") {
+				if isShellControlToken(arg) {
 					break
 				}
 				args = append(args, arg)
@@ -601,6 +608,11 @@ func positionalArgs(command *cobra.Command, fields []string) ([]string, error) {
 		args = append(args, field)
 	}
 	return args, nil
+}
+
+func isShellControlToken(field string) bool {
+	isAngleBracketPlaceholder := len(field) > 2 && strings.HasPrefix(field, "<") && strings.HasSuffix(field, ">")
+	return strings.ContainsAny(field, "|<>") && !isAngleBracketPlaceholder
 }
 
 func validateKnownFlagValue(flag *pflag.Flag, value string) error {
