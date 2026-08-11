@@ -52,10 +52,13 @@ headers.
 
 ## Step-by-Step: Enable basic-auth on a Route
 
+Replace `<gateway-group-id>` with the ID returned by
+`a7 gateway-group list -o json`.
+
 ### 1. Create a consumer
 
 ```bash
-a7 consumer create -g default -f - <<'EOF'
+a7 consumer create -g <gateway-group-id> -f - <<'EOF'
 {
   "username": "alice"
 }
@@ -65,33 +68,32 @@ EOF
 ### 2. Add basic-auth credential
 
 ```bash
-curl -k "https://$(a7 context current -o json | jq -r .server):7443/apisix/admin/consumers/alice/credentials" \
-  -X PUT \
-  -H "X-API-KEY: $(a7 context current -o json | jq -r .token)" \
-  -d '{
-    "id": "cred-alice-basic-auth",
-    "plugins": {
-      "basic-auth": {
-        "username": "alice",
-        "password": "alice-password-123"
-      }
-    }
-  }'
+a7 credential create cred-alice-basic-auth -g <gateway-group-id> \
+  --consumer alice \
+  --plugins-json '{"basic-auth":{"username":"alice","password":"alice-password-123"}}'
 ```
 
-### 3. Create a route with basic-auth enabled
+### 3. Create a service and route with basic-auth enabled
 
 ```bash
-a7 route create -g default -f - <<'EOF'
+a7 service create -g <gateway-group-id> -f - <<'EOF'
 {
-  "id": "basic-protected",
-  "uri": "/api/*",
-  "plugins": {
-    "basic-auth": {}
-  },
+  "id": "basic-protected-service",
+  "name": "Basic protected service",
   "upstream": {
     "type": "roundrobin",
     "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
+  }
+}
+EOF
+
+a7 route create -g <gateway-group-id> -f - <<'EOF'
+{
+  "id": "basic-protected",
+  "paths": ["/api/*"],
+  "service_id": "basic-protected-service",
+  "plugins": {
+    "basic-auth": {}
   }
 }
 EOF
@@ -131,7 +133,7 @@ enable this in production to prevent credential leakage.
 ### Anonymous consumer with rate limiting
 
 ```bash
-a7 consumer create -g default -f - <<'EOF'
+a7 consumer create -g <gateway-group-id> -f - <<'EOF'
 {
   "username": "anonymous",
   "plugins": {
@@ -178,25 +180,37 @@ credentials → anonymous consumer with rate limits.
 
 ## Config Sync Example
 
+Save the following as `basic-auth.yaml`:
+
 ```yaml
 version: "1"
-gateway_groups:
-  - name: default
-    consumers:
-      - username: alice
-    routes:
-      - id: basic-protected
-        uri: /api/*
-        plugins:
-          basic-auth: {}
-        upstream:
-          type: roundrobin
-          nodes:
-            - host: backend
-              port: 8080
-              weight: 1
+services:
+  - id: basic-protected-service
+    name: Basic protected service
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: backend
+          port: 8080
+          weight: 1
+routes:
+  - id: basic-protected
+    name: Basic protected route
+    paths:
+      - /api/*
+    service_id: basic-protected-service
+    plugins:
+      basic-auth: {}
 ```
 
-> **Note**: Consumer credentials (username/password) must be created separately
-> via the Admin API; `a7 config sync` manages the consumer resource but
-> credentials are sub-resources.
+Validate and apply this partial configuration to the target gateway group:
+
+```bash
+a7 config validate -f basic-auth.yaml
+a7 config sync -g <gateway-group-id> -f basic-auth.yaml --delete=false
+```
+
+> **Note**: Create the consumer and credential separately with
+> `a7 consumer create` and `a7 credential create`. Config Sync manages only the
+> service and route in this example. Disabling deletion preserves other
+> resources that are not included in this partial configuration.

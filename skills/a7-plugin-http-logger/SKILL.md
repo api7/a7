@@ -88,25 +88,35 @@ When no custom `log_format` is set, each log entry contains:
 
 ## Step-by-Step: Ship Logs to an HTTP Endpoint
 
-### 1. Create a route with http-logger
+### 1. Create a service and route with http-logger
 
-Enable logging for gateway group `default`:
+Replace `<gateway-group-id>` with the ID returned by
+`a7 gateway-group list -o json`, then enable logging:
 
 ```bash
-a7 route create --gateway-group default -f - <<'EOF'
+a7 service create --gateway-group <gateway-group-id> -f - <<'EOF'
+{
+  "id": "logged-api-service",
+  "name": "Logged API service",
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
+  }
+}
+EOF
+
+a7 route create --gateway-group <gateway-group-id> -f - <<'EOF'
 {
   "id": "logged-api",
-  "uri": "/api/*",
+  "name": "Logged API route",
+  "paths": ["/api/*"],
+  "service_id": "logged-api-service",
   "plugins": {
     "http-logger": {
       "uri": "http://log-collector:8080/logs",
       "batch_max_size": 100,
       "inactive_timeout": 10
     }
-  },
-  "upstream": {
-    "type": "roundrobin",
-    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -114,12 +124,14 @@ EOF
 
 ### 2. Global logging for a gateway group
 
-Apply a Global Rule to log all traffic in the `prod` group:
+Apply a Global Rule to log all traffic in the target gateway group:
+
+Do not set an `id` in the create payload. The CLI derives the Global Rule ID
+from the plugin name.
 
 ```bash
-a7 global_rule create --gateway-group prod -f - <<'EOF'
+a7 global-rule create --gateway-group <gateway-group-id> -f - <<'EOF'
 {
-  "id": "http-logger-global",
   "plugins": {
     "http-logger": {
       "uri": "http://log-collector:8080/global-logs",
@@ -200,12 +212,25 @@ Log request bodies only when a query parameter is present:
 
 ## Config Sync Example
 
+Save the following as `http-logger.yaml`:
+
 ```yaml
 version: "1"
-gateway_group: default
+services:
+  - id: logged-api-service
+    name: Logged API service
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: backend
+          port: 8080
+          weight: 1
 routes:
   - id: logged-api
-    uri: /api/*
+    name: Logged API route
+    paths:
+      - /api/*
+    service_id: logged-api-service
     plugins:
       http-logger:
         uri: http://log-collector:8080/logs
@@ -216,10 +241,14 @@ routes:
           client_ip: "$remote_addr"
           method: "$request_method"
           status: "$status"
-    upstream:
-      type: roundrobin
-      nodes:
-        - host: backend
-          port: 8080
-          weight: 1
 ```
+
+Validate and apply this partial configuration to the target gateway group:
+
+```bash
+a7 config validate -f http-logger.yaml
+a7 config sync -g <gateway-group-id> -f http-logger.yaml --delete=false
+```
+
+Disabling deletion preserves resources that are not included in this partial
+configuration.

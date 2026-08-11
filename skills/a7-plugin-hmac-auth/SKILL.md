@@ -58,10 +58,13 @@ secrets over the wire.
 
 ## Step-by-Step: Enable hmac-auth on a Route
 
+Replace `<gateway-group-id>` with the ID returned by
+`a7 gateway-group list -o json`.
+
 ### 1. Create a consumer
 
 ```bash
-a7 consumer create -g default -f - <<'EOF'
+a7 consumer create -g <gateway-group-id> -f - <<'EOF'
 {
   "username": "alice"
 }
@@ -71,33 +74,32 @@ EOF
 ### 2. Add hmac-auth credential
 
 ```bash
-curl -k "https://$(a7 context current -o json | jq -r .server):7443/apisix/admin/consumers/alice/credentials" \
-  -X PUT \
-  -H "X-API-KEY: $(a7 context current -o json | jq -r .token)" \
-  -d '{
-    "id": "cred-alice-hmac",
-    "plugins": {
-      "hmac-auth": {
-        "key_id": "alice-key",
-        "secret_key": "alice-secret-key-value"
-      }
-    }
-  }'
+a7 credential create cred-alice-hmac -g <gateway-group-id> \
+  --consumer alice \
+  --plugins-json '{"hmac-auth":{"key_id":"alice-key","secret_key":"alice-secret-key-value"}}'
 ```
 
-### 3. Create a route with hmac-auth enabled
+### 3. Create a service and route with hmac-auth enabled
 
 ```bash
-a7 route create -g default -f - <<'EOF'
+a7 service create -g <gateway-group-id> -f - <<'EOF'
 {
-  "id": "hmac-protected",
-  "uri": "/api/*",
-  "plugins": {
-    "hmac-auth": {}
-  },
+  "id": "hmac-protected-service",
+  "name": "HMAC protected service",
   "upstream": {
     "type": "roundrobin",
     "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
+  }
+}
+EOF
+
+a7 route create -g <gateway-group-id> -f - <<'EOF'
+{
+  "id": "hmac-protected",
+  "paths": ["/api/*"],
+  "service_id": "hmac-protected-service",
+  "plugins": {
+    "hmac-auth": {}
   }
 }
 EOF
@@ -245,25 +247,37 @@ recomputes the body digest and rejects the request if it does not match.
 
 ## Config Sync Example
 
+Save the following as `hmac-auth.yaml`:
+
 ```yaml
 version: "1"
-gateway_groups:
-  - name: default
-    consumers:
-      - username: alice
-    routes:
-      - id: hmac-protected
-        uri: /api/*
-        plugins:
-          hmac-auth: {}
-        upstream:
-          type: roundrobin
-          nodes:
-            - host: backend
-              port: 8080
-              weight: 1
+services:
+  - id: hmac-protected-service
+    name: HMAC protected service
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: backend
+          port: 8080
+          weight: 1
+routes:
+  - id: hmac-protected
+    name: HMAC protected route
+    paths:
+      - /api/*
+    service_id: hmac-protected-service
+    plugins:
+      hmac-auth: {}
 ```
 
-> **Note**: Consumer credentials (key_id/secret_key) must be created separately
-> via the Admin API; `a7 config sync` manages the consumer resource but
-> credentials are sub-resources.
+Validate and apply this partial configuration to the target gateway group:
+
+```bash
+a7 config validate -f hmac-auth.yaml
+a7 config sync -g <gateway-group-id> -f hmac-auth.yaml --delete=false
+```
+
+> **Note**: Create the consumer and credential separately with
+> `a7 consumer create` and `a7 credential create`. Config Sync manages only the
+> service and route in this example. Disabling deletion preserves other
+> resources that are not included in this partial configuration.

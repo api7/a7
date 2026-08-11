@@ -59,10 +59,13 @@ headers. On failure it returns `401 Unauthorized`.
 
 ## Step-by-Step: Enable key-auth on a Route
 
+Replace `<gateway-group-id>` with the ID returned by
+`a7 gateway-group list -o json`.
+
 ### 1. Create a consumer
 
 ```bash
-a7 consumer create -g default -f - <<'EOF'
+a7 consumer create -g <gateway-group-id> -f - <<'EOF'
 {
   "username": "alice"
 }
@@ -71,35 +74,33 @@ EOF
 
 ### 2. Add key-auth credential to the consumer
 
-Use the Admin API (credentials are sub-resources of consumers):
-
 ```bash
-curl -k "https://$(a7 context current -o json | jq -r .server):7443/apisix/admin/consumers/alice/credentials" \
-  -X PUT \
-  -H "X-API-KEY: $(a7 context current -o json | jq -r .token)" \
-  -d '{
-    "id": "cred-alice-key-auth",
-    "plugins": {
-      "key-auth": {
-        "key": "alice-secret-key-001"
-      }
-    }
-  }'
+a7 credential create cred-alice-key-auth -g <gateway-group-id> \
+  --consumer alice \
+  --plugins-json '{"key-auth":{"key":"alice-secret-key-001"}}'
 ```
 
-### 3. Create a route with key-auth enabled
+### 3. Create a service and route with key-auth enabled
 
 ```bash
-a7 route create -g default -f - <<'EOF'
+a7 service create -g <gateway-group-id> -f - <<'EOF'
 {
-  "id": "protected-api",
-  "uri": "/api/*",
-  "plugins": {
-    "key-auth": {}
-  },
+  "id": "protected-api-service",
+  "name": "Protected API",
   "upstream": {
     "type": "roundrobin",
     "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
+  }
+}
+EOF
+
+a7 route create -g <gateway-group-id> -f - <<'EOF'
+{
+  "id": "protected-api",
+  "paths": ["/api/*"],
+  "service_id": "protected-api-service",
+  "plugins": {
+    "key-auth": {}
   }
 }
 EOF
@@ -164,7 +165,7 @@ Always enable this in production.
 
 ```bash
 # Create anonymous consumer with strict limits
-a7 consumer create -g default -f - <<'EOF'
+a7 consumer create -g <gateway-group-id> -f - <<'EOF'
 {
   "username": "anonymous",
   "plugins": {
@@ -212,25 +213,37 @@ On successful authentication, API7 EE adds:
 
 ## Config Sync Example
 
+Save the following as `key-auth.yaml`:
+
 ```yaml
 version: "1"
-gateway_groups:
-  - name: default
-    consumers:
-      - username: alice
-    routes:
-      - id: protected-api
-        uri: /api/*
-        plugins:
-          key-auth: {}
-        upstream:
-          type: roundrobin
-          nodes:
-            - host: backend
-              port: 8080
-              weight: 1
+services:
+  - id: protected-api-service
+    name: Protected API service
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: backend
+          port: 8080
+          weight: 1
+routes:
+  - id: protected-api
+    name: Protected API route
+    paths:
+      - /api/*
+    service_id: protected-api-service
+    plugins:
+      key-auth: {}
 ```
 
-> **Note**: Consumer credentials must be created separately via the Admin API;
-> `a7 config sync` manages the consumer resource but credentials are
-> sub-resources.
+Validate and apply this partial configuration to the target gateway group:
+
+```bash
+a7 config validate -f key-auth.yaml
+a7 config sync -g <gateway-group-id> -f key-auth.yaml --delete=false
+```
+
+> **Note**: Create the consumer and credential separately with
+> `a7 consumer create` and `a7 credential create`. Config Sync manages only the
+> service and route in this example. Disabling deletion preserves other
+> resources that are not included in this partial configuration.

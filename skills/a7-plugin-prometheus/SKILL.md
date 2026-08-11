@@ -67,23 +67,33 @@ prometheus port (usually `9091` or exposed via the data plane port `9080`).
 
 ## Step-by-Step: Enable Prometheus Metrics
 
-### 1. Enable on a route
+### 1. Enable on a service-backed route
 
-Enable metrics for gateway group `default`:
+Replace `<gateway-group-id>` with the ID returned by
+`a7 gateway-group list -o json`, then enable metrics:
 
 ```bash
-a7 route create --gateway-group default -f - <<'EOF'
+a7 service create --gateway-group <gateway-group-id> -f - <<'EOF'
+{
+  "id": "metrics-api-service",
+  "name": "Metrics API service",
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
+  }
+}
+EOF
+
+a7 route create --gateway-group <gateway-group-id> -f - <<'EOF'
 {
   "id": "my-api",
-  "uri": "/api/*",
+  "name": "Metrics API route",
+  "paths": ["/api/*"],
+  "service_id": "metrics-api-service",
   "plugins": {
     "prometheus": {
       "prefer_name": true
     }
-  },
-  "upstream": {
-    "type": "roundrobin",
-    "nodes": [{"host": "backend", "port": 8080, "weight": 1}]
   }
 }
 EOF
@@ -91,12 +101,14 @@ EOF
 
 ### 2. Enable globally (all routes in a group)
 
-Use a Global Rule to enable metrics for all routes in the `prod` group:
+Use a Global Rule to enable metrics for all routes in the target gateway group:
+
+Do not set an `id` in the create payload. The CLI derives the Global Rule ID
+from the plugin name.
 
 ```bash
-a7 global_rule create --gateway-group prod -f - <<'EOF'
+a7 global-rule create --gateway-group <gateway-group-id> -f - <<'EOF'
 {
-  "id": "prometheus-global",
   "plugins": {
     "prometheus": {}
   }
@@ -148,23 +160,40 @@ Default buckets for latency are: 1, 2, 5, 7, 10, 15, 20, 25, 30, 40, 50, 60,
 
 ## Config Sync Example
 
+Save the following as `prometheus.yaml`:
+
 ```yaml
 version: "1"
-gateway_group: default
 global_rules:
-  - id: prometheus-global
+  - id: prometheus
     plugins:
       prometheus:
         prefer_name: true
-routes:
-  - id: my-api
-    uri: /api/*
-    plugins:
-      prometheus: {}
+services:
+  - id: metrics-api-service
+    name: Metrics API service
     upstream:
       type: roundrobin
       nodes:
         - host: backend
           port: 8080
           weight: 1
+routes:
+  - id: my-api
+    name: Metrics API route
+    paths:
+      - /api/*
+    service_id: metrics-api-service
+    plugins:
+      prometheus: {}
 ```
+
+Validate and apply this partial configuration to the target gateway group:
+
+```bash
+a7 config validate -f prometheus.yaml
+a7 config sync -g <gateway-group-id> -f prometheus.yaml --delete=false
+```
+
+Disabling deletion preserves resources that are not included in this partial
+configuration.
