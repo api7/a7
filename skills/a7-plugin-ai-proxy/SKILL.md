@@ -47,6 +47,10 @@ Messages requests must use a URI ending in `/v1/messages`, and Bedrock Converse
 requests must use a URI ending in `/converse`. Without these suffixes, a request
 body can match another protocol, such as OpenAI Chat.
 
+OpenAI Responses requests with an `input` field must use a URI ending in
+`/v1/responses`. Otherwise, API7 Gateway detects the body as OpenAI Embeddings;
+use a URI ending in `/v1/embeddings` for embedding routes.
+
 For Bedrock streaming, keep the client-facing URI ending in `/converse` and set
 `stream: true` in the request body. API7 Gateway then selects the upstream
 `/model/{modelId}/converse-stream` endpoint.
