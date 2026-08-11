@@ -101,7 +101,7 @@ a7 consumer create -g "$PLATFORM_GROUP_ID" -f - <<'EOF'
 }
 EOF
 
-a7 credential create -g "$PLATFORM_GROUP_ID" --consumer startup-xyz --plugins-json '{"key-auth":{"key":"startup-xyz-key"}}'
+a7 credential create startup-xyz-key-auth -g "$PLATFORM_GROUP_ID" --consumer startup-xyz --plugins-json '{"key-auth":{"key":"startup-xyz-key"}}'
 
 a7 consumer create -g "$PLATFORM_GROUP_ID" -f - <<'EOF'
 {
@@ -120,7 +120,7 @@ a7 consumer create -g "$PLATFORM_GROUP_ID" -f - <<'EOF'
 }
 EOF
 
-a7 credential create -g "$PLATFORM_GROUP_ID" --consumer acme-corp --plugins-json '{"key-auth":{"key":"acme-secret-key"}}'
+a7 credential create acme-corp-key-auth -g "$PLATFORM_GROUP_ID" --consumer acme-corp --plugins-json '{"key-auth":{"key":"acme-secret-key"}}'
 ```
 
 ## Approach C: Tenant-Aware Service Route
