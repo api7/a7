@@ -265,6 +265,9 @@ func testSkillExamplesUseSupportedA7CommandsAndFlags(t *testing.T, root, binary 
 	if _, _, _, err := resolveCommand(t, binary, "regression", []string{"route", "--output", "wide", "list"}, rootCommands, rootFlags, valueFlags, commandTree); err == nil {
 		t.Fatal("expected unsupported interspersed output format to fail")
 	}
+	if _, _, _, err := resolveCommand(t, binary, "regression", []string{"route", "--gateway-group", "list"}, rootCommands, rootFlags, valueFlags, commandTree); err == nil {
+		t.Fatal("expected a missing interspersed flag value that consumes a subcommand to fail")
+	}
 	_, _, remaining, err = resolveCommand(t, binary, "regression", []string{"debug", "trace", "<route-id>", "--bogus"}, rootCommands, rootFlags, valueFlags, commandTree)
 	if err != nil {
 		t.Fatal(err)
@@ -542,6 +545,16 @@ func resolveCommand(t *testing.T, binary, file string, fields []string, commands
 		path = append(path, field)
 		help = commandHelp(t, binary, path)
 		index++
+	}
+	command, remainingPath, err := root.Find(path)
+	if err != nil {
+		return path, help, nil, err
+	}
+	if len(remainingPath) != 0 {
+		return path, help, nil, fmt.Errorf("failed to resolve command path %q", strings.Join(path, " "))
+	}
+	if !command.Runnable() {
+		return path, help, nil, fmt.Errorf("a7 %s requires a subcommand", strings.Join(path, " "))
 	}
 	return path, help, fields[index:], nil
 }
