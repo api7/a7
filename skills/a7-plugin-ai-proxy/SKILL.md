@@ -67,7 +67,7 @@ For Bedrock streaming, keep the client-facing URI ending in `/converse` and set
 | OpenRouter | `openrouter` | `https://openrouter.ai/api/v1/chat/completions` |
 | Gemini | `gemini` | `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions` |
 | Vertex AI | `vertex-ai` | `https://aiplatform.googleapis.com` |
-| Amazon Bedrock | `bedrock` | Region- and model-specific Bedrock Runtime endpoint; available from API7 Enterprise 3.9.11 |
+| Amazon Bedrock | `bedrock` | Region- and model-specific Bedrock Runtime endpoint; available from API7 Enterprise 3.9.12 |
 | OpenAI-Compatible | `openai-compatible` | Custom via `override.endpoint` |
 
 ## Plugin Configuration Reference
