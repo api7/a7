@@ -1,13 +1,16 @@
 #!/bin/sh
-# Install the API7 Gateway (API7 Enterprise Edition) AI agent skills into your
-# AI coding agent.
+# Install the API7 Enterprise Edition (a7) AI agent skill into your AI coding agent.
 #
-# Each skill is a SKILL.md knowledge pack that teaches an agent (Claude Code,
-# Cursor, Copilot, Windsurf, OpenCode, ...) how to configure a live API7
-# Enterprise Edition gateway through the a7 CLI. This script copies them into
-# your agent's skills directory.
+# The a7 skill is maintained in https://github.com/api7/agent-skills and teaches
+# an agent (Claude Code, Cursor, Copilot, Windsurf, OpenCode, ...) how to
+# configure a live API7 Enterprise Edition gateway through the a7 CLI. The recommended way to install it
+# is the skills CLI, which needs Node.js:
+#   npx skills add api7/agent-skills --skill a7
 #
-# Quick start (installs into ~/.claude/skills for Claude Code):
+# This script is the no-Node fallback: it downloads the api7/agent-skills
+# tarball and copies skills/a7 into your agent's skills directory as "a7".
+#
+# Quick start (installs into ~/.claude/skills/a7 for Claude Code):
 #   curl -fsSL https://raw.githubusercontent.com/api7/a7/master/install.sh | sh
 #
 # Install somewhere else (e.g. a project-local Cursor rules dir):
@@ -15,9 +18,10 @@
 #   SKILLS_DIR=~/.config/opencode/skills sh -c "$(curl -fsSL https://raw.githubusercontent.com/api7/a7/master/install.sh)"
 set -eu
 
-REPO="api7/a7"
-BRANCH="master"
-LABEL="API7 Gateway"
+REPO="api7/agent-skills"
+BRANCH="main"
+SKILL="a7"
+LABEL="API7 Enterprise Edition"
 
 # Target directory. Default: Claude Code personal skills. Override with
 # SKILLS_DIR=... or --dir <path>.
@@ -33,6 +37,7 @@ while [ $# -gt 0 ]; do
       ;;
     -h | --help)
       echo "Usage: install.sh [--dir <path>]   (default: \$HOME/.claude/skills)"
+      echo "Installs the ${SKILL} skill from ${REPO} into <path>/${SKILL}."
       exit 0
       ;;
     *) echo "install.sh: unknown option '$1'" >&2; exit 1 ;;
@@ -48,40 +53,30 @@ else
   exit 1
 fi
 
-echo "Installing ${LABEL} agent skills into ${SKILLS_DIR} ..."
+echo "Installing the ${LABEL} agent skill (${SKILL}) into ${SKILLS_DIR}/${SKILL} ..."
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT INT TERM
 
-# Download the repo tarball (no git required) and extract just the skills.
+# Download the api7/agent-skills tarball (no git required) and extract just
+# the a7 skill.
 fetch "https://codeload.github.com/${REPO}/tar.gz/refs/heads/${BRANCH}" >"$TMP/repo.tgz" ||
   { echo "install.sh: download failed." >&2; exit 1; }
 tar -xzf "$TMP/repo.tgz" -C "$TMP"
 
-SRC="$(find "$TMP" -maxdepth 2 -type d -name skills | head -n 1)"
-if [ -z "$SRC" ] || [ ! -d "$SRC" ]; then
-  echo "install.sh: could not find a skills/ directory in the download." >&2
+SRC="$(find "$TMP" -maxdepth 3 -type d -path "*/skills/${SKILL}" | head -n 1)"
+if [ -z "$SRC" ] || [ ! -f "$SRC/SKILL.md" ]; then
+  echo "install.sh: could not find skills/${SKILL}/SKILL.md in the download." >&2
   exit 1
 fi
 
 mkdir -p "$SKILLS_DIR"
-count=0
-for dir in "$SRC"/*/; do
-  [ -f "${dir}SKILL.md" ] || continue
-  name="$(basename "$dir")"
-  rm -rf "${SKILLS_DIR:?}/${name}"
-  cp -R "$dir" "${SKILLS_DIR}/${name}"
-  count=$((count + 1))
-done
+rm -rf "${SKILLS_DIR:?}/${SKILL}"
+cp -R "$SRC" "${SKILLS_DIR}/${SKILL}"
 
-if [ "$count" -eq 0 ]; then
-  echo "install.sh: no SKILL.md packs found to install." >&2
-  exit 1
-fi
-
-echo "Installed ${count} skills to ${SKILLS_DIR}"
+echo "Installed the ${SKILL} skill to ${SKILLS_DIR}/${SKILL}"
 echo
 echo "Next: ask your AI coding agent to configure ${LABEL} in plain language, e.g."
 echo "  \"add key-auth to my /orders route and rate-limit it to 100 requests per minute\""
 echo
-echo "Browse the catalog: https://docs.api7.ai/api7-gateway/ai-agent-skills"
+echo "Browse the skill: https://skills.sh/api7/agent-skills/${SKILL}"

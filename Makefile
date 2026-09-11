@@ -8,7 +8,7 @@ LDFLAGS := -s -w \
 	-X $(MODULE)/internal/version.Commit=$(COMMIT) \
 	-X $(MODULE)/internal/version.Date=$(DATE)
 
-.PHONY: build test test-verbose lint fmt vet check install clean docker-up docker-down validate-skills test-skills test-e2e test-e2e-full
+.PHONY: build test test-verbose lint fmt vet check install clean docker-up docker-down test-skills test-e2e test-e2e-full
 
 build:
 	go build -ldflags "$(LDFLAGS)" -o bin/$(BINARY) ./cmd/a7
@@ -29,13 +29,13 @@ fmt:
 vet:
 	go vet ./...
 
-check: fmt vet lint test validate-skills
+check: fmt vet lint test test-skills
 
-validate-skills:
-	bash ./scripts/validate-skills.sh
+# a7 skill directory in a checkout of api7/agent-skills (see docs/skills.md)
+SKILLS_DIR ?= $(CURDIR)/../agent-skills/skills/a7
 
 test-skills:
-	go test ./test/skills -count=1
+	SKILLS_DIR="$(SKILLS_DIR)" go test ./test/skills -count=1
 
 install: build
 	cp bin/$(BINARY) $(GOPATH)/bin/$(BINARY)

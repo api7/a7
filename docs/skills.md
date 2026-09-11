@@ -1,223 +1,58 @@
 # AI Agent Skills
 
-This document describes the skill system for the a7 CLI. Skills are structured knowledge files that enable AI coding agents to work effectively with API7 Enterprise Edition through the a7 CLI.
+The `a7` agent skill teaches AI coding agents (Claude Code, Cursor, Codex,
+GitHub Copilot, Windsurf, OpenCode and others) how to configure and operate
+API7 Enterprise Edition through the a7 CLI: gateway groups, routes, services,
+consumers, SSL, 29 plugins, 8 operational recipes, and developer/operator
+personas.
 
-## Overview
+## Where it lives
 
-Skills are `SKILL.md` files stored in the `skills/` directory. Each skill provides domain-specific instructions, command patterns, and decision guidance for AI agents. The supported installation examples cover Claude Code, Codex, Cursor, and GitHub Copilot.
+The skill content is maintained in the dedicated
+[api7/agent-skills](https://github.com/api7/agent-skills) repository and
+published at [skills.sh/api7/agent-skills/a7](https://skills.sh/api7/agent-skills/a7).
+It is no longer stored in this repository.
 
-Start with one task-specific skill. Add another only when the task clearly spans
-multiple workflows. Do not install the full collection by default: overlapping
-persona, recipe, and plugin guidance can make skill routing and updates harder
-to review.
+`skills/a7/SKILL.md` is a short router; detailed guidance lives under
+`skills/a7/references/` (`shared.md`, `plugins/`, `recipes/`, `personas/`) and
+is loaded by the agent only when a task needs it.
 
-## Install a Skill
-
-Preview the available skills, then copy one skill into the current project:
-
-```bash
-npx skills add api7/a7 --list
-npx skills add api7/a7 --skill a7-plugin-key-auth --agent codex --copy
-```
-
-Replace `codex` with `claude-code`, `cursor`, or `github-copilot`. Review the
-selected `SKILL.md` before use. Installation copies instructions only; it does
-not install `a7`, connect to API7 Gateway, or run gateway commands.
-
-Use a non-production gateway group and a narrowly scoped token for a first run.
-Ask the agent to inspect current resources, propose an exact change, wait for
-approval, apply only the approved change, verify the result, and retain a
-rollback path. Never put an access token in a prompt or committed file.
-
-## Directory Structure
-
-```
-skills/
-├── a7-shared/SKILL.md               # Core a7 conventions (shared skill)
-├── a7-plugin-ai-proxy/SKILL.md      # AI Gateway plugin skill
-├── a7-plugin-key-auth/SKILL.md      # key-auth plugin skill
-├── a7-recipe-canary/SKILL.md        # Canary release recipe
-├── a7-persona-operator/SKILL.md     # Operator persona
-└── ...
-```
-
-Each skill lives in its own directory: `skills/<skill-name>/SKILL.md`.
-
-## Skill Taxonomy
-
-Skills follow a naming convention with four types:
-
-| Prefix | Type | Description | Example |
-|--------|------|-------------|---------|
-| `a7-shared` | Shared | Core project conventions and patterns | `a7-shared` |
-| `a7-plugin-*` | Plugin | One API7 EE plugin — config, examples, gateway group scoping | `a7-plugin-ai-proxy` |
-| `a7-recipe-*` | Recipe | Multi-step operational task | `a7-recipe-canary` |
-| `a7-persona-*` | Persona | Role-specific workflow guidance | `a7-persona-operator` |
-
-### Naming Rules
-
-- **Format**: kebab-case
-- **Pattern**: `^[a-z0-9]+(-[a-z0-9]+)*$`
-- **Directory name must match the `name` field in frontmatter**
-
-## SKILL.md Format
-
-Every skill file has two parts: YAML frontmatter and Markdown body.
-
-### Frontmatter (Required)
-
-```yaml
----
-name: a7-plugin-ai-proxy
-description: >-
-  Skill for configuring AI Proxy plugin on API7 EE routes and services.
-  Covers LLM provider configuration, model selection, and endpoint routing.
-version: "1.0.0"
-author: API7.ai Contributors
-license: Apache-2.0
-metadata:
-  category: ai-gateway
-  apisix_version: ">=3.0.0"
-  plugin_name: ai-proxy
-  a7_commands:
-    - a7 route create
-    - a7 service create
-    - a7 plugin list
----
-```
-
-**Required fields:**
-
-| Field | Description |
-|-------|-------------|
-| `name` | Skill identifier. Must match directory name. Kebab-case. |
-| `description` | Multi-line description of what this skill covers. |
-
-**Recommended fields:**
-
-| Field | Description |
-|-------|-------------|
-| `version` | Semantic version of the skill content. |
-| `author` | Who authored the skill. |
-| `license` | License identifier (e.g., `Apache-2.0`). |
-| `metadata` | Structured metadata for categorization and filtering. |
-
-### Body (Markdown)
-
-The body content depends on the skill type:
-
-**Plugin skills** (EE specific):
-- Plugin description and AI Gateway context
-- Configuration schema reference
-- **Gateway Group Scoping**: How to enable per gateway group
-- Example: Enabling on a Route
-- Example: Enabling on a Service
-- Enterprise-only features and limitations
-
-**Recipe skills** (EE specific):
-- Enterprise workflow goal (e.g., "Create service-backed routes across gateway groups")
-- Prerequisites (e.g., "Existing gateway groups")
-- Step-by-step instructions with `a7` commands
-- Verification using `a7` list/get commands
-- Rollback procedure
-
-**Persona skills**:
-- Role description (Platform Engineer, API Architect, App Developer)
-- Common enterprise workflows
-- Decision trees for resource selection (e.g., "Route vs Service")
-- Which other skills to load for specific tasks
-
-## CI Validation
-
-Every PR validates `skills/` with `scripts/validate-skills.sh`. The script checks:
-
-1. Every `skills/*/SKILL.md` has frontmatter delimiters
-2. Required fields `name` and `description` are present
-3. `name` matches the directory name
-4. `name` follows kebab-case pattern
-5. `description` is non-empty
-6. skill names are unique
-
-The Go test package under `test/skills` also contains static skill checks. Those
-checks keep this document aligned with the actual `skills/` inventory, reject
-known removed commands, and validate commands and flags used in shell examples
-against the current a7 CLI command tree. It also validates the corrected Config
-Sync examples against the declarative configuration schema and safety rules.
-
-Run locally:
+## Install
 
 ```bash
-make validate-skills
-make test-skills
+# install the a7 skill into the current project
+npx skills add api7/agent-skills --skill a7
+
+# target a specific agent, e.g. claude-code, cursor, codex, github-copilot
+npx skills add api7/agent-skills --skill a7 -a claude-code
+
+# install globally (for every project) instead of into the current one
+npx skills add api7/agent-skills --skill a7 -g
 ```
 
-## Adding a New Skill
+Update later with `npx skills update`. Without Node, `install.sh` in this
+repository copies the skill into a directory of your choice
+(default `~/.claude/skills/a7`).
 
-1. Choose the skill type and name following the [taxonomy](#skill-taxonomy)
-2. Create the directory: `mkdir skills/<skill-name>`
-3. Create `skills/<skill-name>/SKILL.md` with frontmatter and body
-4. Run validation: `make validate-skills test-skills`
-5. Update this document if adding a new skill type or category
+Installing copies instructions only. It does not install `a7`, connect to an
+API7 EE control plane, or run any command; you still need `a7` on your `PATH`,
+a reachable control plane, a gateway group, and an access token.
 
-## Current Inventory
+## Operating discipline
 
-The repository currently contains 40 skills:
+Use a non-production gateway group and a narrowly scoped token for a first
+run. Ask the agent to inspect the current resources, propose an exact change,
+wait for approval, apply only the approved change, verify the result, and keep
+a rollback path. Never put an access token in a prompt or a committed file;
+configure it through `a7 context` or the `A7_TOKEN` environment variable
+instead.
 
-**Shared**
+## Contributing
 
-- `a7-shared`
-
-**Personas**
-
-- `a7-persona-developer`
-- `a7-persona-operator`
-
-**Plugin Skills**
-
-- `a7-plugin-ai-content-moderation`
-- `a7-plugin-ai-prompt-decorator`
-- `a7-plugin-ai-prompt-template`
-- `a7-plugin-ai-proxy`
-- `a7-plugin-basic-auth`
-- `a7-plugin-consumer-restriction`
-- `a7-plugin-cors`
-- `a7-plugin-datadog`
-- `a7-plugin-ext-plugin`
-- `a7-plugin-fault-injection`
-- `a7-plugin-grpc-transcode`
-- `a7-plugin-hmac-auth`
-- `a7-plugin-http-logger`
-- `a7-plugin-ip-restriction`
-- `a7-plugin-jwt-auth`
-- `a7-plugin-kafka-logger`
-- `a7-plugin-key-auth`
-- `a7-plugin-limit-count`
-- `a7-plugin-limit-req`
-- `a7-plugin-openid-connect`
-- `a7-plugin-prometheus`
-- `a7-plugin-proxy-rewrite`
-- `a7-plugin-redirect`
-- `a7-plugin-response-rewrite`
-- `a7-plugin-serverless`
-- `a7-plugin-skywalking`
-- `a7-plugin-traffic-split`
-- `a7-plugin-wolf-rbac`
-- `a7-plugin-zipkin`
-
-**Recipe Skills**
-
-- `a7-recipe-api-versioning`
-- `a7-recipe-blue-green`
-- `a7-recipe-canary`
-- `a7-recipe-circuit-breaker`
-- `a7-recipe-graphql-proxy`
-- `a7-recipe-health-check`
-- `a7-recipe-mtls`
-- `a7-recipe-multi-tenant`
-
-## Current Compatibility Notes
-
-- Route examples should use the current API7 EE model: create a service, then create routes with `service_id`.
-- Auth examples should use `consumer create` plus `credential create`; do not put auth plugin credentials directly in the consumer body.
-- Standalone upstream workflows are not the preferred `a7` path for current API7 EE. Use service inline upstreams and service-backed routes unless you are intentionally documenting APISIX-compatible behavior.
-- Gateway/httpbin traffic checks are optional for `a7`; the default CI focuses on CLI-driven control-plane resource CRUD and structured `get/list/dump` assertions.
+Changes to skill content (new plugins, recipes, wording fixes) go to
+[api7/agent-skills](https://github.com/api7/agent-skills). This repository
+only validates that the shell examples in the skill use commands and flags
+that exist in the current `a7` CLI: `make test-skills` runs `test/skills`
+against a checkout of api7/agent-skills next to this repository, or against
+the directory given by `SKILLS_DIR` (CI checks out the repository and sets
+`SKILLS_DIR` automatically).

@@ -11,6 +11,7 @@
 - **Gateway group scoping** — All runtime operations are scoped to a gateway group via `--gateway-group` flag or context config
 - **Rich output** — Human-friendly tables in TTY, machine-readable JSON/YAML in pipes (`--output json|yaml|table`)
 - **Shell completions** — Bash, Zsh, Fish, PowerShell (`a7 completion`)
+- **AI agent skill** — an [`a7` skill](https://skills.sh/api7/agent-skills/a7) that teaches AI coding agents to configure API7 EE through this CLI (`npx skills add api7/agent-skills --skill a7`)
 
 ## Installation
 
@@ -215,15 +216,49 @@ make test-verbose   # Tests with verbose output
 make lint           # Run linter
 make fmt            # Format code
 make vet            # Run go vet
-make check          # fmt + vet + lint + test
+make check          # fmt + vet + lint + test + test-skills
+make test-skills    # Validate api7/agent-skills examples against the CLI (SKILLS_DIR=...)
 ```
 
 See [AGENTS.md](AGENTS.md) for the full development guide, coding conventions, and how to add new commands.
+
+## AI Agent Skills
+
+The `a7` agent skill teaches AI coding agents (Claude Code, Cursor, Codex, GitHub Copilot, Windsurf, OpenCode and 70+ others) how to configure API7 Enterprise Edition through the a7 CLI. The skill content lives in the [api7/agent-skills](https://github.com/api7/agent-skills) repository and is published at [skills.sh/api7/agent-skills/a7](https://skills.sh/api7/agent-skills/a7).
+
+```bash
+# install into the current project (add -g for a global install, -a <agent> to pick an agent)
+npx skills add api7/agent-skills --skill a7
+```
+
+Without Node.js, `install.sh` in this repository copies the skill into `~/.claude/skills/a7` (or `--dir <path>`):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/api7/a7/master/install.sh | sh
+```
+
+One skill covers everything; the agent reads the detailed reference for a topic only when a task needs it:
+
+| Category | Count | Examples |
+|----------|-------|---------|
+| **Shared** | 1 | Core a7 conventions and patterns |
+| **Authentication** | 5 | key-auth, jwt-auth, basic-auth, hmac-auth, openid-connect |
+| **Security & Rate Limiting** | 4 | ip-restriction, cors, limit-count, limit-req |
+| **Traffic & Transformation** | 5 | proxy-rewrite, response-rewrite, traffic-split, redirect, grpc-transcode |
+| **AI Gateway** | 4 | ai-proxy, ai-prompt-template, ai-prompt-decorator, ai-content-moderation |
+| **Observability** | 6 | prometheus, skywalking, zipkin, http-logger, kafka-logger, datadog |
+| **Advanced Plugins** | 5 | serverless, ext-plugin, fault-injection, consumer-restriction, wolf-rbac |
+| **Operational Recipes** | 5 | blue-green, canary, circuit-breaker, health-check, mTLS |
+| **Advanced Recipes** | 3 | multi-tenant, api-versioning, graphql-proxy |
+| **Personas** | 2 | operator, developer |
+
+Skill content changes go to [api7/agent-skills](https://github.com/api7/agent-skills); this repository's CI (`make test-skills`) validates the shell examples against the current CLI. See [docs/skills.md](docs/skills.md) for details.
 
 ## Documentation
 
 - [Product Requirements](PRD.md)
 - [AI Agent Guide](AGENTS.md)
+- [AI Agent Skills](docs/skills.md)
 - [Architecture Decision Record](docs/adr/001-tech-stack.md)
 - [API7 EE API Specification](docs/api7ee-api-spec.md)
 - [Golden Example](docs/golden-example.md)
