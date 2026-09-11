@@ -2,6 +2,7 @@ package skills
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -50,6 +51,77 @@ func repoRoot(t *testing.T) string {
 		t.Fatal("failed to locate repository root")
 	}
 	return root
+}
+
+// skillsDirectory returns the a7 skill directory in a checkout of
+// api7/agent-skills: $SKILLS_DIR when set, otherwise ../agent-skills/skills/a7
+// next to this repository. The test is skipped when the default checkout is
+// missing; an explicitly configured SKILLS_DIR must exist.
+func skillsDirectory(t *testing.T, root string) string {
+	t.Helper()
+	dir := os.Getenv("SKILLS_DIR")
+	explicit := dir != ""
+	if !explicit {
+		dir = filepath.Join(root, "..", "agent-skills", "skills", "a7")
+	}
+	info, err := os.Stat(dir)
+	if err == nil && info.IsDir() {
+		return dir
+	}
+	if explicit {
+		t.Fatalf("SKILLS_DIR %q is not a directory: point it at the skills/a7 directory of an api7/agent-skills checkout", dir)
+	}
+	t.Skipf("skills directory %q not found: clone https://github.com/api7/agent-skills next to this repository or set SKILLS_DIR to its skills/a7 directory", dir)
+	return ""
+}
+
+// skillFiles returns SKILL.md plus every Markdown file below references/.
+func skillFiles(t *testing.T, dir string) []string {
+	t.Helper()
+	skill := filepath.Join(dir, "SKILL.md")
+	if _, err := os.Stat(skill); err != nil {
+		t.Fatalf("%s: %v", skill, err)
+	}
+	files := []string{skill}
+	err := filepath.WalkDir(filepath.Join(dir, "references"), func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".md") {
+			files = append(files, path)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return files
+}
+
+// referenceFile returns the path of one reference below references/, e.g.
+// referenceFile(dir, "plugins", "key-auth") for the former a7-plugin-key-auth skill.
+func referenceFile(dir, kind, name string) string {
+	return filepath.Join(dir, "references", kind, name+".md")
+}
+
+// legacySkillName maps a file in the skills directory back to the skill name
+// it had in the flat skills/<name>/SKILL.md layout (a7, a7-shared,
+// a7-plugin-<name>, a7-recipe-<name>, a7-persona-<name>).
+func legacySkillName(dir, file string) string {
+	rel, err := filepath.Rel(dir, file)
+	if err != nil {
+		return ""
+	}
+	parts := strings.Split(filepath.ToSlash(strings.TrimSuffix(rel, ".md")), "/")
+	switch {
+	case rel == "SKILL.md":
+		return "a7"
+	case len(parts) == 2 && parts[0] == "references" && parts[1] == "shared":
+		return "a7-shared"
+	case len(parts) == 3 && parts[0] == "references":
+		return "a7-" + strings.TrimSuffix(parts[1], "s") + "-" + parts[2]
+	}
+	return ""
 }
 
 func buildA7Binary(t *testing.T, root string) string {
@@ -146,61 +218,45 @@ func hasNonEmptyDescription(lines []string, startIdx int, value string) bool {
 	return false
 }
 
-func TestSkillFrontmatterMatchesDirectories(t *testing.T) {
+func TestSkillFrontmatterMatchesSkillName(t *testing.T) {
 	skillNamePattern := regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
-	root := repoRoot(t)
-	entries, err := os.ReadDir(filepath.Join(root, "skills"))
-	if err != nil {
-		t.Fatal(err)
+	skillsDir := skillsDirectory(t, repoRoot(t))
+	file := filepath.Join(skillsDir, "SKILL.md")
+	fields := frontmatter(t, file).Fields
+	if fields["name"] != "a7" {
+		t.Fatalf("%s: frontmatter name %q must be a7", file, fields["name"])
 	}
-	if len(entries) == 0 {
-		t.Fatal("expected at least one skill")
+	if !skillNamePattern.MatchString(fields["name"]) {
+		t.Fatalf("%s: skill name must be kebab-case", file)
 	}
-	seen := map[string]bool{}
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		file := filepath.Join(root, "skills", name, "SKILL.md")
-		metadata := frontmatter(t, file)
-		fields := metadata.Fields
-		if fields["name"] != name {
-			t.Fatalf("%s: frontmatter name %q must match directory name", file, fields["name"])
-		}
-		if !skillNamePattern.MatchString(fields["name"]) {
-			t.Fatalf("%s: skill name must be kebab-case", file)
-		}
-		if !metadata.HasDescriptionText {
+	files := skillFiles(t, skillsDir)
+	if len(files) < 2 {
+		t.Fatal("expected at least one reference file")
+	}
+	for _, file := range files {
+		if !frontmatter(t, file).HasDescriptionText {
 			t.Fatalf("%s: description is required", file)
 		}
-		if seen[fields["name"]] {
-			t.Fatalf("duplicate skill name %q", fields["name"])
-		}
-		seen[fields["name"]] = true
 	}
 }
 
 func TestSkillCommands(t *testing.T) {
 	root := repoRoot(t)
+	skillsDir := skillsDirectory(t, root)
 	binary := buildA7Binary(t, root)
 	commandTree := newA7CommandTree()
 
 	t.Run("DeclaredA7CommandsExist", func(t *testing.T) {
-		testSkillDeclaredA7CommandsExist(t, root, binary)
+		testSkillDeclaredA7CommandsExist(t, root, skillsDir, binary)
 	})
 	t.Run("ExamplesUseSupportedA7CommandsAndFlags", func(t *testing.T) {
-		testSkillExamplesUseSupportedA7CommandsAndFlags(t, root, binary, commandTree)
+		testSkillExamplesUseSupportedA7CommandsAndFlags(t, skillsDir, binary, commandTree)
 	})
 }
 
-func testSkillDeclaredA7CommandsExist(t *testing.T, root, binary string) {
+func testSkillDeclaredA7CommandsExist(t *testing.T, root, skillsDir, binary string) {
 	t.Helper()
-	matches, err := filepath.Glob(filepath.Join(root, "skills", "*", "SKILL.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, file := range matches {
+	for _, file := range skillFiles(t, skillsDir) {
 		metadata := frontmatter(t, file)
 		for _, command := range metadata.A7Commands {
 			command = strings.TrimSpace(command)
@@ -221,17 +277,14 @@ func testSkillDeclaredA7CommandsExist(t *testing.T, root, binary string) {
 	}
 }
 
-func testSkillExamplesUseSupportedA7CommandsAndFlags(t *testing.T, root, binary string, commandTree *cobra.Command) {
+func testSkillExamplesUseSupportedA7CommandsAndFlags(t *testing.T, skillsDir, binary string, commandTree *cobra.Command) {
 	t.Helper()
 	shellFencePattern := regexp.MustCompile("(?s)```(?:bash|sh|shell)\\s*\\n(.*?)```")
 	yamlFencePattern := regexp.MustCompile("(?s)```(?:yaml|yml)\\s*\\n(.*?)```")
 	invocationPattern := regexp.MustCompile(`(?:^|[^A-Za-z0-9_-])(a7)(?:\s|$)`)
 	workflowExpressionPattern := regexp.MustCompile(`\$\{\{.*?\}\}`)
 	rootFlags, valueFlags := rootFlagSets(commandTree)
-	matches, err := filepath.Glob(filepath.Join(root, "skills", "*", "SKILL.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	matches := skillFiles(t, skillsDir)
 	if len(matches) == 0 {
 		t.Fatal("expected at least one skill file")
 	}
@@ -833,10 +886,13 @@ func joinedShellLines(block string) []string {
 }
 
 func TestPluginSkillsDeclarePluginName(t *testing.T) {
-	root := repoRoot(t)
-	matches, err := filepath.Glob(filepath.Join(root, "skills", "a7-plugin-*", "SKILL.md"))
+	skillsDir := skillsDirectory(t, repoRoot(t))
+	matches, err := filepath.Glob(referenceFile(skillsDir, "plugins", "*"))
 	if err != nil {
 		t.Fatal(err)
+	}
+	if len(matches) == 0 {
+		t.Fatal("expected at least one plugin reference")
 	}
 	for _, file := range matches {
 		metadata := frontmatter(t, file)
@@ -847,7 +903,8 @@ func TestPluginSkillsDeclarePluginName(t *testing.T) {
 }
 
 func TestSkillsDoNotReferenceRemovedA7Commands(t *testing.T) {
-	root := repoRoot(t)
+	skillsDir := skillsDirectory(t, repoRoot(t))
+	files := skillFiles(t, skillsDir)
 	disallowed := []string{
 		"a7 health",
 		"a7 portal",
@@ -861,11 +918,7 @@ func TestSkillsDoNotReferenceRemovedA7Commands(t *testing.T) {
 		"upstream_id:",
 	}
 	for _, pattern := range disallowed {
-		matches, err := filepath.Glob(filepath.Join(root, "skills", "*", "SKILL.md"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, file := range matches {
+		for _, file := range files {
 			data, err := os.ReadFile(file)
 			if err != nil {
 				t.Fatal(err)
@@ -878,25 +931,25 @@ func TestSkillsDoNotReferenceRemovedA7Commands(t *testing.T) {
 }
 
 func TestCorrectedSkillConfigSyncExamples(t *testing.T) {
-	root := repoRoot(t)
-	skills := []string{
-		"a7-plugin-basic-auth",
-		"a7-plugin-hmac-auth",
-		"a7-plugin-http-logger",
-		"a7-plugin-jwt-auth",
-		"a7-plugin-kafka-logger",
-		"a7-plugin-key-auth",
-		"a7-plugin-prometheus",
-		"a7-plugin-skywalking",
-		"a7-plugin-zipkin",
+	skillsDir := skillsDirectory(t, repoRoot(t))
+	plugins := []string{
+		"basic-auth",
+		"hmac-auth",
+		"http-logger",
+		"jwt-auth",
+		"kafka-logger",
+		"key-auth",
+		"prometheus",
+		"skywalking",
+		"zipkin",
 	}
 	allowedKeys := configFileYAMLKeys()
 	yamlFence := regexp.MustCompile("(?s)```(?:yaml|yml)\\s*\\n(.*?)```")
 	syncLine := regexp.MustCompile(`(?m)^a7 config sync .+$`)
 
-	for _, skill := range skills {
-		t.Run(skill, func(t *testing.T) {
-			file := filepath.Join(root, "skills", skill, "SKILL.md")
+	for _, plugin := range plugins {
+		t.Run(plugin, func(t *testing.T) {
+			file := referenceFile(skillsDir, "plugins", plugin)
 			data, err := os.ReadFile(file)
 			if err != nil {
 				t.Fatal(err)
@@ -1007,14 +1060,11 @@ func validateConfigSyncReferences(t *testing.T, file string, cfg api.ConfigFile)
 
 func TestSkillsDocumentationReferencesExistingSkills(t *testing.T) {
 	root := repoRoot(t)
-	entries, err := os.ReadDir(filepath.Join(root, "skills"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	skillsDir := skillsDirectory(t, root)
 	existing := map[string]bool{}
-	for _, entry := range entries {
-		if entry.IsDir() {
-			existing[entry.Name()] = true
+	for _, file := range skillFiles(t, skillsDir) {
+		if name := legacySkillName(skillsDir, file); name != "" {
+			existing[name] = true
 		}
 	}
 

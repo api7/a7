@@ -25,7 +25,7 @@ a7 is a Go CLI wrapping the API7 Enterprise Edition Admin API (control-plane + A
 | `docs/coding-standards.md` | Go style, naming conventions | Before writing code |
 | `docs/testing-strategy.md` | Test patterns and practices | Before writing tests |
 | `docs/documentation-maintenance.md` | Rules for keeping docs in sync | When updating docs |
-| `docs/skills.md` | AI agent skill taxonomy and SKILL.md format | When adding or editing `skills/` entries |
+| `docs/skills.md` | Where the a7 agent skill lives (api7/agent-skills), install, CI validation | When touching skill validation or install docs |
 | `docs/user-guide/` | Per-resource user-facing guides | When changing user-visible behavior |
 
 ### Project Structure
@@ -34,7 +34,8 @@ a7 is a Go CLI wrapping the API7 Enterprise Edition Admin API (control-plane + A
 a7/
 ├── .github/workflows/             # CI/CD
 │   ├── ci.yml                     # Unit test + lint
-│   └── e2e.yml                    # E2E tests with real API7 EE
+│   ├── e2e.yml                    # E2E tests with real API7 EE
+│   └── skills.yml                 # Validates api7/agent-skills examples against the CLI
 ├── cmd/a7/main.go                 # Entry point
 ├── pkg/cmd/                       # Command implementations
 │   ├── factory.go                # Factory DI container
@@ -87,11 +88,12 @@ a7/
 ├── docs/                          # Documentation
 ├── test/fixtures/                 # JSON fixtures for tests
 ├── test/e2e/                      # E2E tests
-├── skills/                        # AI agent skill files
-├── scripts/                       # CI/utility scripts
+├── test/skills/                   # Validates api7/agent-skills examples against the CLI
 ├── Makefile                       # Build, test, lint commands
 └── .goreleaser.yml                # Cross-platform release config
 ```
+
+The AI agent skill (`a7`) lives in the [api7/agent-skills](https://github.com/api7/agent-skills) repository; `make test-skills` validates its shell examples against this CLI (see `docs/skills.md`).
 
 ### Key Architecture Patterns
 1. **Factory Pattern**: Every command receives a Factory with IOStreams, HttpClient, Config. No global state.
@@ -133,7 +135,8 @@ make test-verbose     # Tests with verbose output
 make test-e2e         # E2E tests (requires API7 EE)
 make lint             # golangci-lint
 make fmt              # Format code
-make check            # fmt + vet + lint + test
+make check            # fmt + vet + lint + test + test-skills
+make test-skills      # Validate api7/agent-skills examples against the CLI (SKILLS_DIR=...)
 make clean            # Remove build artifacts
 ```
 

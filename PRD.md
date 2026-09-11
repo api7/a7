@@ -328,7 +328,7 @@ The following table tracks feature parity between a7 and [a6](https://github.com
 | `--verbose` HTTP logging | ✅ | 🔲 | Phase 3 |
 | Declarative config (dump/diff/sync/validate) | ✅ | ✅ | Phase 4 |
 | docs/ (29 files) | ✅ | ✅ | Phase 5 |
-| skills/ (40 SKILL.md) | ✅ | ✅ | Phase 6 |
+| AI agent skill (now maintained in api7/agent-skills as `a7`) | ✅ | ✅ | Phase 6 |
 | Debug (logs + trace) | ✅ | ✅ | Phase 7 |
 | Self-update | ✅ | ✅ | Phase 7 |
 | E2E tests | ✅ | ✅ | Phase 8 |

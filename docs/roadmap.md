@@ -15,7 +15,7 @@ This document tracks phase status for the a7 CLI (API7 Enterprise Edition) and r
 | 3 | CLI usability (`-f/--file`, `export`, `--force`, `--label`). `--dry-run` and `--verbose` are partial; see PRD Phase 3. | ✅ (partial flags noted in PRD) |
 | 4 | Declarative configuration (`a7 config dump|diff|sync|validate`) | ✅ |
 | 5 | Documentation (ADR, coding standards, golden example, testing strategy, skills, api spec, user guides) | ✅ |
-| 6 | AI agent skills (40 SKILL.md files, taxonomy in `docs/skills.md`) | ✅ |
+| 6 | AI agent skills (40 SKILL.md files, since moved to [api7/agent-skills](https://github.com/api7/agent-skills) as one `a7` skill; see `docs/skills.md`) | ✅ |
 | 7 | Debug & operations (`a7 debug logs`, `a7 debug trace`, `a7 update`) | ✅ |
 | 8 | E2E tests against a real API7 EE Docker stack (per-resource CRUD, config sync/diff/dump/validate, debug, completion, version) | ✅ |
 
